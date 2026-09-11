@@ -1,0 +1,31 @@
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+aws-credentials*
+
+# Node / frontend
+node_modules/
+.next/
+out/
+frontend/.env.local
+npm-debug.log*
+
+# Python / backend
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# Docker
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
