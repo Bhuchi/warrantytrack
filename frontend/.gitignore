@@ -1,0 +1,9 @@
+# Frontend-local ignores. Env files and node_modules are covered by the root .gitignore.
+
+/.next/
+/out/
+/build/
+/coverage
+*.tsbuildinfo
+next-env.d.ts
+.vercel

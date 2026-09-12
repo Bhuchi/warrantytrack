@@ -29,3 +29,10 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# Claude Code / local AI tooling
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+.mcp.json

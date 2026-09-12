@@ -37,6 +37,9 @@ frontend/src/
 
 ## Mapping to Figma / Jira
 
+**Design file:** [WarrantyTrack on Figma](https://www.figma.com/design/Rf4eIrfmvy9QUwTp5hlKvL/WarrantyTrack?node-id=3312-2)
+— the `WarrantyTrack Desktop 1440x1024` page holds the D-numbered frames below.
+
 Each screen maps to a Figma frame ID (D01–D09, N03) and a Jira task. Keep that
 ID in the folder or component name so design ↔ code ↔ ticket stay traceable:
 
