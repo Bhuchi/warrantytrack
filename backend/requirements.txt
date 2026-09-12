@@ -1,11 +1,18 @@
-fastapi
-uvicorn[standard]
-sqlalchemy
-alembic
-psycopg2-binary
-pydantic
-pydantic-settings
-python-jose[cryptography]
-boto3
-pytest
-httpx
+# Pinned so every teammate and CI install the same versions.
+# To upgrade: change a pin, run the tests, open a chore/ PR.
+
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+
+sqlalchemy==2.0.52
+alembic==1.20.0
+psycopg2-binary==2.9.13
+
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-jose[cryptography]==3.5.0
+
+boto3==1.43.93
+
+pytest==9.1.1
+httpx==0.28.1

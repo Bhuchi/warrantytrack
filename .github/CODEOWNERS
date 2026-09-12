@@ -1,0 +1,31 @@
+# GitHub requests a review from the owner automatically when a PR touches
+# these paths. Replace the placeholders with real GitHub usernames.
+#
+# Format: <path>  @username
+
+# Anything not matched below
+*                             @Bhuchi
+
+# Feature slices — see the team table in README.md
+/frontend/src/features/auth/          @github-username-auth
+/frontend/src/features/workspace/     @github-username-auth
+/backend/app/api/routes/auth.py       @github-username-auth
+
+/frontend/src/features/assets/        @github-username-assets
+/backend/app/api/routes/assets.py     @github-username-assets
+
+/frontend/src/features/ocr/           @github-username-ocr
+/backend/app/services/ocr_service.py  @github-username-ocr
+
+/frontend/src/features/dashboard/     @github-username-dashboard
+/frontend/src/features/notifications/ @github-username-dashboard
+
+# Shared foundations — change with care, tell the team first
+/infra/                       @Bhuchi
+/.github/                     @Bhuchi
+/docker-compose.yml           @Bhuchi
+/backend/alembic/             @Bhuchi
+/backend/app/core/            @Bhuchi
+/backend/app/db/              @Bhuchi
+/frontend/src/lib/            @Bhuchi
+/frontend/src/types/          @Bhuchi
