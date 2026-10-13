@@ -21,6 +21,9 @@
   --brand-soft: #c4defd;
   /* Faintest brand tint, used for info panels on the auth screens (3337:80). */
   --brand-subtle: #eef2ff;
+  /* Alert red — notification badges and the unread dot (3396:7183). */
+  --danger: #dc2626;
+  --danger-foreground: #ffffff;
 }
 
 /* `@theme inline` is what turns a token into a Tailwind utility class:
@@ -37,12 +40,16 @@
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-soft: var(--brand-soft);
   --color-brand-subtle: var(--brand-subtle);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
 
   /* Card elevation used by the auth card (3337:31). */
   --shadow-card: 0 10px 30px 0 rgba(5, 15, 64, 0.08);
   /* Workspace cards (3344:20) — the stronger variant marks the selected card. */
   --shadow-panel: 0 8px 24px 0 rgba(5, 15, 64, 0.05);
   --shadow-panel-selected: 0 8px 24px 0 rgba(5, 15, 64, 0.12);
+  /* Navigation drawer, cast to the right of the panel (3396:7135). */
+  --shadow-drawer: 6px 0 24px 0 rgba(0, 0, 0, 0.18);
 
   /* --font-inter is provided by next/font in app/layout.tsx. */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
