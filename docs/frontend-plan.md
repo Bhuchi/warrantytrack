@@ -11,6 +11,30 @@ where it blocks a frontend ticket.
 | Window | 14 Oct 2026 → 17 Nov 2026 (final delivery) |
 | Design | Figma — [Desktop](https://www.figma.com/design/Rf4eIrfmvy9QUwTp5hlKvL/WarrantyTrack?node-id=3312-2) · [Mobile](https://www.figma.com/design/Rf4eIrfmvy9QUwTp5hlKvL/WarrantyTrack?node-id=3382-2) |
 
+## Before touching the Jira board
+
+This file is a **plan**, not a mirror of the board. The board moves on its own —
+other people add issues, rename them, change statuses, and the keys quoted here
+may be wrong by the time you read it. **Read the board first, then reconcile.**
+
+1. **List what actually exists.** `searchJiraIssuesUsingJql` with
+   `project = CLOUDAPPG5 ORDER BY created ASC`. Do not assume any key in this
+   file is still correct.
+2. **Match by summary text, not by key.** The keys quoted below
+   (CLOUDAPPG5-13, -14, -115) came from a screenshot on 14 Oct 2026. If an
+   issue with the same summary already exists under a different key, edit it —
+   do not create a duplicate.
+3. **Check the workflow before moving anything.** Status names vary per
+   project. Read the transitions available on a real issue before calling
+   `transitionJiraIssue`; do not guess that "Done" or "In Progress" exist.
+4. **Check the issue types.** "Epic" is not guaranteed to be the name on a
+   team-managed board. Read what types the project offers before creating.
+5. **Show the diff before writing.** Tell Chaiyapat what you intend to create,
+   edit and move, and wait. A bulk create against a board that already has
+   tickets is hard to undo.
+6. **Then** create what is genuinely missing, and update this file so it
+   matches the board again.
+
 ## Making the Jira Timeline actually render
 
 The Timeline view draws nothing for issues without dates. For the instructor to
