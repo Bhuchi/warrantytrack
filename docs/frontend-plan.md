@@ -160,10 +160,12 @@ edit → confirm / cancel:
 
 ```
 Add Asset
-├─ 1. Receipt / invoice          REQUIRED — no skip
+├─ 1. Receipt / invoice          REQUIRED — no skip, every workspace
 │     OCR the receipt, or enter manually. Manual is offered up front
 │     and automatically when OCR fails. This is the information that
 │     identifies the asset, so the step must produce data either way.
+│     Required in personal and organization workspaces alike — without
+│     it there is no way to tell what the asset even is.
 ├─ 2. Serial number              OPTIONAL — skippable
 │     OCR it, type it, or skip. Not every warranty needs one.
 └─ 3. Box / storage photo        OPTIONAL — skippable
@@ -181,7 +183,8 @@ Add Asset
      user edits and confirms.
   2. **Enter manually** — available up front, and offered automatically when
      OCR fails or returns nothing usable.
-- AC: no Skip control anywhere on this step; "Enter manually" is reachable
+- AC: no Skip control anywhere on this step, in **either** workspace type —
+  personal and organization behave the same here; "Enter manually" is reachable
   without first attempting OCR; camera capture works on mobile; every OCR
   field is editable before confirm; required fields are validated before
   Confirm enables; cancel discards the whole wizard without saving.
