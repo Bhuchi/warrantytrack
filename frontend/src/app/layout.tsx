@@ -2,11 +2,11 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
 
-import "@/styles/globals.css";
+import "./globals.css";
 
 // next/font downloads Inter at build time and self-hosts it, so there is no
 // request to Google at runtime. `variable` exposes it as a CSS custom property
-// that src/styles/globals.css picks up as --font-sans.
+// that app/globals.css picks up as --font-sans.
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     template: "%s · WarrantyTrack",
   },
   description:
-    "Register products, upload receipts, and track warranty expiration in one place.",
+    "Warranty management for individuals and organizations — DES424 Group 5",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -24,6 +24,9 @@ venv/
 # Docker
 *.log
 
+# Local archives
+*.tar.gz
+
 # OS / editor
 .DS_Store
 Thumbs.db

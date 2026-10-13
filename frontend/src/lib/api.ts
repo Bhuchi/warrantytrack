@@ -8,10 +8,15 @@
  * ```ts
  * const assets = await api.get<Asset[]>("/assets", { query: { status: "active" } });
  * const created = await api.post<Asset>("/assets", { name: "Laptop" });
+ * const health = await api.health();
  * ```
+ *
+ * Add a named method to the `api` object for each endpoint you build; the
+ * generic verbs underneath are there for one-off calls.
  */
 
 import { API_BASE_URL } from "@/lib/config";
+import type { HealthResponse } from "@/types";
 import type { ApiErrorBody, QueryParams } from "@/types/api";
 
 /** Thrown for any non-2xx response. */
@@ -123,11 +128,23 @@ async function request<T>(
     );
   }
 
-  if (response.status === 204 || response.headers.get("content-length") === "0") {
+  if (
+    response.status === 204 ||
+    response.headers.get("content-length") === "0"
+  ) {
     return undefined as T;
   }
 
   return (isJson(response) ? await response.json() : await response.text()) as T;
+}
+
+/**
+ * Thin escape hatch kept for compatibility with code written against the
+ * original skeleton. Prefer the verbs on `api` below.
+ */
+export function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const { method, body, ...rest } = init ?? {};
+  return request<T>(method ?? "GET", path, { ...rest, body });
 }
 
 export const api = {
@@ -145,4 +162,7 @@ export const api = {
 
   delete: <T = void>(path: string, options?: RequestOptions) =>
     request<T>("DELETE", path, options),
+
+  /** GET /health — proves the frontend can reach the API. */
+  health: () => request<HealthResponse>("GET", "/health"),
 };

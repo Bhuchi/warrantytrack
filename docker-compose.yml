@@ -1,4 +1,16 @@
-# Local development stack. Run: docker compose up --build
+# Local development stack.
+#
+#   docker compose up --build     start everything
+#   docker compose down           stop
+#   docker compose down -v        stop AND wipe the database
+#
+# Frontend  → http://localhost:3000
+# API docs  → http://localhost:8000/docs
+# Postgres  → localhost:5432  (user/password/db: warranty / warranty / warrantytrack)
+#
+# Source folders are mounted into the containers, so editing a file reloads
+# the running app. You only need --build when dependencies change.
+
 services:
   db:
     image: postgres:16
@@ -10,24 +22,53 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warranty -d warrantytrack"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   backend:
     build:
-      context: ./backend
-      dockerfile: ../infra/docker/backend.Dockerfile
-    env_file: ./backend/.env
+      context: .
+      dockerfile: infra/docker/backend.Dockerfile
+      target: dev
+    # Optional: the stack runs without it thanks to the defaults below.
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      # Inside Compose the database host is the service name `db`.
+      # This deliberately overrides whatever is in backend/.env, which is
+      # written for running the API directly on your machine.
+      DATABASE_URL: postgresql://warranty:warranty@db:5432/warrantytrack
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend:/app
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: ../infra/docker/frontend.Dockerfile
-    env_file: ./frontend/.env.local
+      context: .
+      dockerfile: infra/docker/frontend.Dockerfile
+      target: dev
+    env_file:
+      - path: ./frontend/.env.local
+        required: false
+    environment:
+      # The browser calls this, so it must be localhost — not `backend`.
+      NEXT_PUBLIC_API_URL: http://localhost:8000
     ports:
       - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      # Anonymous volumes keep the container's own copies of these,
+      # instead of them being hidden by the mount above.
+      - /app/node_modules
+      - /app/.next
     depends_on:
       - backend
 
