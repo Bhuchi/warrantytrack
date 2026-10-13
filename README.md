@@ -108,20 +108,23 @@ See [frontend/README.md](frontend/README.md) and [backend/README.md](backend/REA
 
 ## Team — who owns what
 
-Work is split into **vertical slices**: each person owns the frontend *and*
-backend of their feature. That way nobody is blocked waiting for someone
-else's layer, and we rarely touch the same files.
+Work is split by **layer**: two people own the whole frontend, three own the
+backend and AWS. The Figma file is one design system across all 14 screens, so
+keeping the UI with a single pair stops the components drifting apart.
 
-| Name | Student ID | Slice | Figma | Main folders |
-|---|---|---|---|---|
-| Chaitawat Boonkitticharoen | 6622780342 | Auth & workspaces | D02, D03 | `frontend/src/features/auth/`, `features/workspace/`, `backend/app/api/routes/auth.py` |
-| Sirawich Narakulsookpipat | 6622782298 | Assets | D05, D08 | `frontend/src/features/assets/`, `backend/app/api/routes/assets.py`, `services/asset_service.py` |
-| Poonnawit Wongprateepwilai | 6622772455 | Documents & OCR | D06, D07 | `frontend/src/features/ocr/`, `backend/app/api/routes/documents.py`, `services/ocr_service.py` |
-| Chaiyapat Anantarasuchart | 6622782223 | Dashboard & notifications | D04, D09 | `frontend/src/features/dashboard/`, `features/notifications/`, `services/notification_service.py` |
-| Bhuchi Kumprakob | 6622782215 | Infra, CI & deployment | D01 | `infra/`, `.github/`, `docker-compose.yml`, AWS setup |
+| Name | Student ID | GitHub | Owns |
+|---|---|---|---|
+| Chaiyapat Anantarasuchart | 6622782223 | [@erthcyp](https://github.com/erthcyp) | UX/UI design + frontend |
+| Poonnawit Wongprateepwilai | 6622772455 | [@Aphelios514](https://github.com/Aphelios514) | Frontend |
+| Chaitawat Boonkitticharoen | 6622780342 | [@fongctw](https://github.com/fongctw) | Backend + AWS |
+| Sirawich Narakulsookpipat | 6622782298 | [@SirErthh](https://github.com/SirErthh) | Backend + AWS |
+| Bhuchi Kumprakob | 6622782215 | [@Bhuchi](https://github.com/Bhuchi) | Backend, infra, CI, deployment |
 
-> Swap slices around if someone would rather work on something else — just
-> update this table and `.github/CODEOWNERS` in the same PR.
+Frontend tickets, owners and dates are in
+[docs/frontend-plan.md](docs/frontend-plan.md).
+
+> Changing who owns what means updating this table and `.github/CODEOWNERS` in
+> the same PR.
 
 **Shared foundations** (`backend/app/core/`, `app/db/`, `alembic/`,
 `frontend/src/lib/`, `src/types/`) are owned by everyone. Changing one affects
