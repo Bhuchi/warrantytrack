@@ -58,10 +58,12 @@ may be wrong by the time you read it. **Read the board first, then reconcile.**
 1. **List what actually exists.** `searchJiraIssuesUsingJql` with
    `project = CLOUDAPPG5 ORDER BY created ASC`. Do not assume any key in this
    file is still correct.
-2. **Match by summary text, not by key.** The keys quoted below
-   (CLOUDAPPG5-13, -14, -115) came from a screenshot on 14 Oct 2026. If an
-   issue with the same summary already exists under a different key, edit it —
-   do not create a duplicate.
+2. **Match by summary text, not by key.** The keys quoted below were
+   reconciled against the board on 14 Oct 2026, but they can drift again. If
+   an issue with the same summary already exists under a different key, edit
+   it — do not create a duplicate. (An earlier draft quoted CLOUDAPPG5-13, -14
+   and -115; those never existed, and early commits that cite them are not
+   linked to any ticket.)
 3. **Check the workflow before moving anything.** Status names vary per
    project. Read the transitions available on a real issue before calling
    `transitionJiraIssue`; do not guess that "Done" or "In Progress" exist.
@@ -78,9 +80,9 @@ may be wrong by the time you read it. **Read the board first, then reconcile.**
 The Timeline view draws nothing for issues without dates. For the instructor to
 see a real schedule:
 
-1. A scheduled issue needs a **Start date** and a **Due date** — both, not just
-   due. Issues left unassigned here have neither on purpose; their bars appear
-   once their owner schedules them.
+1. A scheduled issue needs a **Start date** (`customfield_10015`) and a **Due
+   date** (`duedate`) — both, not just due. Poonnawit's issues have neither on
+   purpose; their bars appear once he schedules them.
 2. Every issue must be **linked to an Epic**. Timeline draws one bar per epic
    and nests children inside it.
 3. **Leave the Epic dates empty.** Jira rolls an epic's bar up from its
@@ -90,38 +92,58 @@ see a real schedule:
 
 ## Epics
 
-Named after the Functional Requirements headings in the Kick-off Report, so the
-board maps onto the report one-to-one. Backend tickets belong in the same epics.
+The board's epics are **by project phase**, set up by Bhuchi. We use them as
+they are rather than adding a second, feature-based set — a ticket can only
+have one parent epic, and two parallel structures would split the Timeline.
+The `###` groupings below are for reading this file only; they are not epics.
 
-Create these with no dates — the bar comes from whatever children get scheduled.
+| Epic | Key | Frontend tickets in it |
+|---|---|---|
+| Development: Front-end web | CLOUDAPPG5-59 | Everything except the two below |
+| Testing | CLOUDAPPG5-61 | FE-15 |
+| Deliverables | CLOUDAPPG5-63 | FE-17 |
 
-| Epic | Covers |
-|---|---|
-| Design System & App Shell | Shared UI, navigation, responsive foundation |
-| User Management System | Auth screens, workspace selection, session wiring |
-| Product / Asset Management | Assets list, asset detail, dashboard |
-| Document and OCR Management | Add Asset wizard, OCR review |
-| Warranty Notification | Notifications screen, settings, toasts |
-| Release & QA | Integration, responsive QA, demo prep |
+Epics carry no dates — the bar comes from whatever children get scheduled.
 
-## Done already
+Board facts, read 14 Oct 2026: issue types are Epic, Story, Task, Bug,
+Subtask (tickets here are **Task**); statuses are `To Do`, `In Progress`,
+`Done` for every type.
+
+## Built, awaiting merge
 
 | Key | Summary | Status |
 |---|---|---|
-| CLOUDAPPG5-115 | Scaffold Next.js frontend + landing page (D01 / M01) | Done |
-| CLOUDAPPG5-13 | Login / Sign Up screen (D02 / M02) | Done |
-| CLOUDAPPG5-14 | Workspace Selection screen (D03 / M03) | Done |
+| CLOUDAPPG5-81 | Landing page (D01 / M01) + Next.js scaffold | In Progress |
+| CLOUDAPPG5-82 | Login / Sign Up screen (D02 / M02) | In Progress |
+| CLOUDAPPG5-83 | Workspace Selection screen (D03 / M03) | In Progress |
 
-> All three are UI-only — no screen talks to the API yet. Wiring is tracked
-> separately below so the board does not overstate progress.
+> Code is in PR #1. Move these to Done when it merges. All three are UI-only —
+> no screen talks to the API yet. Wiring is tracked separately below so the
+> board does not overstate progress.
 
-## Tickets to create
+## On hold — needs a team decision
+
+- **Is the serial number required?** Bhuchi's CLOUDAPPG5-116 (manual entry
+  form), -117 (review before save) and -118 (backend validation) make the
+  serial number a required field. This plan makes it optional (FE-10). Until
+  that is agreed, FE-10 and FE-11 are not on the board and -116 to -118 are
+  left as they are.
+- **Scope of Poonnawit's existing tickets.** CLOUDAPPG5-88 (Asset Detail)
+  includes an Edit button and Quick Actions; -89 (Notifications) includes
+  filter tabs and Mark all as read. Both need React state, which FE-08 and
+  FE-13 below deliberately leave out. Agree the narrower scope with the team
+  or split those parts into separate tickets.
+
+## Frontend tickets
+
+Keys in each heading are the board keys as of 14 Oct 2026. Tickets
+reused from the board keep their original (longer) summary there.
 
 Build order is mobile frame first, then `md:` overrides for desktop.
 
 ### Design System & App Shell
 
-**FE-01 · Build shared UI component library**
+**FE-01 · Build shared UI component library** · `CLOUDAPPG5-119`
 - Assignee: Chaiyapat (@erthcyp) · Start 14 Oct · Due 17 Oct
 - Extract `Button`, `StatusBadge`, `Card`, `Modal`, `Toast` into `components/`
   from the patterns already repeated across D01–D03.
@@ -129,14 +151,14 @@ Build order is mobile frame first, then `md:` overrides for desktop.
   Active / Expiring Soon / Expired / No warranty; no raw hex outside
   `app/globals.css`.
 
-**FE-02 · Build navigation panel and signed-in app shell (M10)**
+**FE-02 · Build navigation panel and signed-in app shell (M10)** · `CLOUDAPPG5-120`
 - Assignee: Chaiyapat (@erthcyp) · Start 17 Oct · Due 22 Oct
 - Figma `3392:2` and `3455:536`. Drawer nav for mobile, sidebar for desktop
   (`3382:1309`). Includes sign-out, which mobile currently has nowhere.
 - AC: route group for signed-in screens; nav highlights the current route;
   drawer traps focus and closes on Escape and on backdrop tap.
 
-**FE-03 · Loading, empty and error state components** — *start here*
+**FE-03 · Loading, empty and error state components** · `CLOUDAPPG5-121` — *start here*
 - Assignee: Poonnawit (@Aphelios514) · Dates: Poonnawit to set
 - Three small components, nothing else depends on them yet. The gentlest
   possible first ticket.
@@ -153,14 +175,14 @@ Build order is mobile frame first, then `md:` overrides for desktop.
 
 ### User Management System
 
-**FE-04 · Wire auth screens to Cognito**
+**FE-04 · Wire auth screens to Cognito** · `CLOUDAPPG5-122`
 - Assignee: Chaiyapat (@erthcyp) · Start 24 Oct · Due 31 Oct
 - Blocked by: backend Cognito setup + `/auth` endpoints.
 - AC: sign in, sign up and sign out work end to end; token supplied through
   `setAuthTokenProvider` in `lib/api`; unauthenticated users are redirected;
   form validation and server errors shown inline.
 
-**FE-05 · Wire workspace selection to the API**
+**FE-05 · Wire workspace selection to the API** · `CLOUDAPPG5-123`
 - Assignee: Chaiyapat (@erthcyp) · Start 28 Oct · Due 31 Oct
 - Blocked by: backend `/workspaces` endpoint.
 - AC: real workspaces and counts replace the Figma placeholders; the chosen
@@ -168,14 +190,14 @@ Build order is mobile frame first, then `md:` overrides for desktop.
 
 ### Product / Asset Management
 
-**FE-06 · Build Dashboard (D04 / M04)**
+**FE-06 · Build Dashboard (D04 / M04)** · `CLOUDAPPG5-84`
 - Assignee: Chaiyapat (@erthcyp) · Start 20 Oct · Due 26 Oct
 - Figma `3382:141`, `3418:385`. Summary counts, warranty status breakdown.
 - AC: shows active / expiring soon / expired / no-warranty totals; org view
   can group by department, location, category, vendor; mock data behind a
   single function so swapping to the API is one change.
 
-**FE-07 · Build Assets List with search and filters (D05 / M05)**
+**FE-07 · Build Assets List with search and filters (D05 / M05)** · `CLOUDAPPG5-85`
 - Assignee: Chaiyapat (@erthcyp) · Start 3 Nov · Due 9 Nov
 - Figma `3382:296`, `3418:524`, filters `3396:7503`.
 - Kept with Chaiyapat because search and filtering need client state, which is
@@ -183,7 +205,7 @@ Build order is mobile frame first, then `md:` overrides for desktop.
 - AC: filter by warranty status; search by name and serial; empty state;
   list virtualises or paginates past 50 rows.
 
-**FE-08 · Build Asset Detail (D08 / M08)**
+**FE-08 · Build Asset Detail (D08 / M08)** · `CLOUDAPPG5-88`
 - Assignee: Poonnawit (@Aphelios514) · Dates: Poonnawit to set
 - Figma `3382:676`, `3455:318`.
 - Read-only screen — no forms, no state. Lays out data it is handed.
@@ -220,7 +242,7 @@ Add Asset
 ```
 
 
-**FE-09 · Add Asset step 1 — receipt (D06 / M06)**
+**FE-09 · Add Asset step 1 — receipt (D06 / M06)** · `CLOUDAPPG5-86`
 - Assignee: Chaiyapat (@erthcyp) · Start 27 Oct · Due 2 Nov
 - Figma `3382:447`, `3436:1771`, stepper `3396:7449`.
 - **This step cannot be skipped.** It carries the information that identifies
@@ -235,18 +257,18 @@ Add Asset
   field is editable before confirm; required fields are validated before
   Confirm enables; cancel discards the whole wizard without saving.
 
-**FE-10 · Add Asset step 2 — serial number, optional**
+**FE-10 · Add Asset step 2 — serial number, optional** · *not on the board — on hold*
 - Assignee: Chaiyapat (@erthcyp) · Start 2 Nov · Due 5 Nov
 - OCR the serial, or type it, or skip entirely.
 - AC: a visible **Skip** control; skipping still saves the asset; a hint
   explains some warranties need a serial at claim time.
 
-**FE-11 · Add Asset step 3 — box / storage photo, optional**
+**FE-11 · Add Asset step 3 — box / storage photo, optional** · *not on the board — on hold*
 - Assignee: Chaiyapat (@erthcyp) · Start 5 Nov · Due 8 Nov
 - Photo of the box or where it is stored, plus a free-text note.
 - AC: both fields optional and skippable; photo and note appear on Asset Detail.
 
-**FE-12 · Build OCR Review screen (D07 / M07)**
+**FE-12 · Build OCR Review screen (D07 / M07)** · `CLOUDAPPG5-87`
 - Assignee: Chaiyapat (@erthcyp) · Start 3 Nov · Due 10 Nov
 - Figma `3382:566`, `3455:225`.
 - AC: extracted values shown beside the source image; low-confidence fields
@@ -254,7 +276,7 @@ Add Asset
 
 ### Warranty Notification
 
-**FE-13 · Build Notifications screen (D09 / M09)**
+**FE-13 · Build Notifications screen (D09 / M09)** · `CLOUDAPPG5-89`
 - Assignee: Poonnawit (@Aphelios514) · Dates: Poonnawit to set
 - Figma `3382:794`, `3455:421`.
 - A list of rows. Read/unread is a visual difference only at this stage —
@@ -272,7 +294,7 @@ Add Asset
   > and a `key`. Mock data only, in one array at the top. No React state —
   > if you think you need `useState`, ask first. Run lint, typecheck and build.
 
-**FE-14 · Build Settings — notifications (M11)**
+**FE-14 · Build Settings — notifications (M11)** · `CLOUDAPPG5-124`
 - Assignee: Poonnawit (@Aphelios514) · Dates: Poonnawit to set
 - Figma `3464:171`. The organization variants (`3468:171`, `3494:171`) are a
   separate, later ticket — build the personal one first.
@@ -289,19 +311,19 @@ Add Asset
 
 ### Release & QA
 
-**FE-15 · Responsive and accessibility QA pass**
+**FE-15 · Responsive and accessibility QA pass** · `CLOUDAPPG5-125`
 - Assignee: Chaiyapat (@erthcyp) · Start 11 Nov · Due 14 Nov
 - AC: every screen checked at 402 px and 1440 px on a real device; no
   horizontal scroll; tap targets ≥ 44 px; labels on all inputs; keyboard
   navigation works; colour contrast checked against the brand blue.
 
-**FE-16 · Frontend integration with deployed backend**
+**FE-16 · Frontend integration with deployed backend** · `CLOUDAPPG5-126`
 - Assignee: Chaiyapat (@erthcyp) · Start 12 Nov · Due 16 Nov
 - Blocked by: ECS deployment.
 - AC: `NEXT_PUBLIC_API_URL` points at the ALB; every screen runs on real data;
   no mock data left in the bundle.
 
-**FE-17 · Demo script and report screenshots**
+**FE-17 · Demo script and report screenshots** · `CLOUDAPPG5-127`
 - Assignee: Chaiyapat (@erthcyp) · Start 14 Nov · Due 17 Nov
 - AC: a scripted happy path for the demo; screenshots of each screen for the
   final report.
