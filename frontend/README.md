@@ -23,6 +23,14 @@ npm run dev                  # http://localhost:3000
 | `npm run lint` | ESLint (CI runs this) |
 | `npm run typecheck` | `tsc --noEmit` (CI runs this) |
 
+> **Do not delete and regenerate `package-lock.json`.** Tailwind v4 pulls in
+> platform-specific binaries (`lightningcss`, `@tailwindcss/oxide`). Running
+> `npm install` from scratch on macOS writes a lockfile containing only the
+> macOS binary, and CI then fails on Linux with
+> `Cannot find module '../lightningcss.linux-x64-gnu.node'`.
+> To change a dependency use `npm install <pkg>`, which updates the lockfile in
+> place and keeps the other platforms.
+
 ## Folder guide — where to put things
 
 ```
