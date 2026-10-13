@@ -13,17 +13,41 @@ where it blocks a frontend ticket.
 
 ## Who is scheduled here, and who is not
 
-Only **Chaiyapat's** tickets carry an assignee and dates. He owns those, so he
-can commit to them.
+Only **Chaiyapat's** tickets carry dates. He owns those, so he can commit to
+them.
 
-Every other ticket is deliberately left **unassigned with no dates**. Nobody has
-agreed to those yet, and guessing someone else's schedule on their behalf puts
-dates on the board that they never signed up for. Whoever picks a ticket up sets
-its own assignee, start date and due date.
+**Poonnawit's tickets are assigned but deliberately carry no dates.** Guessing
+someone else's schedule puts commitments on the board that they never agreed
+to. He sets his own start and due date when he picks each one up.
 
-The same applies in Jira: create the unassigned tickets with the summary,
-description and epic filled in, and leave assignee, start date and due date
-empty.
+Same in Jira: create Poonnawit's tickets with summary, description, epic and
+assignee filled in, and leave start date and due date empty.
+
+### How Poonnawit's four tickets were chosen
+
+Poonnawit is new to React, and will be working with AI help against this repo.
+So his tickets are the ones that are **self-contained and have no React state**:
+
+| | Why it suits a first ticket |
+|---|---|
+| FE-03 states | Three tiny components, nothing depends on them yet |
+| FE-13 Notifications | A list rendered with `.map()`, no interaction |
+| FE-14 Settings | Toggles, copied from an existing pattern in the repo |
+| FE-08 Asset Detail | Read-only, lays out data it is handed |
+
+Each carries a **prompt to start with** — paste it into an AI session opened on
+this repo. Writing the prompt in Thai is fine; the repo and this file are in
+English so the AI has the context either way.
+
+Anything needing `useState`, shared state across screens, or wiring to the API
+stays with Chaiyapat. That is why Assets List (search and filters) and the
+toasts are not on this list.
+
+> **Load warning.** This leaves Chaiyapat with 13 of the 17 tickets, several of
+> them overlapping in the first week of November. That is not realistic for one
+> person alongside UX work. Before it bites, cut scope — in order: the Documents
+> screen, the organization Settings variants (M12), and the desktop web push
+> (N03). None of them are on the demo path.
 
 ## Before touching the Jira board
 
@@ -112,10 +136,20 @@ Build order is mobile frame first, then `md:` overrides for desktop.
 - AC: route group for signed-in screens; nav highlights the current route;
   drawer traps focus and closes on Escape and on backdrop tap.
 
-**FE-03 · Loading, empty and error states**
-- Assignee: unassigned · Dates: not set — whoever picks this up schedules it
-- AC: a skeleton, an empty state and an error state usable by every list and
-  detail screen; `ApiError` messages surface to the user rather than the console.
+**FE-03 · Loading, empty and error state components** — *start here*
+- Assignee: Poonnawit (@Aphelios514) · Dates: Poonnawit to set
+- Three small components, nothing else depends on them yet. The gentlest
+  possible first ticket.
+- AC: `Skeleton`, `EmptyState` and `ErrorState` in `components/`; each works at
+  402px and 1440px; colours come from the tokens in `app/globals.css`, never
+  raw hex; `EmptyState` and `ErrorState` take a message and an optional action.
+- Prompt to start with:
+  > Read `frontend/README.md` and `docs/frontend-plan.md` first. Then create
+  > three components in `frontend/src/components/`: `Skeleton`, `EmptyState`
+  > and `ErrorState`. Copy the styling conventions from the existing
+  > `components/TextField.tsx` and `components/AppBar.tsx` — mobile-first
+  > Tailwind, `md:` for desktop, colour tokens only. Run `npm run lint`,
+  > `npm run typecheck` and `npm run build` before you finish.
 
 ### User Management System
 
@@ -135,23 +169,35 @@ Build order is mobile frame first, then `md:` overrides for desktop.
 ### Product / Asset Management
 
 **FE-06 · Build Dashboard (D04 / M04)**
-- Assignee: unassigned · Dates: not set — whoever picks this up schedules it
+- Assignee: Chaiyapat (@erthcyp) · Start 20 Oct · Due 26 Oct
 - Figma `3382:141`, `3418:385`. Summary counts, warranty status breakdown.
 - AC: shows active / expiring soon / expired / no-warranty totals; org view
   can group by department, location, category, vendor; mock data behind a
   single function so swapping to the API is one change.
 
 **FE-07 · Build Assets List with search and filters (D05 / M05)**
-- Assignee: unassigned · Dates: not set — whoever picks this up schedules it
+- Assignee: Chaiyapat (@erthcyp) · Start 3 Nov · Due 9 Nov
 - Figma `3382:296`, `3418:524`, filters `3396:7503`.
+- Kept with Chaiyapat because search and filtering need client state, which is
+  the part of React that is hardest to get right while still learning it.
 - AC: filter by warranty status; search by name and serial; empty state;
   list virtualises or paginates past 50 rows.
 
 **FE-08 · Build Asset Detail (D08 / M08)**
-- Assignee: unassigned · Dates: not set — whoever picks this up schedules it
+- Assignee: Poonnawit (@Aphelios514) · Dates: Poonnawit to set
 - Figma `3382:676`, `3455:318`.
+- Read-only screen — no forms, no state. Lays out data it is handed.
 - AC: shows warranty dates and computed status, attached documents, and the
-  box/storage photo and note from Add Asset step 3.
+  box/storage photo and note from Add Asset step 3; mock data sits in one
+  object at the top of the file so swapping to the API later is one change.
+- Prompt to start with:
+  > Read `frontend/README.md` and `docs/frontend-plan.md`. Build the Asset
+  > Detail screen at `frontend/src/app/(app)/assets/[id]/page.tsx` from Figma
+  > node `3382:676` on the Mobile page, then layer desktop on with `md:` from
+  > node `3455:318`. Use the Figma MCP tools to read the design. Follow
+  > `app/(app)/dashboard/page.tsx` for the page shape and
+  > `features/workspace/WorkspaceCard.tsx` for card styling. Mock data only —
+  > put it in one object at the top. Run lint, typecheck and build.
 
 ### Document and OCR Management
 
@@ -209,15 +255,37 @@ Add Asset
 ### Warranty Notification
 
 **FE-13 · Build Notifications screen (D09 / M09)**
-- Assignee: unassigned · Dates: not set — whoever picks this up schedules it
-- Figma `3382:794`, `3455:421`, plus in-page notification `3488:171` and
-  toast variants `3488:286`.
-- AC: list of expiry notifications; read/unread; toast on asset saved.
+- Assignee: Poonnawit (@Aphelios514) · Dates: Poonnawit to set
+- Figma `3382:794`, `3455:421`.
+- A list of rows. Read/unread is a visual difference only at this stage —
+  nothing has to be saved anywhere yet.
+- AC: list of expiry notifications; unread rows visually distinct; empty state
+  reuses `EmptyState` from FE-03; mock data in one array at the top of the file.
+- Out of scope, kept for later: the toast variants (`3488:171`, `3488:286`)
+  need shared state across screens, so they are not part of this ticket.
+- Prompt to start with:
+  > Read `frontend/README.md` and `docs/frontend-plan.md`. Build the
+  > Notifications screen at `frontend/src/app/(app)/notifications/page.tsx`
+  > from Figma node `3382:794` on the Mobile page, then layer desktop on with
+  > `md:` from `3455:421`. Use the Figma MCP tools to read the design. Follow
+  > `features/auth/BrandPanel.tsx` for how a list is rendered with `.map()`
+  > and a `key`. Mock data only, in one array at the top. No React state —
+  > if you think you need `useState`, ask first. Run lint, typecheck and build.
 
-**FE-14 · Build Settings — notifications (M11 / M12)**
-- Assignee: unassigned · Dates: not set — whoever picks this up schedules it
-- Figma `3464:171`, `3468:171`, `3494:171` (organization, scrolled).
-- AC: personal and organization variants; toggles persist.
+**FE-14 · Build Settings — notifications (M11)**
+- Assignee: Poonnawit (@Aphelios514) · Dates: Poonnawit to set
+- Figma `3464:171`. The organization variants (`3468:171`, `3494:171`) are a
+  separate, later ticket — build the personal one first.
+- AC: the toggle rows from the frame, laid out and styled; toggles flip
+  visually; nothing is persisted yet.
+- Prompt to start with:
+  > Read `frontend/README.md` and `docs/frontend-plan.md`. Build the Settings
+  > screen at `frontend/src/app/(app)/settings/page.tsx` from Figma node
+  > `3464:171` on the Mobile page, then layer desktop on with `md:`. Use the
+  > Figma MCP tools to read the design. For the toggles, copy the pattern in
+  > `features/auth/SignInForm.tsx` where a checkbox is styled with
+  > `appearance-none` and `peer-checked:`. Nothing needs to be saved yet.
+  > Run lint, typecheck and build.
 
 ### Release & QA
 
