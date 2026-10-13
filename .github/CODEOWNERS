@@ -1,31 +1,30 @@
 # GitHub requests a review from the owner automatically when a PR touches
-# these paths. Replace the placeholders with real GitHub usernames.
+# these paths. See the team table in README.md.
 #
 # Format: <path>  @username
 
 # Anything not matched below
 *                             @Bhuchi
 
-# Feature slices — see the team table in README.md
-/frontend/src/features/auth/          @github-username-auth
-/frontend/src/features/workspace/     @github-username-auth
-/backend/app/api/routes/auth.py       @github-username-auth
+# Frontend — owned by the UI pair
+/frontend/                    @erthcyp @Aphelios514
 
-/frontend/src/features/assets/        @github-username-assets
-/backend/app/api/routes/assets.py     @github-username-assets
+# Backend — owned by the API group
+/backend/                     @fongctw @SirErthh @Bhuchi
 
-/frontend/src/features/ocr/           @github-username-ocr
-/backend/app/services/ocr_service.py  @github-username-ocr
-
-/frontend/src/features/dashboard/     @github-username-dashboard
-/frontend/src/features/notifications/ @github-username-dashboard
-
-# Shared foundations — change with care, tell the team first
+# Infrastructure, CI and deployment
 /infra/                       @Bhuchi
 /.github/                     @Bhuchi
 /docker-compose.yml           @Bhuchi
+/scripts/                     @Bhuchi
+
+# Shared foundations — change with care, tell the team first.
+# The API contract and the database schema bind both layers, so a change here
+# needs a reviewer from each side.
+/docs/api.md                  @erthcyp @fongctw
+/docs/erd.md                  @SirErthh @Bhuchi
 /backend/alembic/             @Bhuchi
 /backend/app/core/            @Bhuchi
 /backend/app/db/              @Bhuchi
-/frontend/src/lib/            @Bhuchi
-/frontend/src/types/          @Bhuchi
+/frontend/src/lib/            @erthcyp @Bhuchi
+/frontend/src/types/          @erthcyp @fongctw
