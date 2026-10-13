@@ -11,6 +11,20 @@ where it blocks a frontend ticket.
 | Window | 14 Oct 2026 → 17 Nov 2026 (final delivery) |
 | Design | Figma — [Desktop](https://www.figma.com/design/Rf4eIrfmvy9QUwTp5hlKvL/WarrantyTrack?node-id=3312-2) · [Mobile](https://www.figma.com/design/Rf4eIrfmvy9QUwTp5hlKvL/WarrantyTrack?node-id=3382-2) |
 
+## Who is scheduled here, and who is not
+
+Only **Chaiyapat's** tickets carry an assignee and dates. He owns those, so he
+can commit to them.
+
+Every other ticket is deliberately left **unassigned with no dates**. Nobody has
+agreed to those yet, and guessing someone else's schedule on their behalf puts
+dates on the board that they never signed up for. Whoever picks a ticket up sets
+its own assignee, start date and due date.
+
+The same applies in Jira: create the unassigned tickets with the summary,
+description and epic filled in, and leave assignee, start date and due date
+empty.
+
 ## Before touching the Jira board
 
 This file is a **plan**, not a mirror of the board. The board moves on its own —
@@ -40,10 +54,14 @@ may be wrong by the time you read it. **Read the board first, then reconcile.**
 The Timeline view draws nothing for issues without dates. For the instructor to
 see a real schedule:
 
-1. Every issue needs a **Start date** and a **Due date** — both, not just due.
+1. A scheduled issue needs a **Start date** and a **Due date** — both, not just
+   due. Issues left unassigned here have neither on purpose; their bars appear
+   once their owner schedules them.
 2. Every issue must be **linked to an Epic**. Timeline draws one bar per epic
    and nests children inside it.
-3. Give each **Epic** its own start/due spanning its children.
+3. **Leave the Epic dates empty.** Jira rolls an epic's bar up from its
+   children, so the bar grows on its own as people schedule their tickets —
+   and nobody gets a date they did not agree to.
 4. On a Kanban board, enable the Timeline view in Board settings if it is hidden.
 
 ## Epics
@@ -51,14 +69,16 @@ see a real schedule:
 Named after the Functional Requirements headings in the Kick-off Report, so the
 board maps onto the report one-to-one. Backend tickets belong in the same epics.
 
-| Epic | Covers | Start | Due |
-|---|---|---|---|
-| Design System & App Shell | Shared UI, navigation, responsive foundation | 14 Oct | 24 Oct |
-| User Management System | Auth screens, workspace selection, session wiring | 14 Oct | 31 Oct |
-| Product / Asset Management | Assets list, asset detail, dashboard | 20 Oct | 7 Nov |
-| Document and OCR Management | Add Asset wizard, OCR review | 27 Oct | 10 Nov |
-| Warranty Notification | Notifications screen, settings, toasts | 3 Nov | 12 Nov |
-| Release & QA | Integration, responsive QA, demo prep | 10 Nov | 17 Nov |
+Create these with no dates — the bar comes from whatever children get scheduled.
+
+| Epic | Covers |
+|---|---|
+| Design System & App Shell | Shared UI, navigation, responsive foundation |
+| User Management System | Auth screens, workspace selection, session wiring |
+| Product / Asset Management | Assets list, asset detail, dashboard |
+| Document and OCR Management | Add Asset wizard, OCR review |
+| Warranty Notification | Notifications screen, settings, toasts |
+| Release & QA | Integration, responsive QA, demo prep |
 
 ## Done already
 
@@ -78,7 +98,7 @@ Build order is mobile frame first, then `md:` overrides for desktop.
 ### Design System & App Shell
 
 **FE-01 · Build shared UI component library**
-- Assignee: Earth · Start 14 Oct · Due 17 Oct
+- Assignee: Chaiyapat (@erthcyp) · Start 14 Oct · Due 17 Oct
 - Extract `Button`, `StatusBadge`, `Card`, `Modal`, `Toast` into `components/`
   from the patterns already repeated across D01–D03.
 - AC: each has a mobile and `md:` desktop variant; `StatusBadge` renders
@@ -86,28 +106,28 @@ Build order is mobile frame first, then `md:` overrides for desktop.
   `app/globals.css`.
 
 **FE-02 · Build navigation panel and signed-in app shell (M10)**
-- Assignee: Earth · Start 17 Oct · Due 22 Oct
+- Assignee: Chaiyapat (@erthcyp) · Start 17 Oct · Due 22 Oct
 - Figma `3392:2` and `3455:536`. Drawer nav for mobile, sidebar for desktop
   (`3382:1309`). Includes sign-out, which mobile currently has nowhere.
 - AC: route group for signed-in screens; nav highlights the current route;
   drawer traps focus and closes on Escape and on backdrop tap.
 
 **FE-03 · Loading, empty and error states**
-- Assignee: Bright · Start 20 Oct · Due 24 Oct
+- Assignee: unassigned · Dates: not set — whoever picks this up schedules it
 - AC: a skeleton, an empty state and an error state usable by every list and
   detail screen; `ApiError` messages surface to the user rather than the console.
 
 ### User Management System
 
 **FE-04 · Wire auth screens to Cognito**
-- Assignee: Earth · Start 24 Oct · Due 31 Oct
+- Assignee: Chaiyapat (@erthcyp) · Start 24 Oct · Due 31 Oct
 - Blocked by: backend Cognito setup + `/auth` endpoints.
 - AC: sign in, sign up and sign out work end to end; token supplied through
   `setAuthTokenProvider` in `lib/api`; unauthenticated users are redirected;
   form validation and server errors shown inline.
 
 **FE-05 · Wire workspace selection to the API**
-- Assignee: Earth · Start 28 Oct · Due 31 Oct
+- Assignee: Chaiyapat (@erthcyp) · Start 28 Oct · Due 31 Oct
 - Blocked by: backend `/workspaces` endpoint.
 - AC: real workspaces and counts replace the Figma placeholders; the chosen
   workspace persists and scopes every later request.
@@ -115,20 +135,20 @@ Build order is mobile frame first, then `md:` overrides for desktop.
 ### Product / Asset Management
 
 **FE-06 · Build Dashboard (D04 / M04)**
-- Assignee: Bright · Start 20 Oct · Due 27 Oct
+- Assignee: unassigned · Dates: not set — whoever picks this up schedules it
 - Figma `3382:141`, `3418:385`. Summary counts, warranty status breakdown.
 - AC: shows active / expiring soon / expired / no-warranty totals; org view
   can group by department, location, category, vendor; mock data behind a
   single function so swapping to the API is one change.
 
 **FE-07 · Build Assets List with search and filters (D05 / M05)**
-- Assignee: Bright · Start 27 Oct · Due 3 Nov
+- Assignee: unassigned · Dates: not set — whoever picks this up schedules it
 - Figma `3382:296`, `3418:524`, filters `3396:7503`.
 - AC: filter by warranty status; search by name and serial; empty state;
   list virtualises or paginates past 50 rows.
 
 **FE-08 · Build Asset Detail (D08 / M08)**
-- Assignee: Bright · Start 3 Nov · Due 7 Nov
+- Assignee: unassigned · Dates: not set — whoever picks this up schedules it
 - Figma `3382:676`, `3455:318`.
 - AC: shows warranty dates and computed status, attached documents, and the
   box/storage photo and note from Add Asset step 3.
@@ -153,7 +173,7 @@ Add Asset
 
 
 **FE-09 · Add Asset step 1 — receipt (D06 / M06)**
-- Assignee: Earth · Start 27 Oct · Due 2 Nov
+- Assignee: Chaiyapat (@erthcyp) · Start 27 Oct · Due 2 Nov
 - Figma `3382:447`, `3436:1771`, stepper `3396:7449`.
 - **This step cannot be skipped.** It carries the information that identifies
   the asset, so there is no Skip control — only two ways in:
@@ -167,18 +187,18 @@ Add Asset
   Confirm enables; cancel discards the whole wizard without saving.
 
 **FE-10 · Add Asset step 2 — serial number, optional**
-- Assignee: Earth · Start 2 Nov · Due 5 Nov
+- Assignee: Chaiyapat (@erthcyp) · Start 2 Nov · Due 5 Nov
 - OCR the serial, or type it, or skip entirely.
 - AC: a visible **Skip** control; skipping still saves the asset; a hint
   explains some warranties need a serial at claim time.
 
 **FE-11 · Add Asset step 3 — box / storage photo, optional**
-- Assignee: Earth · Start 5 Nov · Due 8 Nov
+- Assignee: Chaiyapat (@erthcyp) · Start 5 Nov · Due 8 Nov
 - Photo of the box or where it is stored, plus a free-text note.
 - AC: both fields optional and skippable; photo and note appear on Asset Detail.
 
 **FE-12 · Build OCR Review screen (D07 / M07)**
-- Assignee: Earth · Start 3 Nov · Due 10 Nov
+- Assignee: Chaiyapat (@erthcyp) · Start 3 Nov · Due 10 Nov
 - Figma `3382:566`, `3455:225`.
 - AC: extracted values shown beside the source image; low-confidence fields
   flagged; user can correct every field; confirm writes the verified values.
@@ -186,32 +206,32 @@ Add Asset
 ### Warranty Notification
 
 **FE-13 · Build Notifications screen (D09 / M09)**
-- Assignee: Bright · Start 7 Nov · Due 11 Nov
+- Assignee: unassigned · Dates: not set — whoever picks this up schedules it
 - Figma `3382:794`, `3455:421`, plus in-page notification `3488:171` and
   toast variants `3488:286`.
 - AC: list of expiry notifications; read/unread; toast on asset saved.
 
 **FE-14 · Build Settings — notifications (M11 / M12)**
-- Assignee: Bright · Start 10 Nov · Due 12 Nov
+- Assignee: unassigned · Dates: not set — whoever picks this up schedules it
 - Figma `3464:171`, `3468:171`, `3494:171` (organization, scrolled).
 - AC: personal and organization variants; toggles persist.
 
 ### Release & QA
 
 **FE-15 · Responsive and accessibility QA pass**
-- Assignee: Earth · Start 11 Nov · Due 14 Nov
+- Assignee: Chaiyapat (@erthcyp) · Start 11 Nov · Due 14 Nov
 - AC: every screen checked at 402 px and 1440 px on a real device; no
   horizontal scroll; tap targets ≥ 44 px; labels on all inputs; keyboard
   navigation works; colour contrast checked against the brand blue.
 
 **FE-16 · Frontend integration with deployed backend**
-- Assignee: Earth + Bright · Start 12 Nov · Due 16 Nov
+- Assignee: Chaiyapat (@erthcyp) · Start 12 Nov · Due 16 Nov
 - Blocked by: ECS deployment.
 - AC: `NEXT_PUBLIC_API_URL` points at the ALB; every screen runs on real data;
   no mock data left in the bundle.
 
 **FE-17 · Demo script and report screenshots**
-- Assignee: Earth · Start 14 Nov · Due 17 Nov
+- Assignee: Chaiyapat (@erthcyp) · Start 14 Nov · Due 17 Nov
 - AC: a scripted happy path for the demo; screenshots of each screen for the
   final report.
 
