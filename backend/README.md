@@ -1,20 +1,31 @@
 # Backend — WarrantyTrack API
 
-FastAPI (Python) + SQLAlchemy + PostgreSQL. Serves the REST API, business logic,
-OCR orchestration, and warranty monitoring.
+FastAPI (Python) + SQLAlchemy + PostgreSQL. Serves the REST API, business
+logic, OCR orchestration, and warranty monitoring.
 
-## Run locally
+## Run it
+
+Normally you don't run this on its own — `docker compose up` from the repo root
+starts it with the database and frontend, with auto-reload.
+
+```bash
+# Apply migrations (first run, and whenever someone adds a table)
+docker compose exec backend alembic upgrade head
+
+# Run the tests
+docker compose exec backend pytest
+```
+
+To run it standalone (needs Python 3.11+ and a PostgreSQL you can reach):
 
 ```bash
 cd backend
 python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env          # fill in values
-alembic upgrade head          # apply DB migrations
+alembic upgrade head
 uvicorn app.main:app --reload # http://localhost:8000  (docs at /docs)
 ```
-
-Run tests: `pytest`.
 
 ## Folder guide — where to put things
 
@@ -25,12 +36,12 @@ backend/app/
 │                   e.g. assets.py, warranties.py, auth.py, documents.py
 ├── core/         → Config, settings, security, dependencies (env vars, auth guards).
 ├── models/       → SQLAlchemy DB models (the actual tables).
-│                   e.g. asset.py, warranty.py, user.py, organization.py
+│                   e.g. asset.py, warranty.py, user.py, workspace.py
 ├── schemas/      → Pydantic request/response models (API input/output shapes).
 ├── services/     → Business logic. Routes stay thin; real work happens here.
 │                   e.g. ocr_service.py (Textract), warranty_service.py (status calc),
 │                        notification_service.py (SES), import_service.py (bulk CSV)
-├── db/           → DB session/engine setup.
+├── db/           → DB session/engine setup and the declarative Base.
 └── utils/        → Small shared helpers.
 
 backend/
@@ -45,15 +56,27 @@ testable and reusable.
 
 ## Adding a new endpoint (recipe)
 
-1. Add/'update the SQLAlchemy model in `models/`.
-2. Generate a migration: `alembic revision --autogenerate -m "add X"`.
-3. Define request/response shapes in `schemas/`.
-4. Write the logic in `services/`.
-5. Wire up the route in `api/routes/`.
-6. Add a test in `tests/`.
+1. Add/update the SQLAlchemy model in `models/`, and import it in `models/__init__.py`.
+2. Generate a migration: `alembic revision --autogenerate -m "add X"`, then **read it** — autogenerate is a first draft.
+3. Apply it: `alembic upgrade head`. Confirm with `alembic check`.
+4. Define request/response shapes in `schemas/`, matching [docs/api.md](../docs/api.md).
+5. Write the logic in `services/`.
+6. Wire up the route in `api/routes/`, and include the router in `main.py`.
+7. Add a test in `tests/`.
+
+## Multi-tenancy and permissions
+
+Every tenant-scoped table carries `workspace_id NOT NULL`. Every request runs
+inside one workspace, and the caller's role comes from the `memberships`
+table — **never** from the Cognito token. A record in a workspace the caller
+doesn't belong to returns **404, not 403**.
+
+Read [docs/architecture.md](../docs/architecture.md) before writing your first
+endpoint. It explains why.
 
 ## Conventions
 
 - snake_case for files, functions, and variables.
 - Never hardcode secrets — read from `core/config.py` (which reads `.env`).
-- Every new model change needs an Alembic migration. Don't edit the DB by hand.
+- Every model change needs an Alembic migration. CI runs `alembic check` and
+  will fail your PR otherwise. Don't edit the DB by hand.

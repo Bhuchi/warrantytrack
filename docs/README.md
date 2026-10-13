@@ -1,10 +1,13 @@
 # Docs
 
-Project documentation lives here.
+Project documentation. One source of truth for decisions — if it was decided
+in a meeting or on Line, write it down here.
 
-- `CONTRIBUTING.md` → Git workflow, branch naming, PR process. **Read this first.**
-- `architecture.md` → System architecture diagram + explanation _(add)_.
-- `erd.md` → Database schema / entity-relationship diagram _(add)_.
-- `api.md` → API endpoint reference _(add, or link to /docs Swagger)_.
+| File | What's in it |
+|---|---|
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Git workflow, branch naming, PR process. **Read this first.** |
+| [architecture.md](architecture.md) | How the system fits together and why. Read before your first PR. |
+| [api.md](api.md) | The frontend ↔ backend contract. Read before building a screen or an endpoint. |
+| [erd.md](erd.md) | Database schema, and how to add a table. |
 
-Keep design decisions here so the team shares one source of truth.
+Live API docs while the stack is running: <http://localhost:8000/docs>
