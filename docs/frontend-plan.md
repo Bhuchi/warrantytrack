@@ -111,13 +111,36 @@ Build order is mobile frame first, then `md:` overrides for desktop.
 
 ### Document and OCR Management
 
+**The Add Asset flow**, agreed 14 Oct. Three steps, each ending in
+edit → confirm / cancel:
+
+```
+Add Asset
+├─ 1. Receipt / invoice          REQUIRED — no skip
+│     OCR the receipt, or enter manually. Manual is offered up front
+│     and automatically when OCR fails. This is the information that
+│     identifies the asset, so the step must produce data either way.
+├─ 2. Serial number              OPTIONAL — skippable
+│     OCR it, type it, or skip. Not every warranty needs one.
+└─ 3. Box / storage photo        OPTIONAL — skippable
+      Photo of the box or where it is kept, plus a free-text note.
+      Shown later on Asset Detail, for warranties that need the box.
+```
+
+
 **FE-09 · Add Asset step 1 — receipt (D06 / M06)**
 - Assignee: Earth · Start 27 Oct · Due 2 Nov
 - Figma `3382:447`, `3436:1771`, stepper `3396:7449`.
-- Flow: upload or capture receipt → OCR extracts fields → user edits →
-  confirm / cancel. Manual entry available if OCR fails or is declined.
-- AC: camera capture works on mobile; every OCR field is editable before
-  confirm; required fields validated; cancel discards without saving.
+- **This step cannot be skipped.** It carries the information that identifies
+  the asset, so there is no Skip control — only two ways in:
+  1. **OCR** — upload or capture the receipt, Textract fills the fields, the
+     user edits and confirms.
+  2. **Enter manually** — available up front, and offered automatically when
+     OCR fails or returns nothing usable.
+- AC: no Skip control anywhere on this step; "Enter manually" is reachable
+  without first attempting OCR; camera capture works on mobile; every OCR
+  field is editable before confirm; required fields are validated before
+  Confirm enables; cancel discards the whole wizard without saving.
 
 **FE-10 · Add Asset step 2 — serial number, optional**
 - Assignee: Earth · Start 2 Nov · Due 5 Nov
