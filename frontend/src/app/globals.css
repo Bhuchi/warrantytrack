@@ -14,6 +14,15 @@
   --muted-light: #94a3b8;
   --border: #e2e8f0;
 
+  /* Warranty status badges, M05 Assets List (3382:382 / 3382:407 / 3382:432).
+     Each status has a strong colour for the text and a soft one behind it. */
+  --status-active: #16a34a;
+  --status-active-soft: #dcfce7;
+  --status-expiring: #b45309;
+  --status-expiring-soft: #fef3c7;
+  --status-expired: #dc2626;
+  --status-expired-soft: #fee2e2;
+
   /* Brand blue — Figma Header (3313:1716) and Footer (3313:1662). */
   --brand: #001cb7;
   --brand-foreground: #ffffff;
@@ -33,6 +42,12 @@
   --color-muted: var(--muted);
   --color-muted-light: var(--muted-light);
   --color-border: var(--border);
+  --color-status-active: var(--status-active);
+  --color-status-active-soft: var(--status-active-soft);
+  --color-status-expiring: var(--status-expiring);
+  --color-status-expiring-soft: var(--status-expiring-soft);
+  --color-status-expired: var(--status-expired);
+  --color-status-expired-soft: var(--status-expired-soft);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-soft: var(--brand-soft);
