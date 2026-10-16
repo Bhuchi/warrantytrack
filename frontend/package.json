@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"No tests yet — wire up a test runner when the first test lands\" && exit 0"
   },
   "dependencies": {
     "next": "16.3.5",

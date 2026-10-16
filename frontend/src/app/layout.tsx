@@ -1,20 +1,43 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import type { ReactNode } from "react";
+import { Inter } from "next/font/google";
+
 import "./globals.css";
 
+// next/font downloads Inter at build time and self-hosts it, so there is no
+// request to Google at runtime. `variable` exposes it as a CSS custom property
+// that app/globals.css picks up as --font-sans.
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+});
+
+/**
+ * Mobile is the primary target, so the page declares phone-specific chrome:
+ * themeColor paints the browser's address bar brand blue, and viewportFit
+ * "cover" lets the layout reach under the notch/home indicator — required
+ * before env(safe-area-inset-*) does anything.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#001cb7",
+};
+
 export const metadata: Metadata = {
-  title: "WarrantyTrack",
+  title: {
+    default: "WarrantyTrack",
+    template: "%s · WarrantyTrack",
+  },
   description:
     "Warranty management for individuals and organizations — DES424 Group 5",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-white text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100">
-        {children}
-      </body>
+    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }
