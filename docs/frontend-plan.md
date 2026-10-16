@@ -109,17 +109,17 @@ Board facts, read 14 Oct 2026: issue types are Epic, Story, Task, Bug,
 Subtask (tickets here are **Task**); statuses are `To Do`, `In Progress`,
 `Done` for every type.
 
-## Built, awaiting merge
+## Done already
 
 | Key | Summary | Status |
 |---|---|---|
-| CLOUDAPPG5-81 | Landing page (D01 / M01) + Next.js scaffold | In Progress |
-| CLOUDAPPG5-82 | Login / Sign Up screen (D02 / M02) | In Progress |
-| CLOUDAPPG5-83 | Workspace Selection screen (D03 / M03) | In Progress |
+| CLOUDAPPG5-81 | Landing page (D01 / M01) + Next.js scaffold | Done |
+| CLOUDAPPG5-82 | Login / Sign Up screen (D02 / M02) | Done |
+| CLOUDAPPG5-83 | Workspace Selection screen (D03 / M03) | Done |
 
-> Code is in PR #1. Move these to Done when it merges. All three are UI-only —
-> no screen talks to the API yet. Wiring is tracked separately below so the
-> board does not overstate progress.
+> Merged to `main` in PR #1 on 16 Oct 2026. All three are UI-only: no screen
+> talks to the API yet. Wiring is tracked separately below so the board does
+> not overstate progress.
 
 ## On hold — needs a team decision
 
