@@ -23,6 +23,14 @@ npm run dev                  # http://localhost:3000
 | `npm run lint` | ESLint (CI runs this) |
 | `npm run typecheck` | `tsc --noEmit` (CI runs this) |
 
+> **Do not delete and regenerate `package-lock.json`.** Tailwind v4 pulls in
+> platform-specific binaries (`lightningcss`, `@tailwindcss/oxide`). Running
+> `npm install` from scratch on macOS writes a lockfile containing only the
+> macOS binary, and CI then fails on Linux with
+> `Cannot find module '../lightningcss.linux-x64-gnu.node'`.
+> To change a dependency use `npm install <pkg>`, which updates the lockfile in
+> place and keeps the other platforms.
+
 ## Folder guide — where to put things
 
 ```
@@ -66,23 +74,38 @@ in sync with the backend's Pydantic schemas. Change both in the same PR.
 
 ## Mapping to Figma / Jira
 
-Each screen maps to a Figma frame ID (D01–D09) and a Jira task. Keep that ID in
-the folder or component name so design ↔ code ↔ ticket stay traceable:
+**Design file:** [WarrantyTrack on Figma](https://www.figma.com/design/Rf4eIrfmvy9QUwTp5hlKvL/WarrantyTrack)
+— two pages: [`Desktop 1440x1024`](https://www.figma.com/design/Rf4eIrfmvy9QUwTp5hlKvL/WarrantyTrack?node-id=3312-2)
+holds the D-numbered frames, [`Mobile 402x874`](https://www.figma.com/design/Rf4eIrfmvy9QUwTp5hlKvL/WarrantyTrack?node-id=3382-2)
+holds the M-numbered ones.
 
-| Screen | Figma | Suggested location |
-|---|---|---|
-| Landing Page | D01 | `app/page.tsx` |
-| Login / Sign Up | D02 | `features/auth/` |
-| Workspace Selection | D03 | `features/workspace/` |
-| Dashboard | D04 | `features/dashboard/` |
-| Assets List | D05 | `features/assets/` |
-| Add Asset (Upload) | D06 | `features/ocr/` |
-| OCR Review | D07 | `features/ocr/` |
-| Asset Detail | D08 | `features/assets/` |
-| Notifications | D09 | `features/notifications/` |
+**Build mobile first.** Mobile is the primary target, so pull the M frame,
+build it with unprefixed Tailwind classes, then layer the D frame on with
+`md:` overrides. Never write `max-md:`.
 
-> `app/page.tsx` is currently a placeholder that checks the backend connection.
-> Whoever builds D01 replaces it.
+Each screen maps to a Figma frame ID and a Jira task. Keep that ID in the
+folder or component name so design ↔ code ↔ ticket stay traceable:
+
+| Screen | Figma | Location | Status |
+|---|---|---|---|
+| Landing Page | D01 / M01 | `app/(marketing)/page.tsx` | done |
+| Login / Sign Up | D02 / M02 | `features/auth/` | done |
+| Workspace Selection | D03 / M03 | `features/workspace/` | done |
+| Dashboard | D04 / M04 | `features/dashboard/` | — |
+| Assets List | D05 / M05 | `features/assets/` | — |
+| Add Asset (Upload) | D06 / M06 | `features/ocr/` | — |
+| OCR Review | D07 / M07 | `features/ocr/` | — |
+| Asset Detail | D08 / M08 | `features/assets/` | — |
+| Notifications | D09 / M09 | `features/notifications/` | — |
+| Navigation Panel | M10 | `components/` | — |
+
+> Several screens have two frames on the Mobile page — they are **states of the
+> same screen** (e.g. M03 at `3382:71` has Organization selected, `3418:320`
+> has Personal). Check both before building.
+
+Marketing pages live in the `(marketing)` route group (header + footer chrome);
+auth pages live in `(auth)` (full-bleed split screen). Parenthesised folders
+group files without adding a URL segment.
 
 ## Conventions
 

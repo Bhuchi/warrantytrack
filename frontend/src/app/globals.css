@@ -1,3 +1,55 @@
 @import "tailwindcss";
 
-/* Global styles only. Component styles belong with their component. */
+/* Design tokens, sourced from the Figma file "WarrantyTrack Desktop 1440x1024".
+   Change a value here and it changes everywhere in the app.
+   Rule: never write a raw hex code in a component — add a token instead. */
+:root {
+  --background: #ffffff;
+  /* Tinted page background used by the signed-in screens (D03 node 3344:2). */
+  --canvas: #f5f7fc;
+  --surface: #ffffff;
+  --foreground: #0f172a;
+  --muted: #64748b;
+  /* Lighter grey for secondary labels and icons. */
+  --muted-light: #94a3b8;
+  --border: #e2e8f0;
+
+  /* Brand blue — Figma Header (3313:1716) and Footer (3313:1662). */
+  --brand: #001cb7;
+  --brand-foreground: #ffffff;
+  /* Pale brand tint, used behind the landing-page illustration (3313:1411). */
+  --brand-soft: #c4defd;
+  /* Faintest brand tint, used for info panels on the auth screens (3337:80). */
+  --brand-subtle: #eef2ff;
+}
+
+/* `@theme inline` is what turns a token into a Tailwind utility class:
+   --color-brand here is what makes `bg-brand` and `text-brand` work. */
+@theme inline {
+  --color-background: var(--background);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-light: var(--muted-light);
+  --color-border: var(--border);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-subtle: var(--brand-subtle);
+
+  /* Card elevation used by the auth card (3337:31). */
+  --shadow-card: 0 10px 30px 0 rgba(5, 15, 64, 0.08);
+  /* Workspace cards (3344:20) — the stronger variant marks the selected card. */
+  --shadow-panel: 0 8px 24px 0 rgba(5, 15, 64, 0.05);
+  --shadow-panel-selected: 0 8px 24px 0 rgba(5, 15, 64, 0.12);
+
+  /* --font-inter is provided by next/font in app/layout.tsx. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}

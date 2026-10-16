@@ -9,5 +9,6 @@ in a meeting or on Line, write it down here.
 | [architecture.md](architecture.md) | How the system fits together and why. Read before your first PR. |
 | [api.md](api.md) | The frontend ↔ backend contract. Read before building a screen or an endpoint. |
 | [erd.md](erd.md) | Database schema, and how to add a table. |
+| [frontend-plan.md](frontend-plan.md) | Frontend tickets, owners and dates through 17 Nov. Mirrors the Jira board. |
 
 Live API docs while the stack is running: <http://localhost:8000/docs>
