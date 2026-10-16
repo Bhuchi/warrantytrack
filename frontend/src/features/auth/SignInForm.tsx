@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import Button from "@/components/Button";
 import TextField from "@/components/TextField";
 
 /**
@@ -65,12 +66,7 @@ export default function SignInForm() {
         </Link>
       </div>
 
-      <button
-        type="submit"
-        className="h-14 w-full rounded-[10px] bg-brand text-[17px] font-bold tracking-[-0.34px] text-brand-foreground md:h-[54px] md:rounded-lg"
-      >
-        Sign In
-      </button>
+      <Button type="submit">Sign In</Button>
     </form>
   );
 }
