@@ -22,6 +22,10 @@
   --status-expiring-soft: #fef3c7;
   --status-expired: #dc2626;
   --status-expired-soft: #fee2e2;
+  /* No warranty: purple from the Dashboard status bar (3382:250). Figma has no
+     badge for it, so the soft tint follows the same pattern as the three above. */
+  --status-none: #7c3aed;
+  --status-none-soft: #ede9fe;
 
   /* Brand blue — Figma Header (3313:1716) and Footer (3313:1662). */
   --brand: #001cb7;
@@ -48,6 +52,8 @@
   --color-status-expiring-soft: var(--status-expiring-soft);
   --color-status-expired: var(--status-expired);
   --color-status-expired-soft: var(--status-expired-soft);
+  --color-status-none: var(--status-none);
+  --color-status-none-soft: var(--status-none-soft);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-soft: var(--brand-soft);
