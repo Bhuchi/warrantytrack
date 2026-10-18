@@ -43,11 +43,17 @@ Anything needing `useState`, shared state across screens, or wiring to the API
 stays with Chaiyapat. That is why Assets List (search and filters) and the
 toasts are not on this list.
 
-> **Load warning.** This leaves Chaiyapat with 13 of the 17 tickets, several of
-> them overlapping in the first week of November. That is not realistic for one
+> **Load warning.** This leaves Chaiyapat with 13 of the 17 frontend tickets,
+> plus two testing tickets the team assigned on 18 Oct (CLOUDAPPG5-101 and
+> -103, under Release & QA below). Several overlap in the first and second
+> weeks of November. That is not realistic for one
 > person alongside UX work. Before it bites, cut scope — in order: the Documents
 > screen, the organization Settings variants (M12), and the desktop web push
 > (N03). None of them are on the demo path.
+>
+> Poonnawit was also given backend and testing work on 18 Oct (CLOUDAPPG5-72
+> ERD, -100 Pytest, -102 OCR accuracy), so his four frontend tickets below
+> may land later. Do not plan the Dashboard around FE-03 being ready.
 
 ## Before touching the Jira board
 
@@ -255,7 +261,7 @@ Add Asset
   field is editable before confirm; required fields are validated before
   Confirm enables; cancel discards the whole wizard without saving.
 
-**FE-10 · Add Asset step 2: serial number, required** · *not on the board yet*
+**FE-10 · Add Asset step 2: serial number, required** · `CLOUDAPPG5-128`
 - Assignee: Chaiyapat (@erthcyp) · Start 2 Nov · Due 5 Nov
 - Figma: `3569:454` mobile, `3571:18` desktop.
 - Scan the serial with the camera, or type it. There is no way to skip.
@@ -263,7 +269,7 @@ Add Asset
   low-confidence OCR result is flagged and editable; a hint says where to find
   the serial. Matches the backend validation in CLOUDAPPG5-118.
 
-**FE-11 · Add Asset step 3: box / storage photo, optional** · *not on the board yet*
+**FE-11 · Add Asset step 3: box / storage photo, optional** · `CLOUDAPPG5-129`
 - Assignee: Chaiyapat (@erthcyp) · Start 5 Nov · Due 8 Nov
 - Figma: `3569:568` mobile, `3571:331` desktop.
 - Photo of the box or where it is stored, plus a free-text note.
@@ -331,6 +337,16 @@ Add Asset
 - Assignee: Chaiyapat (@erthcyp) · Start 14 Nov · Due 17 Nov
 - AC: a scripted happy path for the demo; screenshots of each screen for the
   final report.
+
+**Testing tickets assigned to Chaiyapat by the team (18 Oct)**
+
+These were on the board already; the dates were chosen to follow the backend
+they depend on.
+
+- `CLOUDAPPG5-101` Build Postman API test collection for all endpoints ·
+  Start 9 Nov · Due 12 Nov. Needs `/auth` and `/assets` to exist (3 and 4 Nov).
+- `CLOUDAPPG5-103` End-to-end testing of the asset lifecycle · Start 13 Nov ·
+  Due 16 Nov. Needs the ECS deployment reachable over the ALB (12 Nov).
 
 ## Risks
 
