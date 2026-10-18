@@ -123,11 +123,6 @@ Subtask (tickets here are **Task**); statuses are `To Do`, `In Progress`,
 
 ## On hold — needs a team decision
 
-- **Is the serial number required?** Bhuchi's CLOUDAPPG5-116 (manual entry
-  form), -117 (review before save) and -118 (backend validation) make the
-  serial number a required field. This plan makes it optional (FE-10). Until
-  that is agreed, FE-10 and FE-11 are not on the board and -116 to -118 are
-  left as they are.
 - **Scope of Poonnawit's existing tickets.** CLOUDAPPG5-88 (Asset Detail)
   includes an Edit button and Quick Actions; -89 (Notifications) includes
   filter tabs and Mark all as read. Both need React state, which FE-08 and
@@ -144,7 +139,7 @@ Build order is mobile frame first, then `md:` overrides for desktop.
 ### Design System & App Shell
 
 **FE-01 · Build shared UI component library** · `CLOUDAPPG5-119`
-- Assignee: Chaiyapat (@erthcyp) · Start 14 Oct · Due 17 Oct
+- Assignee: Chaiyapat (@erthcyp) · Start 17 Oct · Due 21 Oct
 - Extract `Button`, `StatusBadge`, `Card`, `Modal`, `Toast` into `components/`
   from the patterns already repeated across D01–D03.
 - AC: each has a mobile and `md:` desktop variant; `StatusBadge` renders
@@ -223,7 +218,8 @@ Build order is mobile frame first, then `md:` overrides for desktop.
 
 ### Document and OCR Management
 
-**The Add Asset flow**, agreed 14 Oct. Three steps, each ending in
+**The Add Asset flow**, agreed 14 Oct; the serial number was made required on
+18 Oct, matching Bhuchi's CLOUDAPPG5-116 / -118. Three steps, each ending in
 edit → confirm / cancel:
 
 ```
@@ -234,8 +230,8 @@ Add Asset
 │     identifies the asset, so the step must produce data either way.
 │     Required in personal and organization workspaces alike — without
 │     it there is no way to tell what the asset even is.
-├─ 2. Serial number              OPTIONAL — skippable
-│     OCR it, type it, or skip. Not every warranty needs one.
+├─ 2. Serial number              REQUIRED, no skip
+│     Scan it or type it. Needed when making a warranty claim.
 └─ 3. Box / storage photo        OPTIONAL — skippable
       Photo of the box or where it is kept, plus a free-text note.
       Shown later on Asset Detail, for warranties that need the box.
@@ -244,7 +240,9 @@ Add Asset
 
 **FE-09 · Add Asset step 1 — receipt (D06 / M06)** · `CLOUDAPPG5-86`
 - Assignee: Chaiyapat (@erthcyp) · Start 27 Oct · Due 2 Nov
-- Figma `3382:447`, `3436:1771`, stepper `3396:7449`.
+- Figma (3-step flow, mobile): choose method `3569:187`, OCR failed
+  `3569:274`, review receipt `3569:361`. Older frames: `3382:447`, `3436:1771`,
+  stepper `3396:7449`.
 - **This step cannot be skipped.** It carries the information that identifies
   the asset, so there is no Skip control — only two ways in:
   1. **OCR** — upload or capture the receipt, Textract fills the fields, the
@@ -257,20 +255,25 @@ Add Asset
   field is editable before confirm; required fields are validated before
   Confirm enables; cancel discards the whole wizard without saving.
 
-**FE-10 · Add Asset step 2 — serial number, optional** · *not on the board — on hold*
+**FE-10 · Add Asset step 2: serial number, required** · *not on the board yet*
 - Assignee: Chaiyapat (@erthcyp) · Start 2 Nov · Due 5 Nov
-- OCR the serial, or type it, or skip entirely.
-- AC: a visible **Skip** control; skipping still saves the asset; a hint
-  explains some warranties need a serial at claim time.
+- Figma (mobile): `3569:454`.
+- Scan the serial with the camera, or type it. There is no way to skip.
+- AC: no Skip control; Confirm stays disabled until a serial is entered; a
+  low-confidence OCR result is flagged and editable; a hint says where to find
+  the serial. Matches the backend validation in CLOUDAPPG5-118.
 
-**FE-11 · Add Asset step 3 — box / storage photo, optional** · *not on the board — on hold*
+**FE-11 · Add Asset step 3: box / storage photo, optional** · *not on the board yet*
 - Assignee: Chaiyapat (@erthcyp) · Start 5 Nov · Due 8 Nov
+- Figma (mobile): `3569:568`.
 - Photo of the box or where it is stored, plus a free-text note.
-- AC: both fields optional and skippable; photo and note appear on Asset Detail.
+- AC: both fields optional; "Skip for now" still saves the asset; photo and
+  note appear on Asset Detail.
 
 **FE-12 · Build OCR Review screen (D07 / M07)** · `CLOUDAPPG5-87`
 - Assignee: Chaiyapat (@erthcyp) · Start 3 Nov · Due 10 Nov
-- Figma `3382:566`, `3455:225`.
+- Figma `3382:566`, `3455:225`. In the 3-step flow this is the review at the
+  end of step 1 (`3569:361`); the serial number field moved to step 2.
 - AC: extracted values shown beside the source image; low-confidence fields
   flagged; user can correct every field; confirm writes the verified values.
 
