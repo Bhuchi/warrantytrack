@@ -108,17 +108,18 @@ See [frontend/README.md](frontend/README.md) and [backend/README.md](backend/REA
 
 ## Team — who owns what
 
-Work is split by **layer**: two people own the whole frontend, three own the
-backend and AWS. The Figma file is one design system across all 14 screens, so
-keeping the UI with a single pair stops the components drifting apart.
+Work is split broadly by **layer** — a frontend pair and a backend/AWS group —
+with the detail per person below matching what's assigned on the Jira board. The
+Figma file is one design system across all screens, so keeping the UI with a
+single pair stops the components drifting apart.
 
 | Name | Student ID | GitHub | Owns |
 |---|---|---|---|
-| Chaiyapat Anantarasuchart | 6622782223 | [@erthcyp](https://github.com/erthcyp) | UX/UI design + frontend |
-| Poonnawit Wongprateepwilai | 6622772455 | [@Aphelios514](https://github.com/Aphelios514) | Frontend |
-| Chaitawat Boonkitticharoen | 6622780342 | [@fongctw](https://github.com/fongctw) | Backend + AWS |
-| Sirawich Narakulsookpipat | 6622782298 | [@SirErthh](https://github.com/SirErthh) | Backend + AWS |
-| Bhuchi Kumprakob | 6622782215 | [@Bhuchi](https://github.com/Bhuchi) | Backend, infra, CI, deployment |
+| Chaiyapat Anantarasuchart | 6622782223 | [@erthcyp](https://github.com/erthcyp) | UX/UI design + most frontend screens (D01–D07), shared UI library, nav shell, API wiring |
+| Poonnawit Wongprateepwilai | 6622772455 | [@Aphelios514](https://github.com/Aphelios514) | Read-only frontend screens (Asset Detail D08, Notifications D09, Settings, states), requirements docs, some testing |
+| Chaitawat Boonkitticharoen | 6622780342 | [@fongctw](https://github.com/fongctw) | Architecture diagram, Cognito/RBAC, AWS deployment (VPC, ECS, RDS, IAM, CI) |
+| Sirawich Narakulsookpipat | 6622782298 | [@SirErthh](https://github.com/SirErthh) | Backend data & logic (asset CRUD, warranty status, assignment, bulk import) |
+| Bhuchi Kumprakob | 6622782215 | [@Bhuchi](https://github.com/Bhuchi) | Repo/Jira/AWS setup, S3/Textract, SES + scheduler, validation, infra, CI |
 
 Frontend tickets, owners and dates are in
 [docs/frontend-plan.md](docs/frontend-plan.md).
