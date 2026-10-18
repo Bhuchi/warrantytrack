@@ -240,9 +240,9 @@ Add Asset
 
 **FE-09 · Add Asset step 1 — receipt (D06 / M06)** · `CLOUDAPPG5-86`
 - Assignee: Chaiyapat (@erthcyp) · Start 27 Oct · Due 2 Nov
-- Figma (3-step flow, mobile): choose method `3569:187`, OCR failed
-  `3569:274`, review receipt `3569:361`. Older frames: `3382:447`, `3436:1771`,
-  stepper `3396:7449`.
+- Figma (3-step flow): choose method `3569:187` mobile / `3570:18` desktop,
+  OCR failed `3569:274` / `3570:243`, review receipt `3569:361` / `3570:451`.
+  Older frames: `3382:447`, `3436:1771`, stepper `3396:7449`.
 - **This step cannot be skipped.** It carries the information that identifies
   the asset, so there is no Skip control — only two ways in:
   1. **OCR** — upload or capture the receipt, Textract fills the fields, the
@@ -257,7 +257,7 @@ Add Asset
 
 **FE-10 · Add Asset step 2: serial number, required** · *not on the board yet*
 - Assignee: Chaiyapat (@erthcyp) · Start 2 Nov · Due 5 Nov
-- Figma (mobile): `3569:454`.
+- Figma: `3569:454` mobile, `3571:18` desktop.
 - Scan the serial with the camera, or type it. There is no way to skip.
 - AC: no Skip control; Confirm stays disabled until a serial is entered; a
   low-confidence OCR result is flagged and editable; a hint says where to find
@@ -265,7 +265,7 @@ Add Asset
 
 **FE-11 · Add Asset step 3: box / storage photo, optional** · *not on the board yet*
 - Assignee: Chaiyapat (@erthcyp) · Start 5 Nov · Due 8 Nov
-- Figma (mobile): `3569:568`.
+- Figma: `3569:568` mobile, `3571:331` desktop.
 - Photo of the box or where it is stored, plus a free-text note.
 - AC: both fields optional; "Skip for now" still saves the asset; photo and
   note appear on Asset Detail.
@@ -273,7 +273,8 @@ Add Asset
 **FE-12 · Build OCR Review screen (D07 / M07)** · `CLOUDAPPG5-87`
 - Assignee: Chaiyapat (@erthcyp) · Start 3 Nov · Due 10 Nov
 - Figma `3382:566`, `3455:225`. In the 3-step flow this is the review at the
-  end of step 1 (`3569:361`); the serial number field moved to step 2.
+  end of step 1 (`3569:361` mobile, `3570:451` desktop); the serial number
+  field moved to step 2.
 - AC: extracted values shown beside the source image; low-confidence fields
   flagged; user can correct every field; confirm writes the verified values.
 
