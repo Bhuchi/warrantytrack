@@ -136,17 +136,18 @@ shapes with mock data while the endpoint is still being written — don't wait.
 
 ---
 
-## Branching Strategy — GitHub Flow
+## Branching Strategy
 
-We use **GitHub Flow** (simple, one long-lived branch). See
+All work goes through `dev` before it reaches `main`. See
 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the full workflow. Short version:
 
-1. `main` is always deployable. **Never commit directly to `main`.**
-2. Branch off `main` for every piece of work:
+1. **Never commit directly to `dev` or `main`.** `main` only receives merges
+   from `dev`, when the team agrees `dev` is ready.
+2. Branch off `dev` for every piece of work:
    - `feat/<short-name>` — new feature (e.g. `feat/asset-list-page`)
    - `fix/<short-name>` — bug fix
    - `chore/<short-name>` — config, deps, docs
-3. Open a **Pull Request** into `main`. At least **1 teammate reviews** before merge.
+3. Open a **Pull Request** into `dev`. At least **1 teammate reviews** before merge.
 4. CI must pass (lint + types + migrations + tests) before merging.
 5. Squash-merge, then delete the branch.
 
@@ -159,7 +160,7 @@ Do this once, on something harmless, so the workflow isn't new to you when
 you're mid-feature.
 
 ```bash
-git checkout main && git pull origin main
+git checkout dev && git pull origin dev
 git checkout -b chore/add-my-name
 
 # Edit the team table above — add your GitHub username next to your name.
@@ -169,7 +170,7 @@ git commit -m "chore: add my GitHub username to the team table"
 git push -u origin chore/add-my-name
 ```
 
-Then on GitHub: open a PR into `main`, fill in the template, request a review
+Then on GitHub: open a PR into `dev`, fill in the template, request a review
 from someone, wait for CI to go green, and squash-merge it. Delete the branch.
 That's the whole loop.
 
