@@ -1,20 +1,25 @@
-# Contributing — Git Workflow
+# Contributing: Git Workflow
 
-We use **GitHub Flow**. One long-lived branch (`main`), short-lived feature
-branches, everything merged via reviewed Pull Requests.
+Two long-lived branches and short-lived feature branches, everything merged
+via reviewed Pull Requests:
+
+- **`dev`** is where work comes together. Every feature branch starts from
+  `dev` and is merged back into `dev`.
+- **`main`** only receives merges from `dev`, when the team agrees `dev` is
+  ready. Nobody opens a feature PR into `main`.
 
 ## The golden rules
 
-1. **Never push directly to `main`.** `main` is always deployable.
+1. **Never push directly to `dev` or `main`.** Both change only through PRs.
 2. **One branch per task/ticket.** Small, focused PRs are easier to review.
 3. **Every merge needs 1 approval + passing CI.**
 
 ## Step by step
 
 ```bash
-# 1. Start from an up-to-date main
-git checkout main
-git pull origin main
+# 1. Start from an up-to-date dev
+git checkout dev
+git pull origin dev
 
 # 2. Create your branch
 git checkout -b feat/assets-list-page
@@ -26,15 +31,15 @@ git commit -m "feat: build asset row component (CLOUDAPPG5-85)"
 # 4. Push
 git push -u origin feat/assets-list-page
 
-# 5. Open a Pull Request on GitHub into main.
+# 5. Open a Pull Request on GitHub into dev.
 #    - Fill in the PR template
 #    - Request a review from at least 1 teammate
 #    - Wait for CI to pass
 
 # 6. After approval → squash and merge → delete the branch.
 
-# 7. Everyone else: pull main to get the update
-git checkout main && git pull origin main
+# 7. Everyone else: pull dev to get the update
+git checkout dev && git pull origin dev
 ```
 
 ## Branch naming
@@ -68,12 +73,12 @@ Types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`.
 
 ## Handling conflicts
 
-If `main` moved ahead of your branch:
+If `dev` moved ahead of your branch:
 
 ```bash
-git checkout main && git pull origin main
+git checkout dev && git pull origin dev
 git checkout your-branch
-git merge main        # resolve conflicts, commit, push
+git merge dev         # resolve conflicts, commit, push
 ```
 
 ## Never commit
