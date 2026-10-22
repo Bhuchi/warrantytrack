@@ -26,6 +26,8 @@
      badge for it, so the soft tint follows the same pattern as the three above. */
   --status-none: #7c3aed;
   --status-none-soft: #ede9fe;
+  /* Empty part of a progress bar: Dashboard status bars, Add Asset progress (3382:211). */
+  --track: #e8edf7;
 
   /* Brand blue — Figma Header (3313:1716) and Footer (3313:1662). */
   --brand: #001cb7;
@@ -57,6 +59,7 @@
   --color-status-expired-soft: var(--status-expired-soft);
   --color-status-none: var(--status-none);
   --color-status-none-soft: var(--status-none-soft);
+  --color-track: var(--track);
   /* Floating toast (N02b 3488:289), stronger than the card shadow. */
   --shadow-toast: 0 10px 28px 0 rgba(5, 13, 51, 0.2);
   --color-brand: var(--brand);
