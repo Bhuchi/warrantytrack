@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import DepartmentBreakdown from "@/features/dashboard/DepartmentBreakdown";
 import { percent } from "@/features/dashboard/format";
 import { getDashboard } from "@/features/dashboard/getDashboard";
 import StatCard from "@/features/dashboard/StatCard";
@@ -72,7 +73,13 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <StatusBreakdown summary={summary} />
+      {/* Desktop D04: status bars stretch, departments sit beside them at 440px. */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:gap-6">
+        <div className="min-w-0 md:flex-1">
+          <StatusBreakdown summary={summary} />
+        </div>
+        <DepartmentBreakdown summary={summary} />
+      </div>
     </main>
   );
 }
