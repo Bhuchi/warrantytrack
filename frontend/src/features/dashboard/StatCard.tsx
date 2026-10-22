@@ -30,7 +30,7 @@ export default function StatCard({ label, value, tone, caption }: StatCardProps)
   const { icon, iconBox, number } = toneStyles[tone];
 
   return (
-    <Card className="flex flex-col gap-2 px-3.5 py-[13px] md:gap-3 md:rounded-[14px] md:px-5 md:py-[18px]">
+    <Card className="flex flex-col gap-2 px-3.5 py-[13px] md:gap-3 md:px-5 md:py-[18px]">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[11px] font-semibold tracking-[-0.22px] text-muted md:text-[12px] md:tracking-[-0.24px]">
           {label}
