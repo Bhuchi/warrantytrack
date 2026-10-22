@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import DepartmentBreakdown from "@/features/dashboard/DepartmentBreakdown";
+import ExpiringList from "@/features/dashboard/ExpiringList";
 import { percent } from "@/features/dashboard/format";
 import { getDashboard } from "@/features/dashboard/getDashboard";
 import StatCard from "@/features/dashboard/StatCard";
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
  * when summary.total is 0. Figma has no empty Dashboard frame yet.
  */
 export default async function DashboardPage() {
-  const { summary } = await getDashboard();
+  const { summary, expiring } = await getDashboard();
   const departments = summary.by_department.length;
 
   return (
@@ -80,6 +81,8 @@ export default async function DashboardPage() {
         </div>
         <DepartmentBreakdown summary={summary} />
       </div>
+
+      <ExpiringList items={expiring} total={summary.expiring_soon} />
     </main>
   );
 }
