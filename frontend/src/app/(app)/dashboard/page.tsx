@@ -1,16 +1,13 @@
 import type { Metadata } from "next";
 
+import { percent } from "@/features/dashboard/format";
 import { getDashboard } from "@/features/dashboard/getDashboard";
 import StatCard from "@/features/dashboard/StatCard";
+import StatusBreakdown from "@/features/dashboard/StatusBreakdown";
 
 export const metadata: Metadata = {
   title: "Dashboard",
 };
-
-/** Share of `part` in `total` as a whole percentage; 0 when there is nothing yet. */
-function percent(part: number, total: number): number {
-  return total === 0 ? 0 : Math.round((part / total) * 100);
-}
 
 /**
  * Dashboard. Mobile M04 (3382:141), personal M04 (3418:385), desktop D04 (3348:2).
@@ -74,6 +71,8 @@ export default async function DashboardPage() {
           />
         </div>
       </div>
+
+      <StatusBreakdown summary={summary} />
     </main>
   );
 }
