@@ -208,3 +208,16 @@ export function PencilIcon({ className }: IconProps) {
     </Icon>
   );
 }
+
+/** OCR status line under an uploaded receipt (M06 3382:554); grey while reading, red on failure. */
+export function ScanIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} size={14}>
+      <path d="M1.75 4.08333V2.91667C1.75 2.60725 1.87292 2.3105 2.09171 2.09171C2.3105 1.87292 2.60725 1.75 2.91667 1.75H4.08333" {...stroke} />
+      <path d="M9.91667 1.75H11.0833C11.3928 1.75 11.6895 1.87292 11.9083 2.09171C12.1271 2.3105 12.25 2.60725 12.25 2.91667V4.08333" {...stroke} />
+      <path d="M12.25 9.91667V11.0833C12.25 11.3928 12.1271 11.6895 11.9083 11.9083C11.6895 12.1271 11.3928 12.25 11.0833 12.25H9.91667" {...stroke} />
+      <path d="M4.08333 12.25H2.91667C2.60725 12.25 2.3105 12.1271 2.09171 11.9083C1.87292 11.6895 1.75 11.3928 1.75 11.0833V9.91667" {...stroke} />
+      <path d="M4.08333 7H9.91667" {...stroke} />
+    </Icon>
+  );
+}

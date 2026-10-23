@@ -2,10 +2,21 @@
 
 import { useState } from "react";
 
+import Button from "@/components/Button";
 import { CameraIcon, PencilIcon, UploadIcon } from "@/components/NavIcons";
+import type { OcrDocument } from "@/types/documents";
+
+import ReceiptUpload, { type UploadStatus } from "./ReceiptUpload";
+import { scanReceipt } from "./scanReceipt";
 
 /** How the user brings the receipt in. Manual entry is always offered up front. */
 type ReceiptMethod = "upload" | "photo" | "manual";
+
+/** Where the user is inside step 1. */
+type ReceiptPhase = "choose" | "scanning" | "scanned" | "failed" | "review";
+
+/** Matches the "max 10 MB" in the drop zone. */
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 /** The three method cards. Mobile shows the short label; desktop adds the description (D06). */
 const METHODS = [
@@ -19,12 +30,50 @@ const METHODS = [
  * box photo (optional). Figma mobile 3569:187, desktop 3570:18.
  *
  * Runs in the browser ("use client") because it reacts to taps and typing.
- * Built up one piece at a time: so far the header, progress and method cards.
+ * Built up one piece at a time: so far the header, progress, method cards and
+ * the upload with mock OCR.
  *
  * TODO: desktop shows a 3-step stepper instead of the progress card (3396:7449).
  */
 export default function AddAssetWizard() {
   const [method, setMethod] = useState<ReceiptMethod>("upload");
+  const [phase, setPhase] = useState<ReceiptPhase>("choose");
+  const [file, setFile] = useState<File | null>(null);
+  const [scan, setScan] = useState<OcrDocument | null>(null);
+
+  /** Picking another method starts the receipt over. */
+  function chooseMethod(next: ReceiptMethod) {
+    setMethod(next);
+    setPhase("choose");
+    setFile(null);
+    setScan(null);
+  }
+
+  /** Runs when a file is picked or dropped: show "Reading…", wait for OCR, then show the result. */
+  async function handleFile(picked: File) {
+    setFile(picked);
+
+    if (picked.size > MAX_FILE_BYTES) {
+      setScan({ id: "", status: "failed", extracted: null, error: "This file is larger than 10 MB." });
+      setPhase("failed");
+      return;
+    }
+
+    setPhase("scanning");
+    const result = await scanReceipt(picked);
+    setScan(result);
+
+    if (result.status === "extracted") {
+      setPhase("scanned");
+    } else {
+      // OCR failed: offer manual entry automatically (Figma 3569:274).
+      setMethod("manual");
+      setPhase("failed");
+    }
+  }
+
+  const uploadStatus: UploadStatus =
+    phase === "scanning" ? "scanning" : phase === "scanned" ? "done" : phase === "failed" ? "failed" : "idle";
 
   return (
     <div className="flex flex-col gap-3 md:gap-4">
@@ -56,7 +105,7 @@ export default function AddAssetWizard() {
               key={id}
               type="button"
               aria-pressed={selected}
-              onClick={() => setMethod(id)}
+              onClick={() => chooseMethod(id)}
               className={`flex flex-1 flex-col items-center gap-2 rounded-xl py-3.5 md:items-start md:gap-2.5 md:px-[18px] md:py-4 ${
                 selected ? "border-2 border-brand bg-brand-subtle" : "border border-border bg-surface"
               }`}
@@ -79,6 +128,34 @@ export default function AddAssetWizard() {
           );
         })}
       </div>
+
+      {phase === "review" ? (
+        // TODO: the review form (next step). Placeholder so the flow can be clicked through.
+        <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted">
+          Review form comes next.
+        </p>
+      ) : (
+        <>
+          {/* Shown for Upload and Photo, and kept on screen after a failure so the red card explains why. */}
+          {(method !== "manual" || phase === "failed") && (
+            <ReceiptUpload
+              method={method === "photo" ? "photo" : "upload"}
+              file={file}
+              status={uploadStatus}
+              error={scan?.error ?? null}
+              onFile={handleFile}
+            />
+          )}
+
+          {phase === "failed" || method === "manual" ? (
+            <Button onClick={() => setPhase("review")}>Enter details manually</Button>
+          ) : (
+            <Button disabled={phase !== "scanned"} onClick={() => setPhase("review")}>
+              Continue to review
+            </Button>
+          )}
+        </>
+      )}
     </div>
   );
 }
