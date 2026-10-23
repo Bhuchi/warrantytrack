@@ -1,11 +1,15 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import Button from "@/components/Button";
+import Modal from "@/components/Modal";
 import { CameraIcon, PencilIcon, UploadIcon } from "@/components/NavIcons";
 import type { OcrDocument } from "@/types/documents";
 
+import { type AssetDraft, EMPTY_DRAFT, draftFromScan } from "./draft";
+import ReceiptReview from "./ReceiptReview";
 import ReceiptUpload, { type UploadStatus } from "./ReceiptUpload";
 import { scanReceipt } from "./scanReceipt";
 
@@ -14,6 +18,9 @@ type ReceiptMethod = "upload" | "photo" | "manual";
 
 /** Where the user is inside step 1. */
 type ReceiptPhase = "choose" | "scanning" | "scanned" | "failed" | "review";
+
+/** Progress card label for each of the three steps. */
+const STEPS = ["Receipt", "Serial number", "Box photo (optional)"];
 
 /** Matches the "max 10 MB" in the drop zone. */
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -30,16 +37,25 @@ const METHODS = [
  * box photo (optional). Figma mobile 3569:187, desktop 3570:18.
  *
  * Runs in the browser ("use client") because it reacts to taps and typing.
- * Built up one piece at a time: so far the header, progress, method cards and
- * the upload with mock OCR.
+ * The wizard owns all the answers (`draft`); each step reads it and reports
+ * changes back. Nothing is saved until the last step.
  *
  * TODO: desktop shows a 3-step stepper instead of the progress card (3396:7449).
  */
 export default function AddAssetWizard() {
+  const router = useRouter();
+  const [step, setStep] = useState(1);
   const [method, setMethod] = useState<ReceiptMethod>("upload");
   const [phase, setPhase] = useState<ReceiptPhase>("choose");
   const [file, setFile] = useState<File | null>(null);
   const [scan, setScan] = useState<OcrDocument | null>(null);
+  const [draft, setDraft] = useState<AssetDraft>(EMPTY_DRAFT);
+  const [discardOpen, setDiscardOpen] = useState(false);
+
+  /** Change some fields of the draft and keep the rest. */
+  function updateDraft(changes: Partial<AssetDraft>) {
+    setDraft((current) => ({ ...current, ...changes }));
+  }
 
   /** Picking another method starts the receipt over. */
   function chooseMethod(next: ReceiptMethod) {
@@ -47,6 +63,13 @@ export default function AddAssetWizard() {
     setPhase("choose");
     setFile(null);
     setScan(null);
+    setDraft(EMPTY_DRAFT);
+  }
+
+  /** Manual entry, chosen up front or offered after a failed scan: start from an empty form. */
+  function enterManually() {
+    setDraft(EMPTY_DRAFT);
+    setPhase("review");
   }
 
   /** Runs when a file is picked or dropped: show "Reading…", wait for OCR, then show the result. */
@@ -64,6 +87,7 @@ export default function AddAssetWizard() {
     setScan(result);
 
     if (result.status === "extracted") {
+      setDraft(draftFromScan(result));
       setPhase("scanned");
     } else {
       // OCR failed: offer manual entry automatically (Figma 3569:274).
@@ -88,54 +112,68 @@ export default function AddAssetWizard() {
 
       <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-surface px-4 py-3.5">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[13px] font-semibold tracking-[-0.26px] text-brand">Step 1 of 3 · Receipt</p>
-          <p className="text-[12px] font-bold text-muted-light">33%</p>
+          <p className="text-[13px] font-semibold tracking-[-0.26px] text-brand">
+            Step {step} of 3 · {STEPS[step - 1]}
+          </p>
+          <p className="text-[12px] font-bold text-muted-light">{Math.round((step / 3) * 100)}%</p>
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-track">
-          <div className="h-full w-1/3 rounded-full bg-brand" />
+          <div className="h-full rounded-full bg-brand" style={{ width: `${(step / 3) * 100}%` }} />
         </div>
       </div>
 
-      <div className="flex gap-2.5 md:gap-4">
-        {METHODS.map(({ id, label, desktopLabel, description, Icon }) => {
-          const selected = method === id;
-
-          return (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => chooseMethod(id)}
-              className={`flex flex-1 flex-col items-center gap-2 rounded-xl py-3.5 md:items-start md:gap-2.5 md:px-[18px] md:py-4 ${
-                selected ? "border-2 border-brand bg-brand-subtle" : "border border-border bg-surface"
-              }`}
-            >
-              <span
-                className={`flex size-[38px] items-center justify-center rounded-[10px] md:size-10 ${
-                  selected ? "bg-brand text-brand-foreground" : "bg-canvas text-muted"
-                }`}
-              >
-                <Icon className="size-[19px] md:size-5" />
-              </span>
-              <span className={`text-[13px] font-bold tracking-[-0.26px] md:text-[15px] ${selected ? "text-brand" : "text-foreground"}`}>
-                <span className="md:hidden">{label}</span>
-                <span className="hidden md:inline">{desktopLabel}</span>
-              </span>
-              <span className="hidden text-left text-[12px] tracking-[-0.24px] text-muted md:block">
-                {description}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {phase === "review" ? (
-        // TODO: the review form (next step). Placeholder so the flow can be clicked through.
+      {step === 2 && (
+        // TODO: step 2, serial number (FE-10, CLOUDAPPG5-128).
         <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted">
-          Review form comes next.
+          Serial number step comes next (FE-10).
         </p>
-      ) : (
+      )}
+
+      {step === 1 && phase === "review" && (
+        <ReceiptReview
+          draft={draft}
+          onChange={updateDraft}
+          scan={scan}
+          onConfirm={() => setStep(2)}
+          onCancel={() => setDiscardOpen(true)}
+        />
+      )}
+
+      {step === 1 && phase !== "review" && (
         <>
+          <div className="flex gap-2.5 md:gap-4">
+            {METHODS.map(({ id, label, desktopLabel, description, Icon }) => {
+              const selected = method === id;
+
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => chooseMethod(id)}
+                  className={`flex flex-1 flex-col items-center gap-2 rounded-xl py-3.5 md:items-start md:gap-2.5 md:px-[18px] md:py-4 ${
+                    selected ? "border-2 border-brand bg-brand-subtle" : "border border-border bg-surface"
+                  }`}
+                >
+                  <span
+                    className={`flex size-[38px] items-center justify-center rounded-[10px] md:size-10 ${
+                      selected ? "bg-brand text-brand-foreground" : "bg-canvas text-muted"
+                    }`}
+                  >
+                    <Icon className="size-[19px] md:size-5" />
+                  </span>
+                  <span className={`text-[13px] font-bold tracking-[-0.26px] md:text-[15px] ${selected ? "text-brand" : "text-foreground"}`}>
+                    <span className="md:hidden">{label}</span>
+                    <span className="hidden md:inline">{desktopLabel}</span>
+                  </span>
+                  <span className="hidden text-left text-[12px] tracking-[-0.24px] text-muted md:block">
+                    {description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
           {/* Shown for Upload and Photo, and kept on screen after a failure so the red card explains why. */}
           {(method !== "manual" || phase === "failed") && (
             <ReceiptUpload
@@ -148,7 +186,7 @@ export default function AddAssetWizard() {
           )}
 
           {phase === "failed" || method === "manual" ? (
-            <Button onClick={() => setPhase("review")}>Enter details manually</Button>
+            <Button onClick={enterManually}>Enter details manually</Button>
           ) : (
             <Button disabled={phase !== "scanned"} onClick={() => setPhase("review")}>
               Continue to review
@@ -156,6 +194,22 @@ export default function AddAssetWizard() {
           )}
         </>
       )}
+
+      <Modal
+        open={discardOpen}
+        onClose={() => setDiscardOpen(false)}
+        title="Discard this asset?"
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setDiscardOpen(false)}>
+              Keep editing
+            </Button>
+            <Button onClick={() => router.push("/dashboard")}>Discard</Button>
+          </>
+        }
+      >
+        Your changes will be lost. This can&apos;t be undone.
+      </Modal>
     </div>
   );
 }
