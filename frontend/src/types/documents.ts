@@ -1,0 +1,45 @@
+/**
+ * Receipt upload and OCR shapes, from docs/api.md "Documents and OCR".
+ * Keep in sync with the backend's Pydantic schemas.
+ */
+
+/** Where a receipt is in the OCR pipeline. Poll GET /documents/{id} until it leaves pending/processing. */
+export type DocumentStatus = "pending" | "processing" | "extracted" | "confirmed" | "failed";
+
+/**
+ * One item read from the receipt. A receipt can list several; the Add Asset
+ * flow uses the first for now (multi-item invoices are a later improvement).
+ */
+export interface ExtractedLineItem {
+  name: string;
+  serial_number: string | null;
+  /** Decimal as a string, e.g. "32900.00", so no precision is lost. */
+  price: string;
+}
+
+/**
+ * What Textract read from the receipt. The contract only shows filled-in
+ * values; the nulls are assumed for fields Textract could not find.
+ * Confirm with Bhuchi (CLOUDAPPG5-95).
+ */
+export interface ExtractedReceipt {
+  vendor_name: string | null;
+  /** "YYYY-MM-DD". */
+  purchase_date: string | null;
+  total_amount: string | null;
+  currency: string | null;
+  line_items: ExtractedLineItem[];
+}
+
+/** GET /documents/{id}. */
+export interface OcrDocument {
+  id: string;
+  status: DocumentStatus;
+  /** Filled once status is "extracted". */
+  extracted: ExtractedReceipt | null;
+  /** Why OCR failed, when status is "failed". */
+  error: string | null;
+}
+
+/** Physical condition, required when saving an asset (POST /assets, CLOUDAPPG5-118). */
+export type AssetCondition = "new" | "good" | "fair" | "damaged";
