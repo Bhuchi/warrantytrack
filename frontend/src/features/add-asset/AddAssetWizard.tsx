@@ -11,6 +11,7 @@ import type { OcrDocument } from "@/types/documents";
 import { type AssetDraft, EMPTY_DRAFT, draftFromScan } from "./draft";
 import ReceiptReview from "./ReceiptReview";
 import ReceiptUpload, { type UploadStatus } from "./ReceiptUpload";
+import StepProgress from "./StepProgress";
 import { scanReceipt } from "./scanReceipt";
 
 /** How the user brings the receipt in. Manual entry is always offered up front. */
@@ -18,9 +19,6 @@ type ReceiptMethod = "upload" | "photo" | "manual";
 
 /** Where the user is inside step 1. */
 type ReceiptPhase = "choose" | "scanning" | "scanned" | "failed" | "review";
-
-/** Progress card label for each of the three steps. */
-const STEPS = ["Receipt", "Serial number", "Box photo (optional)"];
 
 /** Matches the "max 10 MB" in the drop zone. */
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -39,8 +37,6 @@ const METHODS = [
  * Runs in the browser ("use client") because it reacts to taps and typing.
  * The wizard owns all the answers (`draft`); each step reads it and reports
  * changes back. Nothing is saved until the last step.
- *
- * TODO: desktop shows a 3-step stepper instead of the progress card (3396:7449).
  */
 export default function AddAssetWizard() {
   const router = useRouter();
@@ -110,17 +106,7 @@ export default function AddAssetWizard() {
         </p>
       </div>
 
-      <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-surface px-4 py-3.5">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[13px] font-semibold tracking-[-0.26px] text-brand">
-            Step {step} of 3 · {STEPS[step - 1]}
-          </p>
-          <p className="text-[12px] font-bold text-muted-light">{Math.round((step / 3) * 100)}%</p>
-        </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-track">
-          <div className="h-full rounded-full bg-brand" style={{ width: `${(step / 3) * 100}%` }} />
-        </div>
-      </div>
+      <StepProgress step={step} />
 
       {step === 2 && (
         // TODO: step 2, serial number (FE-10, CLOUDAPPG5-128).
