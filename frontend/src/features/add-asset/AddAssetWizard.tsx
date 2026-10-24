@@ -12,6 +12,7 @@ import { type AssetDraft, EMPTY_DRAFT, draftFromScan } from "./draft";
 import MethodCards, { type MethodOption } from "./MethodCards";
 import ReceiptReview from "./ReceiptReview";
 import ReceiptUpload, { type UploadStatus } from "./ReceiptUpload";
+import SerialStep from "./SerialStep";
 import StepProgress from "./StepProgress";
 import { scanReceipt } from "./scanReceipt";
 
@@ -110,9 +111,20 @@ export default function AddAssetWizard() {
       <StepProgress step={step} />
 
       {step === 2 && (
-        // TODO: step 2, serial number (FE-10, CLOUDAPPG5-128).
+        <SerialStep
+          draft={draft}
+          onChange={updateDraft}
+          ocrSerial={scan?.extracted?.line_items[0]?.serial_number ?? null}
+          onBack={() => setStep(1)}
+          onCancel={() => setDiscardOpen(true)}
+          onConfirm={() => setStep(3)}
+        />
+      )}
+
+      {step === 3 && (
+        // TODO: step 3, box / storage photo (FE-11, CLOUDAPPG5-129).
         <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted">
-          Serial number step comes next (FE-10).
+          Box photo step comes next (FE-11).
         </p>
       )}
 
