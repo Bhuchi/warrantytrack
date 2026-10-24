@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 
 import AppShell from "@/components/AppShell";
+import ToastProvider from "@/components/ToastProvider";
 
 /**
- * Wraps every signed-in screen with the navigation panel and mobile top bar.
+ * Wraps every signed-in screen with the navigation panel and mobile top bar,
+ * and the ToastProvider, so a toast survives moving between these pages.
  * Marketing pages live in (marketing) and auth pages in (auth); neither gets
  * this chrome.
  *
@@ -12,20 +14,22 @@ import AppShell from "@/components/AppShell";
  */
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
-    <AppShell
-      workspace={{
-        name: "SIIT Organization",
-        kind: "Organization workspace",
-        initials: "SI",
-      }}
-      user={{
-        name: "Chaiyapat A.",
-        department: "IT Department",
-        initials: "CA",
-      }}
-      unreadCount={3}
-    >
-      {children}
-    </AppShell>
+    <ToastProvider>
+      <AppShell
+        workspace={{
+          name: "SIIT Organization",
+          kind: "Organization workspace",
+          initials: "SI",
+        }}
+        user={{
+          name: "Chaiyapat A.",
+          department: "IT Department",
+          initials: "CA",
+        }}
+        unreadCount={3}
+      >
+        {children}
+      </AppShell>
+    </ToastProvider>
   );
 }
