@@ -36,3 +36,36 @@ export interface Membership {
 }
 
 export type WarrantyStatus = "active" | "expiring_soon" | "expired" | "unknown";
+
+/** One bar in "Assets by Department". */
+export interface DepartmentCount {
+  department_id: string;
+  name: string;
+  count: number;
+}
+
+/** GET /dashboard/summary: the D04 stat cards and charts. */
+export interface DashboardSummary {
+  total: number;
+  active: number;
+  expiring_soon: number;
+  expired: number;
+  /** Assets with no warranty. The asset itself reports these as status `unknown`. */
+  no_warranty: number;
+  by_department: DepartmentCount[];
+}
+
+/** One row of GET /dashboard/expiring?days=30. */
+export interface ExpiringAsset {
+  asset_id: string;
+  name: string;
+  vendor: string;
+  department: string;
+  /** Warranty end date, "YYYY-MM-DD". */
+  end_date: string;
+  status: WarrantyStatus;
+}
+
+export interface ExpiringAssetsResponse {
+  items: ExpiringAsset[];
+}
