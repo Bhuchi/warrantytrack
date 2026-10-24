@@ -6,14 +6,17 @@ import { useState } from "react";
 import Button from "@/components/Button";
 import Modal from "@/components/Modal";
 import { CameraIcon, PencilIcon, UploadIcon } from "@/components/NavIcons";
+import { useToast } from "@/components/ToastProvider";
 import type { OcrDocument } from "@/types/documents";
 
+import BoxPhotoStep from "./BoxPhotoStep";
 import { type AssetDraft, EMPTY_DRAFT, draftFromScan } from "./draft";
 import MethodCards, { type MethodOption } from "./MethodCards";
 import ReceiptReview from "./ReceiptReview";
 import ReceiptUpload, { type UploadStatus } from "./ReceiptUpload";
 import SerialStep from "./SerialStep";
 import StepProgress from "./StepProgress";
+import { saveAsset } from "./saveAsset";
 import { scanReceipt } from "./scanReceipt";
 
 /** How the user brings the receipt in. Manual entry is always offered up front. */
@@ -42,6 +45,7 @@ const RECEIPT_METHODS: readonly MethodOption<ReceiptMethod>[] = [
  */
 export default function AddAssetWizard() {
   const router = useRouter();
+  const showToast = useToast();
   const [step, setStep] = useState(1);
   const [method, setMethod] = useState<ReceiptMethod>("upload");
   const [phase, setPhase] = useState<ReceiptPhase>("choose");
@@ -49,6 +53,7 @@ export default function AddAssetWizard() {
   const [scan, setScan] = useState<OcrDocument | null>(null);
   const [draft, setDraft] = useState<AssetDraft>(EMPTY_DRAFT);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   /** Change some fields of the draft and keep the rest. */
   function updateDraft(changes: Partial<AssetDraft>) {
@@ -62,6 +67,20 @@ export default function AddAssetWizard() {
     setFile(null);
     setScan(null);
     setDraft(EMPTY_DRAFT);
+  }
+
+  /** The last step: save, then show a toast on the Dashboard (Figma N02 3488:171). */
+  async function save(final: AssetDraft) {
+    setSaving(true);
+    try {
+      await saveAsset(final);
+      showToast({ tone: "success", title: "Asset saved successfully", message: `${final.name} was added.` });
+      router.push("/dashboard");
+    } catch {
+      // Stay on the page so nothing typed is lost.
+      showToast({ tone: "error", title: "Could not save the asset", message: "Please try again." });
+      setSaving(false);
+    }
   }
 
   /** Manual entry, chosen up front or offered after a failed scan: start from an empty form. */
@@ -122,10 +141,14 @@ export default function AddAssetWizard() {
       )}
 
       {step === 3 && (
-        // TODO: step 3, box / storage photo (FE-11, CLOUDAPPG5-129).
-        <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted">
-          Box photo step comes next (FE-11).
-        </p>
+        <BoxPhotoStep
+          draft={draft}
+          onChange={updateDraft}
+          saving={saving}
+          onBack={() => setStep(2)}
+          onSave={() => save(draft)}
+          onSkip={() => save({ ...draft, location: "", location_photo: null })}
+        />
       )}
 
       {step === 1 && phase === "review" && (
