@@ -52,7 +52,7 @@ resource "aws_iam_role_policy" "execution_secrets" {
         Resource = compact([
           aws_ssm_parameter.database_url.arn,
           aws_ssm_parameter.secret_key.arn,
-          var.use_container_database ? aws_ssm_parameter.db_password[0].arn : null
+          one(aws_ssm_parameter.db_password[*].arn)
         ])
       },
       {

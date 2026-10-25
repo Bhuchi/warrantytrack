@@ -104,6 +104,12 @@ for the API to serve against yet.
 Migrations run as a **one-off task**, never in the container entrypoint: with
 more than one task starting they would race each other.
 
+> **Skip this phase entirely when `use_container_database = true`.** The database
+> then lives inside the service task, on loopback, so a separate task has no way
+> to reach it — `run-task` would fail to connect. In that mode the task's own
+> `migrate` container applies migrations before the API starts, and the API waits
+> on it succeeding. Check with `terraform output database_mode`.
+
 ```bash
 cd infra/aws && aws ecs run-task --region "$(terraform output -raw aws_region)" --cluster "$(terraform output -raw ecs_cluster_name)" --task-definition "$(terraform output -raw job_task_definition_arn)" --launch-type FARGATE --network-configuration "{\"awsvpcConfiguration\":{\"subnets\":$(terraform output -json app_subnet_ids),\"securityGroups\":[\"$(terraform output -raw app_security_group_id)\"],\"assignPublicIp\":\"ENABLED\"}}" --query 'tasks[0].taskArn' --output text
 ```
@@ -207,9 +213,10 @@ terraform destroy
 Expect 10–20 minutes. Most of it is AWS releasing the task's network interface,
 which blocks the subnets and security groups behind it.
 
-- RDS takes a **final snapshot** named `<name>-db-final-<secret_version>`.
-  Destroy fails if a snapshot of that name already exists — bump
-  `secret_version` or delete the old snapshot.
+- **The database is deleted, with no final snapshot.** That is deliberate: the
+  cost rules call for tearing the stack down between sessions, and a named
+  snapshot makes the second teardown fail. Back up anything you need to keep
+  before destroying.
 - The **S3 bucket is not managed here** and survives, which is usually what you
   want: documents persist across rebuilds.
 - Keep `terraform.tfstate` until destroy finishes, or you will be deleting
