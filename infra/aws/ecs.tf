@@ -70,7 +70,7 @@ locals {
     ]
     secrets = var.use_container_database ? [{
       name      = "POSTGRES_PASSWORD"
-      valueFrom = aws_ssm_parameter.db_password[0].arn
+      valueFrom = one(aws_ssm_parameter.db_password[*].arn)
     }] : []
     healthCheck = {
       command     = ["CMD-SHELL", "pg_isready -U ${local.db_user} -d ${local.db_name}"]

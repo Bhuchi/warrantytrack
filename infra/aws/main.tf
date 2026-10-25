@@ -12,8 +12,8 @@ locals {
 
   # The container database shares the task's network namespace, so the API
   # reaches it on loopback. RDS supplies a real endpoint instead.
-  db_host = var.use_container_database ? "127.0.0.1" : aws_db_instance.main[0].address
-  db_port = var.use_container_database ? 5432 : aws_db_instance.main[0].port
+  db_host = var.use_container_database ? "127.0.0.1" : one(aws_db_instance.main[*].address)
+  db_port = var.use_container_database ? 5432 : one(aws_db_instance.main[*].port)
 
   app_url = "http://${aws_lb.main.dns_name}"
 

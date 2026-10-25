@@ -15,7 +15,7 @@ Step-by-step commands are in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 | **ALB** | Public entry point, one target group on the web container's port 3000 |
 | **ECS Fargate** | Cluster, a two-container task (`web` + `api`), the service, and a separate job task definition for migrations |
 | **ECR** | Two repositories with scan-on-push and a 10-image lifecycle policy |
-| **RDS PostgreSQL** | Single-AZ, encrypted, private, 7-day backups, final snapshot on destroy |
+| **RDS PostgreSQL** | Single-AZ, encrypted, private, 7-day backups. No final snapshot — see DEPLOYMENT.md teardown. |
 | **Cognito** | User pool and public browser client |
 | **SSM Parameter Store** | `DATABASE_URL` and `SECRET_KEY` as SecureStrings |
 | **CloudWatch Logs** | `/ecs/<name>`, 14-day retention |
@@ -29,7 +29,7 @@ Step-by-step commands are in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 | **S3 bucket and its CORS configuration** | S3/Textract workstream. This stack takes `document_bucket_name` as a variable and grants the task role access to it. |
 | **SES identity verification** | SES workstream. Verify the sender before any mail sends. |
 | **EventBridge Scheduler** for expiry emails | SES/scheduler workstream. The `job` task definition here is what a schedule should invoke. |
-| **ACM certificate / domain** | Undecided — see [`docs/REQUIRES_YOUR_INPUT.md`](../../docs/REQUIRES_YOUR_INPUT.md). Set `certificate_arn` to add an HTTPS listener. |
+| **HTTPS / ACM certificate** | Needs a domain, and none has been chosen — see [`docs/REQUIRES_YOUR_INPUT.md`](../../docs/REQUIRES_YOUR_INPUT.md). Traffic is HTTP only, so use test accounts and no real personal data. |
 
 ## Two design decisions worth knowing
 

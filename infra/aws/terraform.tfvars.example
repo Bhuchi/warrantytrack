@@ -38,5 +38,4 @@ db_multi_az       = false
 # USD 110 is roughly THB 4,000, the budget for the whole semester.
 budget_limit_usd = 110
 
-# No domain chosen yet, so HTTP only. Set an ACM certificate ARN to add HTTPS.
-# certificate_arn = "arn:aws:acm:ap-southeast-1:...:certificate/..."
+# HTTP only. HTTPS needs a domain and an ACM certificate, neither chosen yet.
