@@ -61,5 +61,5 @@ output "database_mode" {
 }
 
 output "database_endpoint" {
-  value = var.use_container_database ? "127.0.0.1:5432 (in-task container)" : aws_db_instance.main[0].endpoint
+  value = var.use_container_database ? "127.0.0.1:5432 (in-task container)" : one(aws_db_instance.main[*].endpoint)
 }

@@ -130,14 +130,3 @@ variable "budget_alert_email" {
   description = "Address that receives the budget alert."
   type        = string
 }
-
-# ---------------------------------------------------------------------------
-# TLS. No domain has been chosen yet (docs/REQUIRES_YOUR_INPUT.md), so the
-# listener is HTTP only until a certificate exists.
-# ---------------------------------------------------------------------------
-
-variable "certificate_arn" {
-  description = "ACM certificate ARN. When set, an HTTPS listener is added on 443. Until a domain is chosen this stays null and traffic is HTTP only."
-  type        = string
-  default     = null
-}

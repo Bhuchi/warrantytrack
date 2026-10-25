@@ -36,10 +36,12 @@ resource "aws_db_instance" "main" {
   publicly_accessible    = false
   multi_az               = var.db_multi_az
 
-  backup_retention_period   = 7
-  skip_final_snapshot       = false
-  final_snapshot_identifier = "${var.name}-db-final-${var.secret_version}"
-  deletion_protection       = false
+  # Backups protect a running database. No final snapshot: the cost rules
+  # call for tearing the stack down between sessions, and a named snapshot
+  # makes the second teardown fail because the name is already taken.
+  backup_retention_period = 7
+  skip_final_snapshot     = true
+  deletion_protection     = false
 
   auto_minor_version_upgrade = true
 }
