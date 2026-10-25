@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import WorkspaceCard from "./WorkspaceCard";
+import { rememberWorkspace } from "./workspaces";
 import { OrganizationIcon, PersonalIcon } from "./WorkspaceIcons";
 
 /**
@@ -15,6 +16,9 @@ import { OrganizationIcon, PersonalIcon } from "./WorkspaceIcons";
  * Desktop (D03) gives each card its own Continue button. Mobile (M03) drops
  * those for one shared button at the bottom, which needs to know the current
  * selection — so it lives here, where the state is.
+ *
+ * Continue saves the choice in a cookie (rememberWorkspace), so the nav panel
+ * and every signed-in page show this workspace, even after a refresh.
  *
  * TODO: the counts below are the placeholder values from Figma. Replace with
  * real data from lib/api once the workspaces endpoint exists.
@@ -76,6 +80,7 @@ export default function WorkspaceSelector() {
             }
             selected={workspace.id === selected}
             onSelect={() => setSelected(workspace.id)}
+            onContinue={() => rememberWorkspace(workspace.id)}
           />
         ))}
       </div>
@@ -93,6 +98,7 @@ export default function WorkspaceSelector() {
 
       <Link
         href={selectedWorkspace.href}
+        onClick={() => rememberWorkspace(selected)}
         className="flex h-14 w-full items-center justify-center rounded-[10px] bg-brand text-[17px] font-bold tracking-[-0.34px] text-brand-foreground md:hidden"
       >
         Continue
