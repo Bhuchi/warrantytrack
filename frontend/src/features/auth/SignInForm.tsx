@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import Button from "@/components/Button";
 import TextField from "@/components/TextField";
@@ -7,13 +10,26 @@ import TextField from "@/components/TextField";
 /**
  * Sign-in form fields — Figma D02 (node 3337:42 onward).
  *
- * TODO: this does not submit anywhere yet. When the Cognito flow exists, add
- * "use client", hold the field values in state, and call a function in
- * features/auth/ that talks to lib/api — never fetch from this component.
+ * For now Sign In only moves on to workspace selection: nothing is checked or
+ * sent, so the demo flows without typing URLs. preventDefault stops the
+ * browser's default submit, which would reload /login with the email and
+ * password in the address bar.
+ *
+ * TODO (FE-04, CLOUDAPPG5-122): replace with the real Cognito sign-in. Hold the
+ * field values in state and call a function in features/auth/ that talks to
+ * lib/api; never fetch from this component.
  */
 export default function SignInForm() {
+  const router = useRouter();
+
   return (
-    <form className="flex w-full flex-col gap-[22px]">
+    <form
+      className="flex w-full flex-col gap-[22px]"
+      onSubmit={(event) => {
+        event.preventDefault();
+        router.push("/workspace");
+      }}
+    >
       <TextField
         id="email"
         name="email"
