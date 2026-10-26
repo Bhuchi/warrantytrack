@@ -1,0 +1,10 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Bell Button">
+<rect width="36" height="36" rx="9" fill="#F5F7FC"/>
+<g id="icon">
+<path id="Vector" d="M13.5 15C13.5 13.8065 13.9741 12.6619 14.818 11.818C15.6619 10.9741 16.8065 10.5 18 10.5C19.1935 10.5 20.3381 10.9741 21.182 11.818C22.0259 12.6619 22.5 13.8065 22.5 15C22.5 20.25 24.75 21.75 24.75 21.75H11.25C11.25 21.75 13.5 20.25 13.5 15Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="#64748B"/>
+<path id="Vector_2" d="M16.725 24.75C16.8505 24.9783 17.0351 25.1688 17.2594 25.3014C17.4837 25.434 17.7394 25.504 18 25.504C18.2606 25.504 18.5163 25.434 18.7406 25.3014C18.9649 25.1688 19.1495 24.9783 19.275 24.75" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="#64748B"/>
+</g>
+<circle id="Ellipse" cx="26.5" cy="9.5" r="4.5" fill="#DC2626"/>
+</g>
+</svg>
