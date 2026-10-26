@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import Button from "@/components/Button";
 import TextField from "@/components/TextField";
@@ -11,11 +14,22 @@ import TextField from "@/components/TextField";
  * checkbox are a best guess built to match the sign-in card. Re-check against
  * the real frame once it exists.
  *
- * TODO: does not submit yet — same wiring plan as SignInForm.
+ * For now Create Account only moves on to workspace selection, like Sign In.
+ *
+ * TODO (FE-04, CLOUDAPPG5-122): create the account with Cognito, same wiring
+ * plan as SignInForm.
  */
 export default function SignUpForm() {
+  const router = useRouter();
+
   return (
-    <form className="flex w-full flex-col gap-[22px]">
+    <form
+      className="flex w-full flex-col gap-[22px]"
+      onSubmit={(event) => {
+        event.preventDefault();
+        router.push("/workspace");
+      }}
+    >
       <TextField
         id="name"
         name="name"

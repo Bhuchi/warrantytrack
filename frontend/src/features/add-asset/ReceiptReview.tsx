@@ -1,10 +1,9 @@
-import type { ReactNode } from "react";
-
 import Button from "@/components/Button";
 import Card from "@/components/Card";
 import type { AssetCondition, OcrDocument } from "@/types/documents";
 
 import { type AssetDraft, draftFromScan, isReceiptComplete, warrantyEndLabel } from "./draft";
+import Field, { inputClasses } from "./Field";
 
 interface ReceiptReviewProps {
   draft: AssetDraft;
@@ -29,41 +28,6 @@ const DURATIONS = [
   { value: "24", label: "2 years" },
   { value: "36", label: "3 years" },
 ];
-
-/** Shared look for every box: M07 field style (3382:636). */
-const inputClasses =
-  "h-12 w-full rounded-[9px] border border-border bg-surface px-3.5 text-[14px] font-medium tracking-[-0.28px] text-foreground outline-none focus:border-brand md:h-[46px]";
-
-interface FieldProps {
-  id: string;
-  label: string;
-  required?: boolean;
-  /** Shows the green "OCR" badge: this value was read from the receipt. */
-  fromOcr?: boolean;
-  /** Spans both columns of the desktop grid. */
-  wide?: boolean;
-  children: ReactNode;
-}
-
-/** A label (with optional "*" and "OCR" badge) above one input. */
-function Field({ id, label, required, fromOcr, wide, children }: FieldProps) {
-  return (
-    <div className={`flex flex-col gap-[7px] ${wide ? "md:col-span-2" : ""}`}>
-      <div className="flex items-center justify-between gap-2">
-        <label htmlFor={id} className="text-[12px] font-semibold tracking-[-0.24px] text-foreground">
-          {label}
-          {required && " *"}
-        </label>
-        {fromOcr && (
-          <span className="rounded-full bg-status-active-soft px-[9px] py-1 text-[10px] font-semibold tracking-[-0.2px] text-status-active">
-            OCR
-          </span>
-        )}
-      </div>
-      {children}
-    </div>
-  );
-}
 
 /**
  * Step 1's review: check and correct what OCR read, or type it all in for
