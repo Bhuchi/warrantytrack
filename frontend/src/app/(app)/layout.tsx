@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 
 import AppShell from "@/components/AppShell";
+import ToastProvider from "@/components/ToastProvider";
 import { getCurrentWorkspace } from "@/features/workspace/currentWorkspace";
 
 /**
- * Wraps every signed-in screen with the navigation panel and mobile top bar.
+ * Wraps every signed-in screen with the navigation panel and mobile top bar,
+ * and the ToastProvider, so a toast survives moving between these pages.
  * Marketing pages live in (marketing) and auth pages in (auth); neither gets
  * this chrome.
  *
@@ -19,8 +21,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const { workspace, user, unreadCount } = await getCurrentWorkspace();
 
   return (
-    <AppShell workspace={workspace} user={user} unreadCount={unreadCount}>
-      {children}
-    </AppShell>
+    <ToastProvider>
+      <AppShell workspace={workspace} user={user} unreadCount={unreadCount}>
+        {children}
+      </AppShell>
+    </ToastProvider>
   );
 }
