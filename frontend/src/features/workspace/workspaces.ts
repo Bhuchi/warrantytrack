@@ -14,7 +14,8 @@ export function toWorkspaceKind(value: string | undefined): WorkspaceKind {
 /**
  * What the signed-in screens show for each workspace: the nav panel's
  * workspace card, its user card (personal has none) and the unread count.
- * Values from Figma M10: personal 3455:536, organization 3392:2.
+ * Values from Figma M10: personal 3455:536, organization 3392:2. Avatar
+ * initials are the first letters of the first and last name (CA), not Figma's EM.
  *
  * TODO (FE-05, CLOUDAPPG5-123): replace with the real workspace from
  * GET /me once /workspaces exists (CLOUDAPPG5-92).
@@ -24,7 +25,7 @@ export const WORKSPACE_PLACEHOLDERS: Record<
   { workspace: NavWorkspace; user: NavUser | null; unreadCount: number }
 > = {
   personal: {
-    workspace: { name: "Chaiyapat Inventory", kind: "Personal workspace", initials: "EM" },
+    workspace: { name: "Chaiyapat Inventory", kind: "Personal workspace", initials: "CA" },
     user: null,
     unreadCount: 1,
   },
