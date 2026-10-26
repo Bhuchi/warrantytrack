@@ -1,3 +1,4 @@
+import type { CreateAssetRequest } from "@/types/assets";
 import type { AssetCondition, OcrDocument } from "@/types/documents";
 
 /**
@@ -25,6 +26,10 @@ export interface AssetDraft {
   warranty_duration_months: string;
   /** Step 2 (FE-10). OCR sometimes reads it from the receipt already. */
   serial_number: string;
+  /** Step 3 (FE-11), optional: where the box is kept. */
+  location: string;
+  /** Step 3, optional: photo of the box or where it is kept. Uploaded on save. */
+  location_photo: File | null;
 }
 
 export const EMPTY_DRAFT: AssetDraft = {
@@ -40,6 +45,8 @@ export const EMPTY_DRAFT: AssetDraft = {
   warranty_start_date: "",
   warranty_duration_months: "",
   serial_number: "",
+  location: "",
+  location_photo: null,
 };
 
 /**
@@ -86,4 +93,34 @@ export function warrantyEndLabel(draft: AssetDraft): string | null {
   const end = new Date(`${draft.warranty_start_date}T00:00:00`);
   end.setMonth(end.getMonth() + months);
   return end.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/**
+ * The draft as the API's POST /assets body. `photoKey` is the S3 key of the
+ * uploaded box photo, or null.
+ *
+ * TODO: the API wants vendor_id, but OCR and the form give a vendor name, and
+ * nothing turns one into the other yet (/vendors is Leg A). Asked the team
+ * whether POST /assets should accept vendor_name, or the frontend looks it up.
+ */
+export function toCreateAssetRequest(draft: AssetDraft, photoKey: string | null): CreateAssetRequest {
+  const months = Number(draft.warranty_duration_months);
+
+  return {
+    name: draft.name.trim(),
+    serial_number: draft.serial_number.trim(),
+    // Only reachable after step 1's Confirm, which requires a condition.
+    condition: draft.condition as AssetCondition,
+    purchase_date: draft.purchase_date,
+    price: draft.price.trim(),
+    currency: draft.currency,
+    invoice_number: draft.invoice_number.trim() || null,
+    location: draft.location.trim() || null,
+    location_image_key: photoKey,
+    document_ids: draft.document_id ? [draft.document_id] : [],
+    warranty:
+      draft.warranty_start_date && months
+        ? { provider: draft.warranty_provider.trim() || null, start_date: draft.warranty_start_date, duration_months: months }
+        : null,
+  };
 }

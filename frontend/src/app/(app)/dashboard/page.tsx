@@ -9,6 +9,7 @@ import { percent } from "@/features/dashboard/format";
 import { getDashboard } from "@/features/dashboard/getDashboard";
 import StatCard from "@/features/dashboard/StatCard";
 import StatusBreakdown from "@/features/dashboard/StatusBreakdown";
+import { getCurrentWorkspace } from "@/features/workspace/currentWorkspace";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -17,9 +18,11 @@ export const metadata: Metadata = {
 /**
  * Dashboard. Mobile M04 (3382:141), personal M04 (3418:385), desktop D04 (3348:2).
  *
- * TODO: the name and the mobile workspace card are Figma placeholders (the same
- * ones as in (app)/layout.tsx); read them from the session once auth and
- * /workspaces exist (FE-04, FE-05). The desktop "This Month" dropdown in D04 is left out on
+ * The mobile workspace card shows the workspace chosen on /workspace, the same
+ * one as the nav panel. The numbers are still the organization's mock data.
+ *
+ * TODO: the name in "Welcome back" is a Figma placeholder; read it from the
+ * session once auth exists (FE-04). The desktop "This Month" dropdown in D04 is left out on
  * purpose: the API has no date range yet, so it would change nothing. Add it
  * when /dashboard/summary accepts a period.
  *
@@ -29,6 +32,7 @@ export const metadata: Metadata = {
  */
 export default async function DashboardPage() {
   const { summary, expiring } = await getDashboard();
+  const { workspace } = await getCurrentWorkspace();
   const departments = summary.by_department.length;
 
   return (
@@ -48,14 +52,14 @@ export default async function DashboardPage() {
         className="flex items-center gap-2.5 rounded-[10px] border border-border bg-surface px-3 py-2.5 md:hidden"
       >
         <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand text-[10px] font-bold text-brand-foreground">
-          SI
+          {workspace.initials}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-px">
           <span className="truncate text-[13px] font-semibold tracking-[-0.26px] text-foreground">
-            SIIT Organization
+            {workspace.name}
           </span>
           <span className="truncate text-[10px] tracking-[-0.2px] text-muted-light">
-            Organization workspace
+            {workspace.kind}
           </span>
         </span>
         <ChevronDownIcon className="size-4 shrink-0 text-muted-light" />

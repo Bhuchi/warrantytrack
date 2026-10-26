@@ -1,8 +1,8 @@
 import Image from "next/image";
 
-type ToastTone = "success" | "info" | "error";
+export type ToastTone = "success" | "info" | "error";
 
-interface ToastProps {
+export interface ToastProps {
   /** Picks the icon and its tinted background. */
   tone: ToastTone;
   title: string;

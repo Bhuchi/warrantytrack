@@ -19,6 +19,8 @@ interface WorkspaceCardProps {
   href: string;
   selected: boolean;
   onSelect: () => void;
+  /** Runs when the desktop "Continue" is clicked, before moving on. */
+  onContinue?: () => void;
 }
 
 /**
@@ -38,6 +40,7 @@ export default function WorkspaceCard({
   href,
   selected,
   onSelect,
+  onContinue,
 }: WorkspaceCardProps) {
   return (
     <div
@@ -115,6 +118,7 @@ export default function WorkspaceCard({
 
       <Link
         href={href}
+        onClick={onContinue}
         className={`hidden h-[50px] w-full items-center justify-center rounded-lg text-[16px] font-bold tracking-[-0.32px] md:flex ${
           selected
             ? "bg-brand text-brand-foreground"
