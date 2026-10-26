@@ -11,8 +11,8 @@ const MOCK_RECEIPT: ExtractedReceipt = {
   ],
 };
 
-/** A Promise that resolves after `ms` milliseconds, so the mock feels like a real request. */
-function wait(ms: number): Promise<void> {
+/** A Promise that resolves after `ms` milliseconds, so a mock feels like a real request. */
+export function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
