@@ -116,17 +116,25 @@ export default function WorkspaceCard({
         </div>
       </button>
 
-      <Link
-        href={href}
-        onClick={onContinue}
-        className={`hidden h-[50px] w-full items-center justify-center rounded-lg text-[16px] font-bold tracking-[-0.32px] md:flex ${
-          selected
-            ? "bg-brand text-brand-foreground"
-            : "border border-border text-brand"
-        }`}
-      >
-        Continue
-      </Link>
+      {/* Desktop Continue. Only the selected card's one works, so you cannot
+          continue into a workspace that is not the one highlighted. */}
+      {selected ? (
+        <Link
+          href={href}
+          onClick={onContinue}
+          className="hidden h-[50px] w-full items-center justify-center rounded-lg bg-brand text-[16px] font-bold tracking-[-0.32px] text-brand-foreground md:flex"
+        >
+          Continue
+        </Link>
+      ) : (
+        <button
+          type="button"
+          disabled
+          className="hidden h-[50px] w-full cursor-not-allowed items-center justify-center rounded-lg border border-border text-[16px] font-bold tracking-[-0.32px] text-brand opacity-50 md:flex"
+        >
+          Continue
+        </button>
+      )}
     </div>
   );
 }
