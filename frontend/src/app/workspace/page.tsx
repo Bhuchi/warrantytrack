@@ -19,7 +19,7 @@ export default function WorkspacePage() {
     <div className="flex min-h-screen flex-1 flex-col bg-canvas">
       <div className="hidden md:block">
         {/* TODO: read the signed-in user from the auth session instead. */}
-        <AppTopBar email="chai@warrantytrack.io" initials="EM" />
+        <AppTopBar email="chai@warrantytrack.io" initials="CA" />
       </div>
 
       <main className="mx-auto flex w-full max-w-[920px] flex-col gap-5 px-6 pt-4 pb-7 md:items-center md:gap-11 md:px-8 md:pt-[166px] md:pb-20">
