@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AddAssetIcon } from "@/components/NavIcons";
 import AssetsList from "@/features/assets/AssetsList";
 import { getAssets } from "@/features/assets/getAssets";
+import { getCurrentWorkspace } from "@/features/workspace/currentWorkspace";
 
 export const metadata: Metadata = {
   title: "Assets",
@@ -14,12 +15,13 @@ export const metadata: Metadata = {
  * The page stays on the server; the search, filters and list run in the
  * browser inside AssetsList.
  *
- * TODO: "SIIT Organization" is the Figma placeholder; read the workspace name
- * from the session once /workspaces exists (FE-05).
+ * The subtitle names the workspace chosen on /workspace. The asset list itself
+ * is still the same mock data for both workspaces.
  */
 export default async function AssetsPage() {
   // Everything registered, ignoring filters: the count under the title.
   const { total } = await getAssets();
+  const { workspace } = await getCurrentWorkspace();
 
   return (
     <main className="flex flex-1 flex-col gap-3 px-5 pt-4 pb-6 md:gap-4 md:px-8 md:pt-6 md:pb-8">
@@ -29,7 +31,7 @@ export default async function AssetsPage() {
             Assets
           </h1>
           <p className="text-[12px] tracking-[-0.24px] text-muted md:text-[14px] md:tracking-[-0.28px]">
-            {total} registered in SIIT Organization
+            {total} registered in {workspace.name}
           </p>
         </div>
         {/* Desktop: next to the title (D05). Mobile has it at the bottom instead. */}
