@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import AppShell from "@/components/AppShell";
 import ToastProvider from "@/components/ToastProvider";
+import { getCurrentWorkspace } from "@/features/workspace/currentWorkspace";
 
 /**
  * Wraps every signed-in screen with the navigation panel and mobile top bar,
@@ -9,25 +10,19 @@ import ToastProvider from "@/components/ToastProvider";
  * Marketing pages live in (marketing) and auth pages in (auth); neither gets
  * this chrome.
  *
- * TODO: workspace, user and unread count are the Figma placeholders. Read them
- * from the session and the API once auth and /workspaces exist (FE-04, FE-05).
+ * The nav panel shows the workspace chosen on /workspace, read from the
+ * "workspace" cookie. Reading a cookie makes these pages render on every
+ * request instead of once at build time.
+ *
+ * TODO (FE-05, CLOUDAPPG5-123): the names, user and unread count are still the
+ * Figma placeholders; read them from GET /me once /workspaces exists.
  */
-export default function AppLayout({ children }: { children: ReactNode }) {
+export default async function AppLayout({ children }: { children: ReactNode }) {
+  const { workspace, user, unreadCount } = await getCurrentWorkspace();
+
   return (
     <ToastProvider>
-      <AppShell
-        workspace={{
-          name: "SIIT Organization",
-          kind: "Organization workspace",
-          initials: "SI",
-        }}
-        user={{
-          name: "Chaiyapat A.",
-          department: "IT Department",
-          initials: "CA",
-        }}
-        unreadCount={3}
-      >
+      <AppShell workspace={workspace} user={user} unreadCount={unreadCount}>
         {children}
       </AppShell>
     </ToastProvider>
