@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api.routes import health
+from app.api.routes import health, notifications
 from app.core.config import settings
 
 app = FastAPI(
@@ -19,8 +19,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# One include_router per resource. Give each feature router its own prefix so
+# each path is defined in exactly one place; the route files use "" for the
+# collection root.
 app.include_router(health.router)
-
-# Add your feature router here, one line per resource:
+app.include_router(notifications.router, prefix="/notifications")
+# Next, following the same pattern:
 #   from app.api.routes import assets
 #   app.include_router(assets.router, prefix="/assets")
