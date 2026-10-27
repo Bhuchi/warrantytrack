@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_current_workspace
@@ -34,3 +34,18 @@ def list_notifications(
         db, workspace_id, user_id
     )
     return NotificationList(unread=unread, items=items)
+
+
+@router.post("/mark-all-read", status_code=status.HTTP_204_NO_CONTENT)
+def mark_all_read(
+    db: Session = Depends(get_db),
+    workspace_id: uuid.UUID = Depends(get_current_workspace),
+    user_id: uuid.UUID = Depends(get_current_user),
+) -> None:
+    """POST /notifications/mark-all-read — mark every unread as read.
+
+    A write endpoint: it changes data, so the service commits. Returns 204 No
+    Content (empty body) because the bell just clears its badge — it doesn't
+    need anything back. That's why there is no response_model here.
+    """
+    notification_service.mark_all_read(db, workspace_id, user_id)
