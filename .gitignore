@@ -39,3 +39,18 @@ CLAUDE.md
 CLAUDE.local.md
 AGENTS.md
 .mcp.json
+
+# Terraform
+# State holds secrets in plaintext and must never be committed. The lock file
+# is committed on purpose, so everyone resolves the same provider versions.
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+# Real values, including the SES sender and alert email. Examples are committed.
+terraform.tfvars
+*.auto.tfvars
+!terraform.tfvars.example
+!*.tfvars.example
