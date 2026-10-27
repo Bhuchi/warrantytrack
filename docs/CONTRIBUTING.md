@@ -64,9 +64,30 @@ chore: bump next.js to 14.2 (CLOUDAPPG5-65)
 
 Types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`.
 
+### No AI attribution trailers
+
+If you used an AI assistant, write the message as your own. Do **not** include:
+
+- `Co-Authored-By: Claude ... <noreply@anthropic.com>`
+- `Claude-Session: https://claude.ai/code/session_...`
+- `🤖 Generated with [Claude Code](...)`
+
+This applies to PR descriptions too, and it applies even when the tool adds
+them by default — delete them before you commit.
+
+We have had to strip these from this repo's history **twice**, each time
+rewriting published commits and force-pushing branches everyone had already
+pulled. The second time, a stale branch that still carried them was merged back
+into `dev` and undid the first cleanup. The `Claude-Session:` form also puts a
+link to a private session transcript into the history.
+
+After any such cleanup, every branch you hold must be reset or rebased onto the
+rewritten history before you push again — see [Handling conflicts](#handling-conflicts).
+
 ## Pull Requests
 
 - Title includes the Jira key so tickets link automatically.
+- No AI attribution in the description — see [Commit messages](#commit-messages).
 - Keep PRs small — ideally one screen or one endpoint per PR.
 - Don't merge your own PR without a review.
 - Resolve all review comments before merging.
