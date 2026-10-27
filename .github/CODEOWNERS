@@ -13,7 +13,7 @@
 /backend/                     @fongctw @SirErthh @Bhuchi
 
 # Infrastructure, CI and deployment
-/infra/                       @Bhuchi
+/infra/                       @fongctw @Bhuchi
 /.github/                     @Bhuchi
 /docker-compose.yml           @Bhuchi
 /scripts/                     @Bhuchi
