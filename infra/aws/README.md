@@ -1,0 +1,103 @@
+# infra/aws — Terraform for the AWS deployment
+
+Infrastructure as code for the target architecture in
+[`docs/architecture.md`](../../docs/architecture.md) and the service list and
+cost rules in [`infra/README.md`](../README.md).
+
+Step-by-step commands are in [`DEPLOYMENT.md`](DEPLOYMENT.md).
+
+## What this creates
+
+| Service | Purpose |
+|---|---|
+| **VPC** | `10.0.0.0/16`, 2 public + 2 private subnets across 2 AZs, internet gateway, S3 gateway endpoint. **No NAT gateway.** |
+| **Security groups** | ALB:80 from the internet → task:3000 from the ALB only → RDS:5432 from the task only |
+| **ALB** | Public entry point, one target group on the web container's port 3000 |
+| **ECS Fargate** | Cluster, a two-container task (`web` + `api`), the service, and a separate job task definition for migrations |
+| **ECR** | Two repositories with scan-on-push and a 10-image lifecycle policy |
+| **RDS PostgreSQL** | Single-AZ, encrypted, private, 7-day backups. No final snapshot — see DEPLOYMENT.md teardown. |
+| **Cognito** | User pool and public browser client |
+| **SSM Parameter Store** | `DATABASE_URL` and `SECRET_KEY` as SecureStrings |
+| **CloudWatch Logs** | `/ecs/<name>`, 14-day retention |
+| **IAM** | Scoped execution and task roles |
+| **AWS Budgets** | Monthly alert at 50%, 80% and forecast 100% |
+
+## What this deliberately does not create
+
+| Not here | Owner |
+|---|---|
+| **S3 bucket and its CORS configuration** | S3/Textract workstream. This stack takes `document_bucket_name` as a variable and grants the task role access to it. |
+| **SES identity verification** | SES workstream. Verify the sender before any mail sends. |
+| **EventBridge Scheduler** for expiry emails | SES/scheduler workstream. The `job` task definition here is what a schedule should invoke. |
+| **HTTPS / ACM certificate** | Needs a domain, and none has been chosen — see [`docs/REQUIRES_YOUR_INPUT.md`](../../docs/REQUIRES_YOUR_INPUT.md). Traffic is HTTP only, so use test accounts and no real personal data. |
+
+## Two design decisions worth knowing
+
+### The browser reaches the API same-origin
+
+The API serves `/health`, `/assets` and `/dashboard` at its **root**, and the
+Next.js frontend serves pages at those same paths. Path-based routing on the
+load balancer would therefore be ambiguous.
+
+Instead the web container rewrites `/api/*` to the api container on
+`127.0.0.1:8000`, stripping the prefix:
+
+```
+Browser ─→ ALB:80 ─→ web:3000 ──/api/* rewrite──→ api:8000
+```
+
+That lets `NEXT_PUBLIC_API_URL` be a relative `/api`, which means **no CORS**
+and **no need to know the load balancer hostname at image build time**. The
+rewrite lives in `frontend/next.config.ts`; local development is unaffected,
+because `.env.local` points `NEXT_PUBLIC_API_URL` straight at
+`http://localhost:8000` and bypasses it.
+
+Port 8000 is absent from every security group on purpose — nothing outside the
+task needs to reach it.
+
+### Cognito is applied before the web image is built
+
+Next inlines `NEXT_PUBLIC_*` values at build time, so the web image cannot be
+built until the Cognito client ID exists. Cognito, ECR and the budget alert are
+all free, so they are applied first; you read the outputs, build and push, and
+only then create the chargeable resources. `DEPLOYMENT.md` sets this out as an
+ordered sequence.
+
+## Cost
+
+No NAT gateway (~USD 33/month saved), single-AZ RDS, one task, and an ECR
+lifecycle policy. The budget alert is created first because
+[`infra/README.md`](../README.md) says to do that before creating any resource.
+
+**Tear the stack down when not demoing.** `desired_count = 0` stops Fargate but
+the ALB and RDS keep billing — a load balancer has no stop operation.
+
+## Learner Lab testing
+
+The stack targets a real AWS account. To rehearse in an AWS Academy Learner Lab
+first, start from `terraform.tfvars.lab.example`, which sets
+`create_iam_roles = false` (labs deny `iam:CreateRole`) and
+`use_container_database = true` (labs usually deny `rds:CreateDBInstance`).
+
+The container database stores data on the task's ephemeral disk, so **all data
+is lost whenever the task restarts.** It exists to prove the deployment shape,
+never for a real deployment.
+
+## Files
+
+```
+versions.tf        provider pins and default tags
+variables.tf       the full input surface
+main.tf            data sources, locals, the backend's environment contract
+network.tf         VPC, subnets, routing, S3 endpoint
+security.tf        the three security groups
+identity.tf        Cognito user pool and client
+registry.tf        ECR repositories and lifecycle policies
+secrets.tf         generated DATABASE_URL and SECRET_KEY in SSM
+database.tf        RDS PostgreSQL
+load_balancer.tf   ALB, target group, listeners
+ecs.tf             cluster, task definitions, service
+iam.tf             execution and task roles
+budget.tf          AWS Budgets alert
+outputs.tf         everything the deploy steps and the frontend build need
+```

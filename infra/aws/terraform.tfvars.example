@@ -1,0 +1,41 @@
+# Copy to terraform.tfvars and fill in. Never commit terraform.tfvars.
+#
+# These are the defaults for the real AWS account. For a Learner Lab test run,
+# start from terraform.tfvars.lab.example instead.
+
+aws_region  = "ap-southeast-1"
+name        = "warrantytrack"
+environment = "production"
+
+# The document bucket is created by the S3/Textract workstream, not here.
+# Ask for the exact bucket name before the first apply.
+document_bucket_name = "warrantytrack-documents-CHANGEME"
+
+# Must be verified in SES before any mail sends. SES also starts in sandbox
+# mode, so verify every recipient too, or delivery fails silently.
+ses_sender_email = "noreply@CHANGEME"
+
+# Receives the budget alerts.
+budget_alert_email = "CHANGEME@g.siit.tu.ac.th"
+
+# Scoped execution and task roles. A real account allows this.
+create_iam_roles = true
+
+# Bootstrap with no running tasks: the images do not exist in ECR yet. Push
+# images first, then set a real tag and desired_count = 1.
+image_tag     = "bootstrap"
+desired_count = 0
+
+# One task normally. Two only for the demo.
+task_cpu    = 512
+task_memory = 1024
+
+# Single-AZ. Multi-AZ is the production answer and is documented as such in the
+# report, but it doubles the database bill.
+db_instance_class = "db.t4g.micro"
+db_multi_az       = false
+
+# USD 110 is roughly THB 4,000, the budget for the whole semester.
+budget_limit_usd = 110
+
+# HTTP only. HTTPS needs a domain and an ACM certificate, neither chosen yet.
