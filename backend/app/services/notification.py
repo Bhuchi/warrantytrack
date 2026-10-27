@@ -8,8 +8,9 @@ here. All SQL lives in services, so logic is testable without HTTP and reusable
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.models.notification import Notification
@@ -39,3 +40,26 @@ def list_for_workspace_user(
 
     unread = sum(1 for n in items if not n.read)
     return unread, list(items)
+
+
+def mark_all_read(
+    db: Session, workspace_id: uuid.UUID, user_id: uuid.UUID
+) -> int:
+    """Mark every unread notification for this user read. Returns rows changed.
+
+    One bulk UPDATE instead of loading rows and looping in Python — the DB does
+    it in a single statement and we never pull data we don't need. The
+    `read == False` filter keeps it idempotent (running it twice changes nothing
+    the second time) and avoids rewriting read_at on rows already read.
+    """
+    result = db.execute(
+        update(Notification)
+        .where(
+            Notification.workspace_id == workspace_id,
+            Notification.user_id == user_id,
+            Notification.read.is_(False),
+        )
+        .values(read=True, read_at=datetime.now(timezone.utc))
+    )
+    db.commit()
+    return result.rowcount
