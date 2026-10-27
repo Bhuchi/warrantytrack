@@ -15,7 +15,13 @@ from __future__ import annotations
 
 import uuid
 
+from fastapi import Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from app.core.config import settings
+from app.db.session import get_db
+from app.models.membership import Membership, MembershipRole
 
 # Deterministic IDs so the stub and the seed script always agree on "who".
 DEV_WORKSPACE_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
@@ -45,3 +51,42 @@ def get_current_user() -> uuid.UUID:
     """STUB — the signed-in user. Real version: derive from Cognito `sub`."""
     _forbid_stub_in_prod()
     return DEV_USER_ID
+
+
+def get_current_membership(
+    db: Session = Depends(get_db),
+    workspace_id: uuid.UUID = Depends(get_current_workspace),
+    user_id: uuid.UUID = Depends(get_current_user),
+) -> Membership:
+    """The caller's role inside the workspace the request acts in.
+
+    This one is NOT a stub. Identity is stubbed above (who you are), but
+    authorization is read from the `memberships` table on every request, which
+    is exactly how it works once Cognito lands — see docs/architecture.md,
+    Decision 2. Roles are never taken from a token.
+
+    No membership in that workspace -> **404, not 403**. A 403 would confirm
+    the workspace exists, which leaks across tenants (docs/api.md).
+    """
+    membership = db.scalars(
+        select(Membership).where(
+            Membership.workspace_id == workspace_id,
+            Membership.user_id == user_id,
+        )
+    ).first()
+    if membership is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    return membership
+
+
+def employee_scope(membership: Membership) -> uuid.UUID | None:
+    """The user id a query must be narrowed to, or None for the whole workspace.
+
+    Employees may only see assets assigned to them (docs/architecture.md);
+    owners and admins see everything. Returning None rather than a boolean
+    keeps the caller's query to one `if`, and keeps the rule in one place
+    instead of in every endpoint that lists assets.
+    """
+    if membership.role is MembershipRole.employee:
+        return membership.user_id
+    return None

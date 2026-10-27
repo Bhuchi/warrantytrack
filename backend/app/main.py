@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api.routes import health, notifications
+from app.api.routes import dashboard, health, notifications
 from app.core.config import settings
 
 app = FastAPI(
@@ -24,6 +24,7 @@ app.add_middleware(
 # collection root.
 app.include_router(health.router)
 app.include_router(notifications.router, prefix="/notifications")
+app.include_router(dashboard.router, prefix="/dashboard")
 # Next, following the same pattern:
 #   from app.api.routes import assets
 #   app.include_router(assets.router, prefix="/assets")

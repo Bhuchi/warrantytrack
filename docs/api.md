@@ -65,6 +65,93 @@ target group.
 { "status": "ok", "service": "warrantytrack-api", "version": "0.1.0" }
 ```
 
+### Warranty status · owner: Bhuchi (Leg B)
+
+No standalone endpoints — warranty is embedded in the asset (set via
+`POST`/`PATCH /assets`). Leg B owns the **status computation** surfaced as
+`warranty_status` (list) / `warranty.status` (detail) wherever an asset appears:
+
+- `active` — today is before `end_date − 30 days`
+- `expiring_soon` — within 30 days of `end_date` (inclusive; expiring **today**
+  is `expiring_soon`, not `expired`)
+- `expired` — today is after `end_date`
+- `unknown` — the asset has no warranty
+
+Implemented in `app/services/warranty.py`. Anything that needs the rule calls
+`compute_status()` (one asset) or `soon_cutoff()` (a boundary date for SQL to
+count with) — never its own copy of the comparison.
+
+### Dashboard · owner: Bhuchi (Leg B)
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/dashboard/summary` | Counts by status + by department (D04 cards + charts) |
+| `GET` | `/dashboard/expiring?days=30` | Assets expiring within N days (D04 table) |
+
+`days` accepts 1–365; outside that is `422`. It selects **which rows appear**
+and does not change what `status` means — asked for 60 days, a warranty 45 days
+out is listed but still reports `active`, so the word matches every other
+screen. Already-expired assets are excluded (they are still counted in
+`summary.expired`).
+
+An **employee** sees only assets assigned to them, so their numbers are theirs,
+not the organization's. Owners and admins see the whole workspace.
+
+Assets with no department are counted in `total` but have no `by_department`
+row — the API does not invent an "Others" label. The chart can show the
+remainder as `total − Σ count` if it wants one.
+
+```jsonc
+// GET /dashboard/summary
+{
+  "total": 128, "active": 90, "expiring_soon": 12, "expired": 20, "no_warranty": 6,
+  "by_department": [
+    { "department_id": "uuid", "name": "IT", "count": 45 },
+    { "department_id": "uuid", "name": "Marketing", "count": 28 }
+  ]
+}
+
+// GET /dashboard/expiring?days=30
+{
+  "items": [
+    { "asset_id": "uuid", "name": "Dell Latitude 5540", "vendor": "Power Buy",
+      "department": "IT", "end_date": "2026-11-10", "status": "expiring_soon" }
+    // vendor and department are NULLABLE: both are optional on an asset.
+  ]
+}
+```
+
+### Notifications · owner: Bhuchi (Leg B)
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/notifications` | In-app list (bell + Notifications screen D09) |
+| `POST` | `/notifications/mark-all-read` | Mark all as read |
+
+```jsonc
+// GET /notifications
+{
+  "unread": 2,
+  "items": [
+    { "id": "uuid", "type": "warranty_expiring", "read": false,
+      "asset_id": "uuid",
+      "title": "Dell Latitude 5540 warranty expires in 30 days",
+      "created_at": "2026-10-19T07:00:00Z" }
+  ]
+}
+// POST /notifications/mark-all-read  → 204
+```
+
+`unread` counts the same rows the list returns, so the badge and the list can
+never disagree. `mark-all-read` is one bulk `UPDATE` filtered on
+`read = false`, which makes it idempotent — running it twice changes nothing
+the second time and does not rewrite `read_at`.
+
+The scheduled job (Leg B) that scans expiring warranties writes these rows and
+sends the SES email; the frontend bell just reads this list. **The job is not
+built yet** (CLOUDAPPG5-98) — until it runs, rows come from
+`scripts/seed_dev.py`.
+
 ---
 
 ## Planned
@@ -303,64 +390,3 @@ accuracy in the final presentation.
 // → 201
 { "created_asset_ids": ["uuid"], "document_id": "uuid" }
 ```
-
-### Warranty status · owner: Bhuchi (Leg B)
-
-No standalone endpoints — warranty is embedded in the asset (set via
-`POST`/`PATCH /assets`). Leg B owns the **status computation** surfaced as
-`warranty_status` (list) / `warranty.status` (detail) wherever an asset appears:
-
-- `active` — today is before `end_date − 30 days`
-- `expiring_soon` — within 30 days of `end_date`
-- `expired` — today is after `end_date`
-- `unknown` — the asset has no warranty
-
-### Dashboard · owner: Bhuchi (Leg B)
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/dashboard/summary` | Counts by status + by department (D04 cards + charts) |
-| `GET` | `/dashboard/expiring?days=30` | Assets expiring within N days (D04 table) |
-
-```jsonc
-// GET /dashboard/summary
-{
-  "total": 128, "active": 90, "expiring_soon": 12, "expired": 20, "no_warranty": 6,
-  "by_department": [
-    { "department_id": "uuid", "name": "IT", "count": 45 },
-    { "department_id": "uuid", "name": "Marketing", "count": 28 }
-  ]
-}
-
-// GET /dashboard/expiring?days=30
-{
-  "items": [
-    { "asset_id": "uuid", "name": "Dell Latitude 5540", "vendor": "Power Buy",
-      "department": "IT", "end_date": "2026-11-10", "status": "expiring_soon" }
-  ]
-}
-```
-
-### Notifications · owner: Bhuchi (Leg B)
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/notifications` | In-app list (bell + Notifications screen D09) |
-| `POST` | `/notifications/mark-all-read` | Mark all as read |
-
-```jsonc
-// GET /notifications
-{
-  "unread": 2,
-  "items": [
-    { "id": "uuid", "type": "warranty_expiring", "read": false,
-      "asset_id": "uuid",
-      "title": "Dell Latitude 5540 warranty expires in 30 days",
-      "created_at": "2026-10-19T07:00:00Z" }
-  ]
-}
-// POST /notifications/mark-all-read  → 204
-```
-
-The scheduled job (Leg B) that scans expiring warranties writes these rows and
-sends the SES email; the frontend bell just reads this list.
