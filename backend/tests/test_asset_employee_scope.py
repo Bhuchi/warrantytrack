@@ -256,10 +256,10 @@ def test_employee_can_edit_their_own_asset(
     membership.role = MembershipRole.employee
     db.flush()
 
-    response = api.patch(f"/assets/{mine.id}", json={"location": "Shelf B2"})
+    response = api.patch(f"/assets/{mine.id}", json={"storage_note": "Box is on the top shelf"})
 
     assert response.status_code == 200
-    assert response.json()["location"] == "Shelf B2"
+    assert response.json()["storage_note"] == "Box is on the top shelf"
 
 
 # --- the write paths must still be able to read back their own work ---------

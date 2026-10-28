@@ -20,7 +20,7 @@ from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import Session, contains_eager, joinedload
 
 from app.models.asset import Asset
-from app.models.catalog import Category, Vendor
+from app.models.catalog import Category, Location, Vendor
 from app.models.document import AssetDocument, Document
 from app.models.warranty import Warranty
 from app.schemas.asset import AssetCreate, AssetUpdate, WarrantyInput
@@ -177,6 +177,7 @@ def list_assets(
                 # queries per asset for the names the table draws.
                 joinedload(Asset.category),
                 joinedload(Asset.vendor),
+                joinedload(Asset.location_ref),
             )
             .where(*conditions)
             .order_by(Asset.created_at.desc(), Asset.id)
@@ -192,7 +193,7 @@ def list_assets(
 
 def _resolve_catalog_id(
     db: Session,
-    model: type[Category] | type[Vendor],
+    model: type[Category] | type[Vendor] | type[Location],
     workspace_id: uuid.UUID,
     given_id: uuid.UUID | None,
     given_name: str | None,
@@ -252,7 +253,12 @@ def create_asset(
             db, Vendor, workspace_id, data.vendor_id, data.vendor_name
         ),
         department_id=data.department_id,
-        location=data.location,
+        location_id=_resolve_catalog_id(
+            db, Location, workspace_id, data.location_id, data.location_name
+        ),
+        # `assets.location` is the free-text storage note; the column name
+        # predates the API field name. See the schema for why.
+        location=data.storage_note,
         image_key=data.image_key,
         location_image_key=data.location_image_key,
         assigned_to_user_id=data.assigned_to_user_id,
@@ -328,7 +334,6 @@ _PLAIN_UPDATE_FIELDS = (
     "currency",
     "invoice_number",
     "department_id",
-    "location",
     "image_key",
     "location_image_key",
 )
@@ -366,8 +371,18 @@ def update_asset(
             value = getattr(data, field)
             setattr(asset, field, value.strip() if isinstance(value, str) else value)
 
+    # The one field whose API name and column name differ: `storage_note` is
+    # stored in `assets.location`, which was named before the field was.
+    if "storage_note" in sent:
+        note = data.storage_note
+        asset.location = note.strip() if note is not None else None
+
     # A name and an id are two ways of setting the same column, so they share
     # one branch: whichever the client sent decides the new value.
+    if "location_id" in sent or "location_name" in sent:
+        asset.location_id = _resolve_catalog_id(
+            db, Location, asset.workspace_id, data.location_id, data.location_name
+        )
     if "category_id" in sent or "category_name" in sent:
         asset.category_id = _resolve_catalog_id(
             db, Category, asset.workspace_id, data.category_id, data.category_name
@@ -464,6 +479,7 @@ def get_asset(
                 joinedload(Asset.category),
                 joinedload(Asset.vendor),
                 joinedload(Asset.department),
+                joinedload(Asset.location_ref),
                 joinedload(Asset.assigned_to),
                 joinedload(Asset.documents),
             )

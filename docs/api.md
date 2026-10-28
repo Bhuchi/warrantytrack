@@ -167,7 +167,7 @@ inline:
       // Flattened, not nested: the D05 table draws these as plain cells.
       "category_name": "Laptop",
       "vendor_name": "Power Buy",
-      "location": "Shelf B2"
+      "location": "HQ Floor 3"       // the SITE, from /locations
     }
   ],
   "total": 1, "page": 1, "page_size": 20
@@ -189,8 +189,9 @@ tenants, `assigned_to_user_id` separates people inside one.
 // POST /assets   (request)
 // required: name, serial_number, condition, purchase_date, price, vendor
 //           (the 18 Oct decision — see docs/frontend-plan.md)
-// optional: category, department_id, invoice_number, location (box/storage),
-//           *_image_key, document_ids, assigned_to_user_id, warranty
+// optional: category, location (site), department_id, invoice_number,
+//           storage_note, *_image_key, document_ids, assigned_to_user_id,
+//           warranty
 {
   "name": "Dell Latitude 5540",
   "serial_number": "ABC123",
@@ -204,8 +205,9 @@ tenants, `assigned_to_user_id` separates people inside one.
   // OCR both produce "Power Buy", not a UUID. An id wins if both are sent.
   "vendor_name": "Power Buy",          // or "vendor_id": "uuid"
   "category_name": "Laptop",           // or "category_id": "uuid"
+  "location_name": "HQ Floor 3",       // or "location_id": "uuid" — the SITE
   "department_id": "uuid",             // optional
-  "location": "Shelf B2",             // optional (box / storage)
+  "storage_note": "Box is on the top shelf",   // optional, free text
   "location_image_key": null,          // optional S3 key
   "document_ids": ["uuid"],            // optional: receipts already uploaded
   "assigned_to_user_id": null,         // optional
@@ -246,7 +248,8 @@ ignored if sent in the body.
   "category":   { "id": "uuid", "name": "Laptop" },
   "vendor":     { "id": "uuid", "name": "Power Buy" },
   "department": { "id": "uuid", "name": "IT" },
-  "location": "Shelf B2",
+  "location":   { "id": "uuid", "name": "HQ Floor 3" },   // the site
+  "storage_note": "Box is on the top shelf",
   "assigned_to": { "user_id": "uuid", "display_name": "Earth" },
   "warranty": {
     "provider": "Dell",
@@ -351,8 +354,12 @@ whole list; a page of 20 would just make the frontend loop to rebuild it.
 `{id, name}` is the same object a catalog row already appears as when nested
 in `GET /assets/{id}`, so the frontend sees one shape either way.
 
-> `locations` is the **site** picker; `assets.location` is free text for the
-> spot inside it ("Shelf B2"). Two different things — see docs/erd.md.
+> **Two things, two names.** `location` on an asset is the **site** from this
+> list ("HQ Floor 3"), nested like `category` and `vendor`. The free text about
+> where the box is kept ("Box is on the top shelf") is `storage_note` — the Add
+> Asset form labels that field "Note", and it is what FE-11 calls a free-text
+> note. The database column behind `storage_note` is still named
+> `assets.location`; only the API field was renamed, so there is no migration.
 
 ```jsonc
 // POST /categories  (/vendors, /departments and /locations are identical)

@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.asset import Asset, AssetCondition
-from app.models.catalog import Category, Vendor
+from app.models.catalog import Category, Location, Vendor
 from app.models.user import User
 from app.models.warranty import Warranty
 from app.models.workspace import Workspace
@@ -32,7 +32,8 @@ def make_asset(
     warranty_end: date | None = None,
     category: Category | None = None,
     vendor: Vendor | None = None,
-    location: str | None = None,
+    site: Location | None = None,
+    storage_note: str | None = None,
     invoice_number: str | None = None,
     assigned_to: User | None = None,
 ) -> Asset:
@@ -40,6 +41,10 @@ def make_asset(
 
     `warranty_end=None` means no warranty row at all — which is what makes an
     asset's status `unknown`, not a null end date.
+
+    `site` is the row from the `locations` list; `storage_note` is the free
+    text about where the box is kept. Both exist because they are different
+    things — the model column for the note is still called `location`.
     """
     asset = Asset(
         workspace_id=workspace.id,
@@ -49,7 +54,8 @@ def make_asset(
         purchase_date=date(2025, 3, 1),
         currency="THB",
         invoice_number=invoice_number,
-        location=location,
+        location=storage_note,
+        location_id=site.id if site else None,
         category_id=category.id if category else None,
         vendor_id=vendor.id if vendor else None,
         assigned_to_user_id=assigned_to.id if assigned_to else None,
@@ -85,17 +91,24 @@ def test_empty_workspace_returns_no_items(api: TestClient) -> None:
 def test_row_flattens_the_names_the_table_draws(
     api: TestClient, db: Session, workspace: Workspace
 ) -> None:
-    """category_name, vendor_name and location, as asked for in assetList.ts."""
+    """category_name, vendor_name and location, as asked for in assetList.ts.
+
+    `location` is the site from the `locations` list, not the storage note —
+    the D05 column sits beside CATEGORY and VENDOR and is filtered by a
+    dropdown, which only a list can fill.
+    """
     category = Category(workspace_id=workspace.id, name="Laptop")
     vendor = Vendor(workspace_id=workspace.id, name="Power Buy")
-    db.add_all([category, vendor])
+    site = Location(workspace_id=workspace.id, name="HQ Floor 3")
+    db.add_all([category, vendor, site])
     db.flush()
     make_asset(
         db,
         workspace,
         category=category,
         vendor=vendor,
-        location="Shelf B2",
+        site=site,
+        storage_note="Box is on the top shelf",
         warranty_end=TODAY + timedelta(days=365),
     )
 
@@ -103,8 +116,10 @@ def test_row_flattens_the_names_the_table_draws(
 
     assert item["category_name"] == "Laptop"
     assert item["vendor_name"] == "Power Buy"
-    assert item["location"] == "Shelf B2"
+    assert item["location"] == "HQ Floor 3"
     assert item["serial_number"] == "ABC123"
+    # The storage note is detail-screen material; it is not a list column.
+    assert "storage_note" not in item
 
 
 def test_assets_from_another_workspace_are_never_listed(
@@ -276,7 +291,8 @@ def test_detail_returns_the_nested_contract_shape(
     category = Category(workspace_id=workspace.id, name="Laptop")
     vendor = Vendor(workspace_id=workspace.id, name="Power Buy")
     user = User(cognito_sub="sub-1", email="earth@example.com", display_name="Earth")
-    db.add_all([category, vendor, user])
+    site = Location(workspace_id=workspace.id, name="HQ Floor 3")
+    db.add_all([category, vendor, site, user])
     db.flush()
     asset = make_asset(
         db,
@@ -284,7 +300,8 @@ def test_detail_returns_the_nested_contract_shape(
         category=category,
         vendor=vendor,
         assigned_to=user,
-        location="Shelf B2",
+        site=site,
+        storage_note="Box is on the top shelf",
         warranty_end=TODAY + timedelta(days=365),
     )
 
@@ -292,6 +309,8 @@ def test_detail_returns_the_nested_contract_shape(
 
     assert body["category"] == {"id": str(category.id), "name": "Laptop"}
     assert body["vendor"] == {"id": str(vendor.id), "name": "Power Buy"}
+    assert body["location"] == {"id": str(site.id), "name": "HQ Floor 3"}
+    assert body["storage_note"] == "Box is on the top shelf"
     assert body["department"] is None
     assert body["assigned_to"] == {"user_id": str(user.id), "display_name": "Earth"}
     assert body["warranty"]["status"] == "active"

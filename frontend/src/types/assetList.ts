@@ -21,9 +21,12 @@ export interface AssetListItem {
   assigned_to_user_id: string | null;
 
   /*
-   * Not in the contract yet. The D05 table shows these columns; asked
-   * Sirawich (Leg A, /assets) to add them to each list row. Optional until
-   * then, so the table shows "—" when they are missing.
+   * The three extra columns the D05 table draws. Now in the contract —
+   * GET /assets returns all three on every row.
+   *
+   * `location` is the SITE from /locations ("HQ Floor 3"), matching the
+   * LOCATION column beside CATEGORY and VENDOR. The box/storage note is a
+   * different field (`storage_note`) and only appears on Asset Detail.
    */
   category_name?: string | null;
   vendor_name?: string | null;
