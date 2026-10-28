@@ -138,8 +138,9 @@ inline:
 
 ### Assets · owner: Sirawich (Leg A)
 
-> **Built:** `GET /assets`, `GET /assets/{id}`, `POST /assets`,
-> `PATCH /assets/{id}`. **Still planned:** `DELETE`, `assign`, `import`.
+> **Built:** the full CRUD set — `GET /assets`, `GET /assets/{id}`,
+> `POST /assets`, `PATCH /assets/{id}`, `DELETE /assets/{id}`.
+> **Still planned:** `assign`, `import`.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -269,6 +270,22 @@ ignored if sent in the body.
 // POST /assets/{id}/assign   (request)
 { "assigned_to_user_id": "uuid" }      // null to unassign
 // → 200  (updated asset)
+
+// DELETE /assets/{id}   → 204, no body
+//
+// Owners and admins only. The codes mean different things:
+//   404  no membership in this workspace — not 403, which would confirm the
+//        workspace exists
+//   403  an employee: they belong here, they are just not allowed. Checked
+//        before the asset is looked up, so it cannot be used to probe for ids
+//   404  the asset does not exist, or is in another workspace
+//
+// The warranty and the asset_documents links go with it; the documents
+// themselves stay, since one invoice can back several assets. Notifications
+// survive with asset_id set to NULL.
+//
+// Permanent — there is no soft-delete column in the schema. Archiving instead
+// would be a migration and a contract change.
 ```
 
 ```jsonc

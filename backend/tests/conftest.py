@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_current_workspace
 from app.db.session import engine, get_db
 from app.main import app
+from app.models.membership import Membership, MembershipRole
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceType
 
@@ -92,8 +93,30 @@ def user(db: Session) -> User:
 
 
 @pytest.fixture
+def membership(db: Session, workspace: Workspace, user: User) -> Membership:
+    """The caller's role in the workspace, defaulting to `owner`.
+
+    A real row, because authorization is read from this table on every request
+    rather than taken from a token (docs/architecture.md, Decision 2) — so an
+    endpoint guarded by `get_current_membership` sees nothing to authorize
+    without it.
+
+    A test that needs a different role reassigns it before making the request:
+
+        membership.role = MembershipRole.employee
+        db.flush()
+    """
+    membership = Membership(
+        user_id=user.id, workspace_id=workspace.id, role=MembershipRole.owner
+    )
+    db.add(membership)
+    db.flush()
+    return membership
+
+
+@pytest.fixture
 def api(
-    db: Session, workspace: Workspace, user: User
+    db: Session, workspace: Workspace, user: User, membership: Membership
 ) -> Generator[TestClient, None, None]:
     """A client whose requests run on `db` and act as `user` in `workspace`.
 

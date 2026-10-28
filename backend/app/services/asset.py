@@ -388,6 +388,23 @@ def _apply_warranty(db: Session, asset: Asset, warranty: WarrantyInput | None) -
         asset.warranty.end_date = end_date
 
 
+def delete_asset(db: Session, asset: Asset) -> None:
+    """Remove an asset, its warranty and its document links.
+
+    What goes and what stays is decided by the schema, not by code here
+    (docs/erd.md): the warranty row and the `asset_documents` join rows are
+    `ON DELETE CASCADE`, so they go with it, while the `documents` themselves
+    are untouched — one invoice can back several assets, and the S3 object
+    outlives any single one of them.
+
+    Notifications about the asset also survive, with `asset_id` set to NULL:
+    "your warranty expired" stays true after the asset is gone, it just stops
+    being a link.
+    """
+    db.delete(asset)
+    db.flush()
+
+
 def get_asset(
     db: Session, workspace_id: uuid.UUID, asset_id: uuid.UUID
 ) -> Asset | None:
