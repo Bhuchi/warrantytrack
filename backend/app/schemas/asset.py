@@ -23,12 +23,25 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.models.asset import Asset, AssetCondition
 from app.models.document import DocumentKind, DocumentStatus
 from app.services import warranty as warranty_service
 from app.services.warranty import WarrantyStatus
+
+
+#: Text that must actually say something. Stripped first, then required to be
+#: non-empty — checking length before stripping would let "   " through and
+#: store an asset with a blank name.
+AssetName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
+]
+SerialNumber = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
+]
 
 
 class WarrantyInput(BaseModel):
@@ -64,8 +77,8 @@ class AssetCreate(BaseModel):
     exists.
     """
 
-    name: str = Field(min_length=1, max_length=200)
-    serial_number: str = Field(min_length=1, max_length=120)
+    name: AssetName
+    serial_number: SerialNumber
     condition: AssetCondition
     purchase_date: date
     price: Decimal
@@ -116,8 +129,8 @@ class AssetUpdate(BaseModel):
       attached at creation; changing them needs its own agreed shape.
     """
 
-    name: str | None = Field(default=None, min_length=1, max_length=200)
-    serial_number: str | None = Field(default=None, min_length=1, max_length=120)
+    name: AssetName | None = None
+    serial_number: SerialNumber | None = None
     condition: AssetCondition | None = None
     purchase_date: date | None = None
     price: Decimal | None = None

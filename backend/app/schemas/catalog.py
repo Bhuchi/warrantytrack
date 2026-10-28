@@ -13,8 +13,17 @@ frontend sees the same object whichever endpoint it came from.
 from __future__ import annotations
 
 import uuid
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StringConstraints
+
+#: A catalog name: trimmed first, then required to be non-empty and to fit the
+#: column. Order matters — validating length before stripping would let "   "
+#: through `min_length=1` and store a row with a blank name.
+CatalogName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=120),
+]
 
 
 class CatalogItem(BaseModel):
@@ -26,6 +35,17 @@ class CatalogItem(BaseModel):
 
     id: uuid.UUID
     name: str
+
+
+class CatalogCreate(BaseModel):
+    """Adding one option to a list — a category, vendor, department or location.
+
+    Only a name: these tables hold nothing else (app/models/catalog.py). The
+    length matches the column, so an over-long name is a 422 naming the field
+    rather than a database error.
+    """
+
+    name: CatalogName
 
 
 class CatalogList(BaseModel):

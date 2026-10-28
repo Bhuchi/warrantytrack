@@ -26,6 +26,28 @@ from app.models.catalog import Category, Department, Location, Vendor
 CatalogModel = TypeVar("CatalogModel", Category, Vendor, Department, Location)
 
 
+class DuplicateCatalogName(Exception):
+    """This workspace already has a row with that name in that list."""
+
+
+def _find_by_name(
+    db: Session, model: type[CatalogModel], workspace_id: uuid.UUID, name: str
+) -> CatalogModel | None:
+    """Case-insensitive lookup within one workspace.
+
+    The unique constraint is case-sensitive, so "power buy" and "Power Buy"
+    could both be stored — and the dashboard would then count them as two
+    vendors. Matching without case is what stops that, both here and in
+    `get_or_create`.
+    """
+    return db.scalars(
+        select(model).where(
+            model.workspace_id == workspace_id,
+            func.lower(model.name) == name.lower(),
+        )
+    ).first()
+
+
 def list_for_workspace(
     db: Session, model: type[CatalogModel], workspace_id: uuid.UUID
 ) -> list[CatalogModel]:
@@ -71,12 +93,7 @@ def get_or_create(
     """
     cleaned = name.strip()
 
-    existing = db.scalars(
-        select(model).where(
-            model.workspace_id == workspace_id,
-            func.lower(model.name) == cleaned.lower(),
-        )
-    ).first()
+    existing = _find_by_name(db, model, workspace_id, cleaned)
     if existing is not None:
         return existing
 
@@ -86,11 +103,31 @@ def get_or_create(
             db.add(row)
     except IntegrityError:
         # Lost the race — the other writer's row is the one that exists.
-        return db.scalars(
-            select(model).where(
-                model.workspace_id == workspace_id,
-                func.lower(model.name) == cleaned.lower(),
-            )
-        ).one()
+        winner = _find_by_name(db, model, workspace_id, cleaned)
+        if winner is None:  # pragma: no cover - the constraint just fired
+            raise
+        return winner
 
+    return row
+
+
+def create(
+    db: Session, model: type[CatalogModel], workspace_id: uuid.UUID, name: str
+) -> CatalogModel:
+    """Add a row to one catalog list, or raise if the name is taken.
+
+    Deliberately not `get_or_create`. That one is for the asset write path,
+    where "Power Buy" arriving on a receipt should quietly attach to the vendor
+    that already exists. Here the user is explicitly adding to a list they can
+    see, so a name already on it is a mistake worth telling them about — the
+    route turns this into 409.
+    """
+    cleaned = name.strip()
+
+    if _find_by_name(db, model, workspace_id, cleaned) is not None:
+        raise DuplicateCatalogName(cleaned)
+
+    row = model(workspace_id=workspace_id, name=cleaned)
+    db.add(row)
+    db.flush()
     return row
