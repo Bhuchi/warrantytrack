@@ -45,7 +45,17 @@ def uploads_in_tmp(tmp_path: Path):
 
 
 def asset_entry(**overrides: object) -> dict[str, object]:
-    """One reviewed line from the OCR screen, ready for confirm."""
+    """One reviewed line from the OCR screen, ready for confirm.
+
+    Carries category, invoice number and warranty because confirm goes through
+    `asset_service.create_asset()`, which requires them (CLOUDAPPG5-118, from
+    docs/database/WarrantyTrack-ERD-v1.2/README.md lines 35-36 — line 27 of the
+    same document lists exactly these as what the confirm step validates).
+
+    None of the three come out of Textract: `extracted` holds vendor, purchase
+    date, total and line items only. They are the user's edits on the OCR
+    Review screen (D07), which has to collect them before confirm can succeed.
+    """
     entry: dict[str, object] = {
         "name": "Dell Latitude 5540",
         "serial_number": "ABC123",
@@ -53,6 +63,13 @@ def asset_entry(**overrides: object) -> dict[str, object]:
         "purchase_date": "2025-03-01",
         "price": "32900.00",
         "vendor_name": "Power Buy",
+        "category_name": "Laptop",
+        "invoice_number": "INV-2025-001",
+        "warranty": {
+            "provider": "Dell",
+            "start_date": "2025-03-01",
+            "duration_months": 36,
+        },
     }
     entry.update(overrides)
     return entry
