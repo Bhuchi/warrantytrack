@@ -29,11 +29,17 @@ def db() -> Generator[Session, None, None]:
     handed this same session via the `get_db` override below) while staying
     invisible to everything else.
 
+    `join_transaction_mode="create_savepoint"` is what lets this survive a
+    route that commits: the session's commit releases a SAVEPOINT instead of
+    committing the connection's transaction, so the rollback below still undoes
+    everything. Without it, the first write endpoint under test would leave its
+    rows behind for every later test to trip over.
+
     Needs a database. Tests that do not touch one should use `client`.
     """
     connection = engine.connect()
     transaction = connection.begin()
-    session = Session(bind=connection)
+    session = Session(bind=connection, join_transaction_mode="create_savepoint")
     try:
         yield session
     finally:

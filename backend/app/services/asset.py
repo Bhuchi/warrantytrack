@@ -20,9 +20,22 @@ from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import Session, contains_eager, joinedload
 
 from app.models.asset import Asset
+from app.models.catalog import Category, Vendor
+from app.models.document import AssetDocument, Document
 from app.models.warranty import Warranty
+from app.schemas.asset import AssetCreate
+from app.services import catalog as catalog_service
 from app.services import warranty as warranty_service
 from app.services.warranty import WarrantyStatus
+from app.utils.dates import add_months
+
+
+class DuplicateSerialNumber(Exception):
+    """This workspace already has an asset with that serial number."""
+
+
+class UnknownDocument(Exception):
+    """A document_id does not exist in this workspace."""
 
 
 def _status_condition(status: WarrantyStatus, today: date) -> ColumnElement[bool]:
@@ -147,6 +160,134 @@ def list_assets(
     )
 
     return total or 0, list(items)
+
+
+def _resolve_catalog_id(
+    db: Session,
+    model: type[Category] | type[Vendor],
+    workspace_id: uuid.UUID,
+    given_id: uuid.UUID | None,
+    given_name: str | None,
+) -> uuid.UUID | None:
+    """Turn "an id, or a name, or neither" into an id.
+
+    An explicit id wins: once the form has a real dropdown it will send one,
+    and it should not be second-guessed by a stale name sitting beside it.
+    """
+    if given_id is not None:
+        return given_id
+    if given_name and given_name.strip():
+        return catalog_service.get_or_create(db, model, workspace_id, given_name).id
+    return None
+
+
+def create_asset(
+    db: Session,
+    workspace_id: uuid.UUID,
+    created_by_user_id: uuid.UUID | None,
+    data: AssetCreate,
+) -> Asset:
+    """Create one asset, with its warranty and document links.
+
+    **The only way an asset is written.** Manual entry, confirmed OCR and bulk
+    import all come through here — docs/api.md makes that a rule rather than a
+    convention, so the required fields, the vendor lookup and the end-date
+    calculation cannot drift between the three paths.
+
+    Raises DuplicateSerialNumber or UnknownDocument; the route turns those into
+    409 and 422. They are exceptions rather than return codes because every
+    caller has to handle them and none of them can continue without doing so.
+    """
+    clash = db.scalars(
+        select(Asset).where(
+            Asset.workspace_id == workspace_id,
+            Asset.serial_number == data.serial_number,
+        )
+    ).first()
+    if clash is not None:
+        raise DuplicateSerialNumber(data.serial_number)
+
+    asset = Asset(
+        workspace_id=workspace_id,
+        created_by_user_id=created_by_user_id,
+        name=data.name.strip(),
+        serial_number=data.serial_number.strip(),
+        condition=data.condition,
+        purchase_date=data.purchase_date,
+        price=data.price,
+        currency=data.currency,
+        invoice_number=data.invoice_number,
+        category_id=_resolve_catalog_id(
+            db, Category, workspace_id, data.category_id, data.category_name
+        ),
+        vendor_id=_resolve_catalog_id(
+            db, Vendor, workspace_id, data.vendor_id, data.vendor_name
+        ),
+        department_id=data.department_id,
+        location=data.location,
+        image_key=data.image_key,
+        location_image_key=data.location_image_key,
+        assigned_to_user_id=data.assigned_to_user_id,
+    )
+    db.add(asset)
+    db.flush()
+
+    if data.warranty is not None:
+        db.add(
+            Warranty(
+                workspace_id=workspace_id,
+                asset_id=asset.id,
+                provider=data.warranty.provider,
+                start_date=data.warranty.start_date,
+                # Stored, not derived on read: the dashboard, the expiring list
+                # and the nightly e-mail job all filter on this column.
+                end_date=add_months(
+                    data.warranty.start_date, data.warranty.duration_months
+                ),
+            )
+        )
+
+    if data.document_ids:
+        _link_documents(db, workspace_id, asset.id, data.document_ids)
+
+    db.flush()
+    db.refresh(asset)
+    return asset
+
+
+def _link_documents(
+    db: Session,
+    workspace_id: uuid.UUID,
+    asset_id: uuid.UUID,
+    document_ids: list[uuid.UUID],
+) -> None:
+    """Attach already-uploaded documents to a new asset.
+
+    Every id is checked to be in *this* workspace first. Without that, a
+    caller could cite someone else's receipt and the asset detail screen would
+    hand out a presigned URL to it — the join row's own workspace_id would not
+    save us, because we would be the ones writing it.
+    """
+    found = set(
+        db.scalars(
+            select(Document.id).where(
+                Document.workspace_id == workspace_id,
+                Document.id.in_(document_ids),
+            )
+        )
+    )
+    missing = set(document_ids) - found
+    if missing:
+        raise UnknownDocument(sorted(str(value) for value in missing))
+
+    for document_id in dict.fromkeys(document_ids):
+        db.add(
+            AssetDocument(
+                asset_id=asset_id,
+                document_id=document_id,
+                workspace_id=workspace_id,
+            )
+        )
 
 
 def get_asset(

@@ -23,12 +23,79 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.asset import Asset, AssetCondition
 from app.models.document import DocumentKind, DocumentStatus
 from app.services import warranty as warranty_service
 from app.services.warranty import WarrantyStatus
+
+
+class WarrantyInput(BaseModel):
+    """The warranty part of POST /assets.
+
+    The client sends a start date and a duration; the backend works out
+    `end_date`. That split is the frontend's expectation, not an invention —
+    `warrantyEndLabel` in add-asset/draft.ts computes the same value for the
+    form's preview and says outright that it is "display only: the backend
+    computes the real end date".
+    """
+
+    provider: str | None = None
+    start_date: date
+    duration_months: int = Field(gt=0, le=600)
+
+
+class AssetCreate(BaseModel):
+    """POST /assets.
+
+    Required fields follow the team's 18 Oct decision, recorded in
+    docs/frontend-plan.md and enforced by `isReceiptComplete` in
+    add-asset/draft.ts: name, vendor, purchase date, price, condition — plus
+    the serial number, which the same decision made non-skippable.
+
+    Category, department, invoice number, location, documents and the warranty
+    itself are all optional.
+
+    **Vendor and category accept either an id or a name.** The form and OCR
+    produce "Power Buy", not a UUID, and there is no vendor picker in the UI;
+    a name is looked up in this workspace's catalog and created if missing.
+    Sending the id is still supported and is what a dropdown will do once one
+    exists.
+    """
+
+    name: str = Field(min_length=1, max_length=200)
+    serial_number: str = Field(min_length=1, max_length=120)
+    condition: AssetCondition
+    purchase_date: date
+    price: Decimal
+    currency: str = Field(default="THB", min_length=3, max_length=3)
+    invoice_number: str | None = Field(default=None, max_length=100)
+
+    category_id: uuid.UUID | None = None
+    category_name: str | None = Field(default=None, max_length=120)
+    vendor_id: uuid.UUID | None = None
+    vendor_name: str | None = Field(default=None, max_length=120)
+    department_id: uuid.UUID | None = None
+
+    location: str | None = Field(default=None, max_length=200)
+    image_key: str | None = Field(default=None, max_length=1024)
+    location_image_key: str | None = Field(default=None, max_length=1024)
+
+    document_ids: list[uuid.UUID] = Field(default_factory=list)
+    assigned_to_user_id: uuid.UUID | None = None
+    warranty: WarrantyInput | None = None
+
+    @model_validator(mode="after")
+    def check_vendor_given(self) -> AssetCreate:
+        """Vendor is required, by either route.
+
+        Rejected here rather than in the service so the caller gets a 422 with
+        the field named, which is what the form shows inline.
+        """
+        if self.vendor_id is None and not (self.vendor_name or "").strip():
+            raise ValueError("vendor_id or vendor_name is required")
+        return self
 
 
 class CatalogRef(BaseModel):
