@@ -24,6 +24,7 @@ from app.models.catalog import Category, Location, Vendor
 from app.models.document import AssetDocument, Document
 from app.models.warranty import Warranty
 from app.schemas.asset import AssetCreate, AssetUpdate, WarrantyInput
+from app.services import asset_validation
 from app.services import catalog as catalog_service
 from app.services import warranty as warranty_service
 from app.services.warranty import WarrantyStatus
@@ -223,10 +224,17 @@ def create_asset(
     convention, so the required fields, the vendor lookup and the end-date
     calculation cannot drift between the three paths.
 
-    Raises DuplicateSerialNumber or UnknownDocument; the route turns those into
-    409 and 422. They are exceptions rather than return codes because every
-    caller has to handle them and none of them can continue without doing so.
+    Raises AssetValidationError, DuplicateSerialNumber or UnknownDocument; the
+    route turns those into 422, 409 and 422. They are exceptions rather than
+    return codes because every caller has to handle them and none of them can
+    continue without doing so.
+
+    Validation runs **before anything is written**, including before the
+    vendor-by-name lookup that would otherwise create a catalog row — so a
+    rejected save leaves the database exactly as it found it.
     """
+    asset_validation.validate_references(db, workspace_id, data)
+
     clash = db.scalars(
         select(Asset).where(
             Asset.workspace_id == workspace_id,
@@ -352,7 +360,12 @@ def update_asset(
     client actually sent, so omitting `invoice_number` leaves it untouched
     while sending it as `null` clears it. Reading `data.invoice_number is not
     None` instead would make it impossible to ever clear a field.
+
+    References are checked the same way as on create: an edit must not be a
+    way to attach an asset to another workspace's vendor.
     """
+    asset_validation.validate_references(db, asset.workspace_id, data)
+
     sent = data.model_fields_set
 
     if "serial_number" in sent and data.serial_number != asset.serial_number:
