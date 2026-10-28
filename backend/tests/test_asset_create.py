@@ -14,10 +14,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import DEV_USER_ID
 from app.models.asset import Asset
 from app.models.catalog import Category, Vendor
 from app.models.document import Document
+from app.models.user import User
 from app.models.workspace import Workspace
 from app.utils.dates import add_months
 
@@ -52,7 +52,7 @@ def test_creates_an_asset_and_returns_the_detail_shape(api: TestClient) -> None:
 
 
 def test_workspace_and_creator_come_from_the_request_not_the_body(
-    api: TestClient, db: Session, workspace: Workspace
+    api: TestClient, db: Session, workspace: Workspace, user: User
 ) -> None:
     """A caller must not be able to file an asset into another workspace."""
     created = api.post("/assets", json=body()).json()
@@ -60,7 +60,7 @@ def test_workspace_and_creator_come_from_the_request_not_the_body(
     asset = db.get(Asset, created["id"])
     assert asset is not None
     assert asset.workspace_id == workspace.id
-    assert asset.created_by_user_id == DEV_USER_ID
+    assert asset.created_by_user_id == user.id
 
 
 # --- vendor and category by name or id --------------------------------------
