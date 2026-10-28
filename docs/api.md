@@ -178,6 +178,13 @@ inline:
 `total` counts every asset matching the filters, not just the returned page.
 Rows are newest-first. `page_size` defaults to 20 and is capped at 100.
 
+**Employees see only the assets assigned to them** — on the list, on the detail
+and on `PATCH`. Their `total` is their own count, not the organization's, and
+an asset assigned to someone else (or to nobody) is a **404**, the same as one
+in another workspace. Owners and admins see everything. This is the second of
+the two checks in [architecture.md](architecture.md): `workspace_id` separates
+tenants, `assigned_to_user_id` separates people inside one.
+
 ```jsonc
 // POST /assets   (request)
 // required: name, serial_number, condition, purchase_date, price, vendor

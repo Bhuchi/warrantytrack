@@ -7,6 +7,7 @@ workspace, 403 when they are inside it but not allowed.
 
 from __future__ import annotations
 
+import uuid
 from datetime import date
 
 import pytest
@@ -123,7 +124,10 @@ def test_an_employee_may_not_delete(
     response = api.delete(f"/assets/{asset['id']}")
 
     assert response.status_code == 403
-    assert api.get("/assets").json()["total"] == 1
+    # Checked against the row, not against GET /assets: an employee cannot see
+    # an unassigned asset through the API, so an empty list would prove
+    # nothing about whether the delete went through.
+    assert db.get(Asset, uuid.UUID(asset["id"])) is not None
 
 
 def test_an_employee_is_refused_before_the_asset_is_looked_up(

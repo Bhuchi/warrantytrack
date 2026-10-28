@@ -13,7 +13,12 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status as http_status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_membership, get_current_user, get_current_workspace
+from app.api.deps import (
+    employee_scope,
+    get_current_membership,
+    get_current_user,
+    get_current_workspace,
+)
 from app.models.membership import Membership, MembershipRole
 from app.db.session import get_db
 from app.schemas.asset import (
@@ -47,9 +52,13 @@ def list_assets(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    workspace_id: uuid.UUID = Depends(get_current_workspace),
+    membership: Membership = Depends(get_current_membership),
 ) -> AssetList:
     """GET /assets — one page of the Assets List (D05).
+
+    An employee sees only the assets assigned to them, so their `total` is
+    their own count rather than the organization's. `employee_scope()` decides
+    that, not this route — the same way the dashboard does it.
 
     The query parameter is `status`, matching the contract; it is named
     `warranty_status` in Python because `status` is also the name of
@@ -60,13 +69,14 @@ def list_assets(
     """
     total, assets = asset_service.list_assets(
         db,
-        workspace_id,
+        membership.workspace_id,
         q=q,
         status=warranty_status,
         category_id=category_id,
         vendor_id=vendor_id,
         page=page,
         page_size=page_size,
+        assigned_to_user_id=employee_scope(membership),
     )
 
     return AssetList(
@@ -124,15 +134,21 @@ def create_asset(
 def get_asset(
     asset_id: uuid.UUID,
     db: Session = Depends(get_db),
-    workspace_id: uuid.UUID = Depends(get_current_workspace),
+    membership: Membership = Depends(get_current_membership),
 ) -> AssetDetail:
     """GET /assets/{id} — one asset in full (D08).
 
-    404 covers both "no such asset" and "in a workspace you do not belong
-    to". That is deliberate and there is a test for it: a 403 would confirm
-    the record exists to someone who should not know. See docs/api.md.
+    404 covers "no such asset", "in a workspace you do not belong to" and, for
+    an employee, "not assigned to you". That is deliberate and there is a test
+    for it: a 403 would confirm the record exists to someone who should not
+    know. See docs/api.md.
     """
-    asset = asset_service.get_asset(db, workspace_id, asset_id)
+    asset = asset_service.get_asset(
+        db,
+        membership.workspace_id,
+        asset_id,
+        assigned_to_user_id=employee_scope(membership),
+    )
 
     if asset is None:
         raise HTTPException(
@@ -146,7 +162,6 @@ def get_asset(
 def delete_asset(
     asset_id: uuid.UUID,
     db: Session = Depends(get_db),
-    workspace_id: uuid.UUID = Depends(get_current_workspace),
     membership: Membership = Depends(get_current_membership),
 ) -> None:
     """DELETE /assets/{id} — owners and admins only (docs/api.md).
@@ -173,7 +188,7 @@ def delete_asset(
             detail="Only an owner or admin can delete an asset.",
         )
 
-    asset = asset_service.get_asset(db, workspace_id, asset_id)
+    asset = asset_service.get_asset(db, membership.workspace_id, asset_id)
 
     if asset is None:
         raise HTTPException(
@@ -189,15 +204,21 @@ def update_asset(
     asset_id: uuid.UUID,
     data: AssetUpdate,
     db: Session = Depends(get_db),
-    workspace_id: uuid.UUID = Depends(get_current_workspace),
+    membership: Membership = Depends(get_current_membership),
 ) -> AssetDetail:
     """PATCH /assets/{id} — change any subset of the create fields.
 
-    Fetching inside the workspace first is what makes an asset belonging to
-    someone else a 404 rather than an edit: there is no path here that reaches
-    a row the caller cannot already read.
+    Fetching through the same scope as `GET` is what makes an asset belonging
+    to someone else a 404 rather than an edit: there is no path here that
+    reaches a row the caller cannot already read. For an employee that means
+    they may edit the assets assigned to them and nothing else —
+    docs/architecture.md says they "may only touch" those, and editing is
+    touching.
     """
-    asset = asset_service.get_asset(db, workspace_id, asset_id)
+    workspace_id = membership.workspace_id
+    asset = asset_service.get_asset(
+        db, workspace_id, asset_id, assigned_to_user_id=employee_scope(membership)
+    )
 
     if asset is None:
         raise HTTPException(
