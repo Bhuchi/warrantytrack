@@ -39,19 +39,24 @@ export default function ExpiringList({ items, total }: ExpiringListProps) {
 
         <ul className="flex flex-col gap-[11px]">
           {items.slice(0, 2).map((item) => (
-            <li key={item.asset_id} className="flex items-center gap-3">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-[9px] bg-brand-subtle">
-                <Image src="/icons/device-laptop.svg" alt="" width={17} height={17} />
-              </div>
-              <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                <p className="truncate text-[13px] font-semibold tracking-[-0.26px] text-foreground">
-                  {item.name}
-                </p>
-                <p className="text-[11px] tracking-[-0.22px] text-muted-light">
-                  Expires {formatDate(item.end_date)}
-                </p>
-              </div>
-              <StatusBadge status={item.status} />
+            <li key={item.asset_id}>
+              <Link
+                href={`/assets/${item.asset_id}`}
+                className="flex items-center gap-3 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              >
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-[9px] bg-brand-subtle">
+                  <Image src="/icons/device-laptop.svg" alt="" width={17} height={17} />
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+                  <p className="truncate text-[13px] font-semibold tracking-[-0.26px] text-foreground">
+                    {item.name}
+                  </p>
+                  <p className="text-[11px] tracking-[-0.22px] text-muted-light">
+                    Expires {formatDate(item.end_date)}
+                  </p>
+                </div>
+                <StatusBadge status={item.status} />
+              </Link>
             </li>
           ))}
         </ul>
@@ -86,7 +91,14 @@ export default function ExpiringList({ items, total }: ExpiringListProps) {
           <tbody className="divide-y divide-border text-[14px] font-medium tracking-[-0.28px] text-foreground">
             {items.slice(0, 3).map((item) => (
               <tr key={item.asset_id}>
-                <td className="truncate py-3.5 pr-4">{item.name}</td>
+                <td className="truncate py-3.5 pr-4">
+                  <Link
+                    href={`/assets/${item.asset_id}`}
+                    className="hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                  >
+                    {item.name}
+                  </Link>
+                </td>
                 <td className="truncate py-3.5 pr-4">{item.vendor}</td>
                 <td className="truncate py-3.5 pr-4">{item.department}</td>
                 <td className="py-3.5 pr-4">{formatDate(item.end_date)}</td>
