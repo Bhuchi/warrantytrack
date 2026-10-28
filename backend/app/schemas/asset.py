@@ -67,14 +67,14 @@ class AssetCreate(BaseModel):
     add-asset/draft.ts: name, vendor, purchase date, price, condition — plus
     the serial number, which the same decision made non-skippable.
 
-    Category, department, invoice number, location, documents and the warranty
-    itself are all optional.
+    Category, vendor, department and location are all optional, as are the
+    invoice number, the storage note, the documents and the warranty itself.
 
-    **Vendor and category accept either an id or a name.** The form and OCR
-    produce "Power Buy", not a UUID, and there is no vendor picker in the UI;
-    a name is looked up in this workspace's catalog and created if missing.
-    Sending the id is still supported and is what a dropdown will do once one
-    exists.
+    **Category, vendor and location accept either an id or a name.** The form
+    and OCR produce "Power Buy", not a UUID, and there is no picker in the UI
+    yet; a name is looked up in this workspace's catalog and created if
+    missing. Sending the id is still supported and is what a dropdown will do
+    once one exists.
     """
 
     name: AssetName
@@ -90,8 +90,16 @@ class AssetCreate(BaseModel):
     vendor_id: uuid.UUID | None = None
     vendor_name: str | None = Field(default=None, max_length=120)
     department_id: uuid.UUID | None = None
+    # The site the asset lives at ("HQ Floor 3"), from the `locations` list.
+    # Not to be confused with `storage_note` below.
+    location_id: uuid.UUID | None = None
+    location_name: str | None = Field(default=None, max_length=120)
 
-    location: str | None = Field(default=None, max_length=200)
+    # Free text about where the box is kept ("Box is on the top shelf"). The
+    # Add Asset form labels this field "Note" (BoxPhotoStep.tsx) and FE-11
+    # calls it a free-text note, so that is what the API calls it. It is stored
+    # in the `assets.location` column, which predates the name.
+    storage_note: str | None = Field(default=None, max_length=200)
     image_key: str | None = Field(default=None, max_length=1024)
     location_image_key: str | None = Field(default=None, max_length=1024)
 
@@ -142,8 +150,10 @@ class AssetUpdate(BaseModel):
     vendor_id: uuid.UUID | None = None
     vendor_name: str | None = Field(default=None, max_length=120)
     department_id: uuid.UUID | None = None
+    location_id: uuid.UUID | None = None
+    location_name: str | None = Field(default=None, max_length=120)
 
-    location: str | None = Field(default=None, max_length=200)
+    storage_note: str | None = Field(default=None, max_length=200)
     image_key: str | None = Field(default=None, max_length=1024)
     location_image_key: str | None = Field(default=None, max_length=1024)
 
@@ -200,6 +210,12 @@ class AssetListItem(BaseModel):
     `category_name`, `vendor_name` and `location` are flattened rather than
     nested: the table draws them as plain cells, and the frontend asked for
     exactly these three in frontend/src/types/assetList.ts.
+
+    `location` here is the **site** ("HQ Floor 3"), not the storage note. The
+    D05 table's LOCATION column sits between CATEGORY and VENDOR, both of
+    which are catalog lists, and the planned filter for it is a dropdown
+    (AssetsList.tsx) — which only a list can fill. The storage note is free
+    text and belongs on the detail screen, not in a 14%-wide column.
     """
 
     id: uuid.UUID
@@ -230,7 +246,7 @@ class AssetListItem(BaseModel):
             assigned_to_user_id=asset.assigned_to_user_id,
             category_name=asset.category.name if asset.category else None,
             vendor_name=asset.vendor.name if asset.vendor else None,
-            location=asset.location,
+            location=asset.location_ref.name if asset.location_ref else None,
         )
 
 
@@ -261,7 +277,10 @@ class AssetDetail(BaseModel):
     category: CatalogRef | None
     vendor: CatalogRef | None
     department: CatalogRef | None
-    location: str | None
+    # The site, nested like category and vendor — what docs/erd.md proposed.
+    location: CatalogRef | None
+    # Free text from Add Asset step 3, shown under "Box / Storage" on D08.
+    storage_note: str | None
     assigned_to: AssignedToRef | None
     warranty: WarrantyDetail | None
     documents: list[DocumentRef]
@@ -286,7 +305,12 @@ class AssetDetail(BaseModel):
             department=(
                 CatalogRef.model_validate(asset.department) if asset.department else None
             ),
-            location=asset.location,
+            location=(
+                CatalogRef.model_validate(asset.location_ref)
+                if asset.location_ref
+                else None
+            ),
+            storage_note=asset.location,
             assigned_to=(
                 AssignedToRef(
                     user_id=asset.assigned_to.id,

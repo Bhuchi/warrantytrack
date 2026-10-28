@@ -99,9 +99,10 @@ export function warrantyEndLabel(draft: AssetDraft): string | null {
  * The draft as the API's POST /assets body. `photoKey` is the S3 key of the
  * uploaded box photo, or null.
  *
- * TODO: the API wants vendor_id, but OCR and the form give a vendor name, and
- * nothing turns one into the other yet (/vendors is Leg A). Asked the team
- * whether POST /assets should accept vendor_name, or the frontend looks it up.
+ * Vendor goes as a name: POST /assets accepts `vendor_name` and adds it to the
+ * workspace's vendor list if it is new, so the form does not need a picker
+ * first. Category and location (the site) work the same way when this form
+ * gains those fields.
  */
 export function toCreateAssetRequest(draft: AssetDraft, photoKey: string | null): CreateAssetRequest {
   const months = Number(draft.warranty_duration_months);
@@ -115,7 +116,10 @@ export function toCreateAssetRequest(draft: AssetDraft, photoKey: string | null)
     price: draft.price.trim(),
     currency: draft.currency,
     invoice_number: draft.invoice_number.trim() || null,
-    location: draft.location.trim() || null,
+    vendor_name: draft.vendor_name.trim(),
+    // Step 3's "Note" field. The draft still calls it `location`; the API
+    // calls it storage_note, because `location` there is the site.
+    storage_note: draft.location.trim() || null,
     location_image_key: photoKey,
     document_ids: draft.document_id ? [draft.document_id] : [],
     warranty:

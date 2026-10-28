@@ -24,10 +24,19 @@ export interface CreateAssetRequest {
   currency: string;
   invoice_number?: string | null;
   category_id?: string | null;
+  category_name?: string | null;
   vendor_id?: string | null;
+  vendor_name?: string | null;
   department_id?: string | null;
-  /** Box / storage location note. */
-  location?: string | null;
+  /**
+   * The site the asset lives at ("HQ Floor 3"), from the /locations list.
+   * Send either the id or the name — a name that is not on the list yet is
+   * added to it, the same way vendor works.
+   */
+  location_id?: string | null;
+  location_name?: string | null;
+  /** Free text about where the box is kept — the "Note" field in step 3. */
+  storage_note?: string | null;
   /** S3 key of the box / storage photo. */
   location_image_key?: string | null;
   /** Receipts already uploaded, e.g. the OCR document. */

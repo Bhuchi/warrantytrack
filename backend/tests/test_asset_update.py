@@ -28,7 +28,7 @@ def create(api: TestClient, **overrides: object) -> dict:
         "price": "32900.00",
         "vendor_name": "Power Buy",
         "invoice_number": "INV-2025-001",
-        "location": "Shelf B2",
+        "storage_note": "Box is on the top shelf",
         "warranty": {
             "provider": "Dell",
             "start_date": "2025-03-01",
@@ -51,7 +51,7 @@ def test_changes_only_the_field_sent(api: TestClient) -> None:
     # Everything else survives untouched.
     assert updated["serial_number"] == "ABC123"
     assert updated["invoice_number"] == "INV-2025-001"
-    assert updated["location"] == "Shelf B2"
+    assert updated["storage_note"] == "Box is on the top shelf"
     assert updated["price"] == "32900.00"
     assert updated["vendor"]["name"] == "Power Buy"
     assert updated["warranty"]["end_date"] == "2028-03-01"
@@ -78,7 +78,7 @@ def test_explicit_null_clears_a_field(api: TestClient) -> None:
     ).json()
 
     assert updated["invoice_number"] is None
-    assert updated["location"] == "Shelf B2"
+    assert updated["storage_note"] == "Box is on the top shelf"
 
 
 # --- vendor and category ----------------------------------------------------
