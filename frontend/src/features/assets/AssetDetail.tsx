@@ -328,34 +328,12 @@ export default function AssetDetail({ assetId }: { assetId: string }) {
       <AssetHeader />
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-5 pb-8 pt-4 md:gap-4 md:px-8 md:pt-8 lg:px-12">
         <Link
-          href="/workspace"
+          href="/assets"
           className="flex w-fit items-center gap-1.5 text-[13px] font-semibold tracking-[-0.26px] text-muted hover:text-brand"
         >
           <Image src="/icons/asset-back.svg" alt="" width={15} height={15} />
           Assets
         </Link>
-
-        <section
-          aria-label="Asset setup status"
-          className="flex w-full flex-col gap-2.5 rounded-xl border border-border bg-surface px-4 py-[13px]"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[13px] font-semibold tracking-[-0.26px] text-brand">
-              Step 3 of 3 · OCR Review
-            </p>
-            <p className="text-xs font-bold text-muted-light">Complete</p>
-          </div>
-          <div
-            role="progressbar"
-            aria-label="Asset setup completed"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={100}
-            className="h-1.5 w-full overflow-hidden rounded-full bg-border"
-          >
-            <div className="h-full w-full rounded-full bg-brand" />
-          </div>
-        </section>
 
         <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] md:gap-5">
           <div className="flex min-w-0 flex-col gap-3 md:gap-4">
