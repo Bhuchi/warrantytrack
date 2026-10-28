@@ -552,6 +552,23 @@ No standalone endpoints — warranty is embedded in the asset (set via
 | `GET` | `/dashboard/summary` | Counts by status + by department (D04 cards + charts) |
 | `GET` | `/dashboard/expiring?days=30` | Assets expiring within N days (D04 table) |
 
+`days` accepts 1–365; outside that is `422`. It selects **which rows appear**
+and does not change what `status` means — asked for 60 days, a warranty 45 days
+out is listed but still reports `active`, so the word matches every other
+screen. Already-expired assets are excluded; they are still counted in
+`summary.expired`.
+
+An **employee** sees only assets assigned to them, so their numbers are theirs,
+not the organization's. Owners and admins see the whole workspace. A caller
+with no membership gets `404`, never `403`.
+
+Assets with no department are counted in `total` but have no `by_department`
+row — the API does not invent an "Others" label. The chart can show the
+remainder as `total − Σ count` if it wants one.
+
+`expiring[].vendor` and `.department` are **nullable**: both are optional on an
+asset, and the row still appears without them.
+
 ```jsonc
 // GET /dashboard/summary
 {

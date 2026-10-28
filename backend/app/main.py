@@ -2,7 +2,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api.routes import assets, catalog, documents, health, notifications
+from app.api.routes import (
+    assets,
+    catalog,
+    dashboard,
+    documents,
+    health,
+    notifications,
+)
 from app.core.config import settings
 
 app = FastAPI(
@@ -34,3 +41,4 @@ app.include_router(assets.router, prefix="/assets")
 # Receipt upload and OCR. Mounted after /assets because confirming a
 # document creates assets through the same service that router uses.
 app.include_router(documents.router, prefix="/documents")
+app.include_router(dashboard.router, prefix="/dashboard")
