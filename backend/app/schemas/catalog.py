@@ -48,6 +48,15 @@ class CatalogCreate(BaseModel):
     name: CatalogName
 
 
+class CatalogUpdate(BaseModel):
+    """Renaming one option. The name is all these tables hold, so it is all
+    there is to change — which makes PUT-shaped semantics and PATCH-shaped
+    semantics identical here, and `name` required rather than optional.
+    """
+
+    name: CatalogName
+
+
 class CatalogList(BaseModel):
     """Envelope for the four GET endpoints.
 
