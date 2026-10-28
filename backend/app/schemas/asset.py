@@ -65,6 +65,19 @@ def _blank_to_none(value: object) -> object:
     return value
 
 
+#: Money cannot be negative. Zero is allowed — a donated or transferred asset
+#: is still an asset worth tracking, so this is `ge` and not `gt`.
+#:
+#: Nothing in the contract states this rule; it is a guard against an obvious
+#: typo rather than a documented requirement. The form's price box is a plain
+#: text input with no `min` (ReceiptReview.tsx), so "-500" reaches the server
+#: unchallenged by the browser.
+#:
+#: The constraint sits on the Decimal itself rather than on `Decimal | None`,
+#: because applied to the union it would be handed a None and raise.
+Price = Annotated[Decimal, Field(ge=0)]
+
+
 #: Free text where blank genuinely means absent. Unlike the invoice number,
 #: there is nothing to tell the user off about: leaving the step 3 note empty,
 #: or typing spaces into it, both mean the same thing.
@@ -113,7 +126,7 @@ class AssetCreate(BaseModel):
     serial_number: SerialNumber
     condition: AssetCondition
     purchase_date: date
-    price: Decimal
+    price: Price
     currency: str = Field(default="THB", min_length=3, max_length=3)
     invoice_number: InvoiceNumber | None = None
 
@@ -173,7 +186,7 @@ class AssetUpdate(BaseModel):
     serial_number: SerialNumber | None = None
     condition: AssetCondition | None = None
     purchase_date: date | None = None
-    price: Decimal | None = None
+    price: Price | None = None
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     invoice_number: InvoiceNumber | None = None
 
