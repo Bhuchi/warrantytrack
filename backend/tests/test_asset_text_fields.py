@@ -37,6 +37,13 @@ def body(**overrides: object) -> dict[str, object]:
         "purchase_date": "2025-03-01",
         "price": "32900.00",
         "vendor_name": "Power Buy",
+        "category_name": "Laptop",
+        "invoice_number": "INV-2025-001",
+        "warranty": {
+            "provider": "Dell",
+            "start_date": "2025-03-01",
+            "duration_months": 36,
+        },
     }
     payload.update(overrides)
     return payload
@@ -95,17 +102,23 @@ def test_a_blank_invoice_number_is_rejected(api: TestClient, value: str) -> None
     assert "invoice_number" in fields_in(response)
 
 
-def test_an_omitted_invoice_number_is_fine(api: TestClient) -> None:
-    response = api.post("/assets", json=body())
+def test_an_omitted_invoice_number_is_rejected(api: TestClient) -> None:
+    """Required per ERD-v1.2/README.md: "invoice_number is NOT NULL and
+    nonblank even on manual entry (OCR failure never bypasses business
+    required fields)"."""
+    payload = body()
+    del payload["invoice_number"]
 
-    assert response.status_code == 201
-    assert response.json()["invoice_number"] is None
+    response = api.post("/assets", json=payload)
+
+    assert response.status_code == 422
+    assert "invoice_number" in fields_in(response)
 
 
-def test_an_explicitly_null_invoice_number_is_fine(api: TestClient) -> None:
+def test_an_explicitly_null_invoice_number_is_rejected(api: TestClient) -> None:
     response = api.post("/assets", json=body(invoice_number=None))
 
-    assert response.status_code == 201
+    assert response.status_code == 422
 
 
 def test_an_invoice_number_is_stored_trimmed(api: TestClient) -> None:
@@ -125,16 +138,14 @@ def test_a_blank_invoice_number_is_rejected_on_patch(api: TestClient) -> None:
     assert api.get(f"/assets/{created['id']}").json()["invoice_number"] == "INV-1"
 
 
-def test_patch_can_still_clear_the_invoice_number_with_null(
-    api: TestClient,
-) -> None:
-    """Rejecting "   " must not also block the way to clear the field."""
+def test_patch_cannot_clear_the_invoice_number(api: TestClient) -> None:
+    """It is required, so an edit must not be able to take it away either."""
     created = api.post("/assets", json=body(invoice_number="INV-1")).json()
 
     updated = api.patch(f"/assets/{created['id']}", json={"invoice_number": None})
 
-    assert updated.status_code == 200
-    assert updated.json()["invoice_number"] is None
+    assert updated.status_code == 422
+    assert api.get(f"/assets/{created['id']}").json()["invoice_number"] == "INV-1"
 
 
 # --- storage note: blank means absent ---------------------------------------

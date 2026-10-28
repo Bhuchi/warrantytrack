@@ -35,6 +35,13 @@ def body(**overrides: object) -> dict[str, object]:
         "purchase_date": "2025-03-01",
         "price": "32900.00",
         "vendor_name": "Power Buy",
+        "category_name": "Laptop",
+        "invoice_number": "INV-2025-001",
+        "warranty": {
+            "provider": "Dell",
+            "start_date": "2025-03-01",
+            "duration_months": 36,
+        },
     }
     payload.update(overrides)
     return payload

@@ -69,6 +69,94 @@ class AssetValidationError(Exception):
         return [error.as_detail() for error in self.errors]
 
 
+#: What a committed asset must always have —
+#: docs/database/WarrantyTrack-ERD-v1.2/README.md, "Explicit design decisions".
+#: `AssetCreate` enforces these through the schema; this list is for the edit
+#: path, which must not be able to take one away afterwards.
+#:
+#: Until now `PATCH {"name": null}` set the column to NULL, the flush raised an
+#: IntegrityError and the caller got a 500 — neither clear nor per-field.
+_REQUIRED_SCALARS = (
+    "name",
+    "serial_number",
+    "condition",
+    "purchase_date",
+    "price",
+    "invoice_number",
+)
+
+#: The same rule for the two references that are required rather than optional.
+#: Clearing one means sending its id as null without supplying a name.
+_REQUIRED_REFERENCES = (("vendor", "vendor_id", "vendor_name"),
+                        ("category", "category_id", "category_name"))
+
+
+def validate_required_catalog_refs(data: Any) -> None:
+    """Vendor and category must be given, by id or by name.
+
+    Here rather than in a Pydantic `model_validator` because a model-level
+    validator reports `loc: ["body"]` — the form cannot show that against a
+    field, and the response echoes the whole payload back. A `FieldError`
+    names `category_id`, which is what "clear per-field error messages" in
+    CLOUDAPPG5-118 asks for.
+
+    Create only. On update the pair is already there, and
+    `validate_nothing_required_is_cleared` stops it being removed.
+    """
+    errors: list[FieldError] = []
+
+    for label, id_field, name_field in _REQUIRED_REFERENCES:
+        given_name = getattr(data, name_field, None) or ""
+        if getattr(data, id_field, None) is None and not given_name.strip():
+            errors.append(
+                FieldError(
+                    id_field,
+                    f"{id_field} or {name_field} is required",
+                    type="missing",
+                )
+            )
+
+    if errors:
+        raise AssetValidationError(errors)
+
+
+def validate_nothing_required_is_cleared(data: Any) -> None:
+    """Refuse an edit that would strip a required field from a saved asset.
+
+    Only looks at what the caller actually sent: `model_fields_set` separates
+    "left alone" from "explicitly set to null", and only the second is a
+    problem. Omitting a field on PATCH is the normal case and stays untouched.
+
+    Create does not need this — the schema already demands every one of these.
+    """
+    sent = data.model_fields_set
+    errors: list[FieldError] = []
+
+    for field in _REQUIRED_SCALARS:
+        if field in sent and getattr(data, field, None) is None:
+            errors.append(
+                FieldError(field, "Field required", type="missing")
+            )
+
+    for label, id_field, name_field in _REQUIRED_REFERENCES:
+        touched = id_field in sent or name_field in sent
+        if not touched:
+            continue
+        given_name = getattr(data, name_field, None) or ""
+        if getattr(data, id_field, None) is None and not given_name.strip():
+            errors.append(
+                FieldError(id_field, f"An asset must have a {label}", type="missing")
+            )
+
+    if "warranty" in sent and getattr(data, "warranty", None) is None:
+        errors.append(
+            FieldError("warranty", "An asset must have a warranty", type="missing")
+        )
+
+    if errors:
+        raise AssetValidationError(errors)
+
+
 #: The asset fields that point at a workspace-scoped catalog row.
 _CATALOG_REFERENCES = (
     ("category_id", Category, "category"),

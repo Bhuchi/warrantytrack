@@ -31,6 +31,13 @@ def body(**overrides: object) -> dict[str, object]:
         "purchase_date": "2025-03-01",
         "price": "32900.00",
         "vendor_name": "Power Buy",
+        "category_name": "Laptop",
+        "invoice_number": "INV-2025-001",
+        "warranty": {
+            "provider": "Dell",
+            "start_date": "2025-03-01",
+            "duration_months": 36,
+        },
     }
     payload.update(overrides)
     return payload
@@ -165,7 +172,11 @@ def test_end_date_rolls_over_like_the_form_does(api: TestClient) -> None:
     created = api.post(
         "/assets",
         json=body(
-            warranty={"provider": None, "start_date": "2025-01-31", "duration_months": 1}
+            warranty={
+                "provider": "Dell",
+                "start_date": "2025-01-31",
+                "duration_months": 1,
+            }
         ),
     ).json()
 
@@ -173,11 +184,30 @@ def test_end_date_rolls_over_like_the_form_does(api: TestClient) -> None:
     assert created["warranty"]["end_date"] == add_months(date(2025, 1, 31), 1).isoformat()
 
 
-def test_warranty_is_optional(api: TestClient) -> None:
-    """The form sends warranty: null when the fields are left blank."""
-    created = api.post("/assets", json=body(warranty=None)).json()
+def test_a_warranty_is_required(api: TestClient) -> None:
+    """A committed asset must have one.
 
-    assert created["warranty"] is None
+    docs/database/WarrantyTrack-ERD-v1.2/README.md: "A committed asset must
+    have 1..N warranties ... the old `No Warranty Info` status is no longer
+    generated for valid committed assets."
+    """
+    payload = body()
+    del payload["warranty"]
+
+    response = api.post("/assets", json=payload)
+
+    assert response.status_code == 422
+    assert "warranty" in {entry["loc"][1] for entry in response.json()["detail"]}
+
+
+def test_a_warranty_provider_is_required(api: TestClient) -> None:
+    """"Warranty details, including provider" — CLOUDAPPG5-118."""
+    response = api.post(
+        "/assets",
+        json=body(warranty={"start_date": "2025-03-01", "duration_months": 36}),
+    )
+
+    assert response.status_code == 422
 
 
 # --- validation -------------------------------------------------------------

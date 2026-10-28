@@ -27,6 +27,7 @@ def create(api: TestClient, **overrides: object) -> dict:
         "purchase_date": "2025-03-01",
         "price": "32900.00",
         "vendor_name": "Power Buy",
+        "category_name": "Laptop",
         "invoice_number": "INV-2025-001",
         "storage_note": "Box is on the top shelf",
         "warranty": {
@@ -65,20 +66,21 @@ def test_an_empty_patch_changes_nothing(api: TestClient) -> None:
     assert updated == asset
 
 
-def test_explicit_null_clears_a_field(api: TestClient) -> None:
+def test_explicit_null_clears_an_optional_field(api: TestClient) -> None:
     """Sending null is a real instruction, not the same as omitting it.
 
     If the service tested `value is not None` instead of reading which keys
-    were sent, there would be no way to ever clear an invoice number.
+    were sent, there would be no way to ever clear an optional field. The
+    required ones reject null instead — see test_asset_text_fields.py.
     """
     asset = create(api)
 
     updated = api.patch(
-        f"/assets/{asset['id']}", json={"invoice_number": None}
+        f"/assets/{asset['id']}", json={"storage_note": None}
     ).json()
 
-    assert updated["invoice_number"] is None
-    assert updated["storage_note"] == "Box is on the top shelf"
+    assert updated["storage_note"] is None
+    assert updated["invoice_number"] == "INV-2025-001"
 
 
 # --- vendor and category ----------------------------------------------------
@@ -99,12 +101,14 @@ def test_vendor_name_moves_the_asset_to_another_vendor(
     assert names == ["JIB", "Power Buy"]
 
 
-def test_vendor_can_be_cleared(api: TestClient) -> None:
+def test_vendor_cannot_be_cleared(api: TestClient) -> None:
+    """Vendor is required, so an edit must not strip it."""
     asset = create(api)
 
-    updated = api.patch(f"/assets/{asset['id']}", json={"vendor_id": None}).json()
+    updated = api.patch(f"/assets/{asset['id']}", json={"vendor_id": None})
 
-    assert updated["vendor"] is None
+    assert updated.status_code == 422
+    assert api.get(f"/assets/{asset['id']}").json()["vendor"]["name"] == "Power Buy"
 
 
 # --- the warranty -----------------------------------------------------------
@@ -129,19 +133,19 @@ def test_warranty_end_date_is_recomputed_on_update(api: TestClient) -> None:
     assert updated["warranty"]["provider"] == "Dell Pro"
 
 
-def test_warranty_can_be_removed(api: TestClient) -> None:
-    """An asset with no warranty is `unknown`, which is a valid state."""
+def test_warranty_cannot_be_removed(api: TestClient) -> None:
+    """A committed asset must keep one — ERD-v1.2/README.md, line 36."""
     asset = create(api)
 
-    updated = api.patch(f"/assets/{asset['id']}", json={"warranty": None}).json()
+    updated = api.patch(f"/assets/{asset['id']}", json={"warranty": None})
 
-    assert updated["warranty"] is None
-    assert api.get("/assets").json()["items"][0]["warranty_status"] == "unknown"
+    assert updated.status_code == 422
+    assert api.get(f"/assets/{asset['id']}").json()["warranty"] is not None
 
 
-def test_warranty_can_be_added_to_an_asset_without_one(api: TestClient) -> None:
-    asset = create(api, warranty=None)
-    assert asset["warranty"] is None
+def test_a_warranty_can_be_replaced_wholesale(api: TestClient) -> None:
+    """Swapping provider, start and duration at once recomputes the end date."""
+    asset = create(api)
 
     updated = api.patch(
         f"/assets/{asset['id']}",
@@ -154,6 +158,7 @@ def test_warranty_can_be_added_to_an_asset_without_one(api: TestClient) -> None:
         },
     ).json()
 
+    assert updated["warranty"]["provider"] == "Apple"
     assert updated["warranty"]["end_date"] == "2027-06-01"
 
 
