@@ -15,7 +15,7 @@ Rules (docs/architecture.md):
 from __future__ import annotations
 
 import enum
-from datetime import date
+from datetime import date, timedelta
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -31,6 +31,28 @@ class WarrantyStatus(str, enum.Enum):
     expiring_soon = "expiring_soon"
     expired = "expired"
     unknown = "unknown"
+
+
+def soon_cutoff(today: date, days: int = EXPIRING_SOON_DAYS) -> date:
+    """The last `end_date` that still counts as expiring soon.
+
+    Exists so a query can select a date range instead of loading every row and
+    calling `compute_status()` on each one. The nightly scan
+    (app/services/warranty_scan.py) uses it to pick the warranties worth
+    looking at:
+
+        expired       -> end_date <  today
+        expiring_soon -> end_date >= today AND end_date <= soon_cutoff(today)
+        active        -> end_date >  soon_cutoff(today)
+
+    Those comparisons and `compute_status()` below have to agree; there is a
+    test that walks the boundaries day by day to prove they do.
+
+    `days` widens or narrows *which rows a query selects*. It does not change
+    what a status means — a warranty 45 days out picked up by a 60-day scan is
+    still `active`, because that is what every screen calls it.
+    """
+    return today + timedelta(days=days)
 
 
 def compute_status(
