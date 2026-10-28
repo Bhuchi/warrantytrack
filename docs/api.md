@@ -302,8 +302,12 @@ ignored if sent in the body.
 //   403  an employee — they belong here but may not hand assets around,
 //        settled before the asset is read so it cannot probe for ids
 //   404  no such asset, or one in another workspace
-//   422  the proposed assignee is not a member of this workspace, or the
-//        body omits assigned_to_user_id ({} is not a silent unassign)
+//   422  the proposed assignee is not a member of this workspace; the body
+//        omits assigned_to_user_id ({} is not a silent unassign); or the
+//        workspace is personal — "exactly one member, role owner"
+//        (architecture.md), so there is no employee to assign to. Creating an
+//        asset with assigned_to_user_id is refused there for the same reason.
+//        Unassigning stays allowed everywhere.
 //
 // Assignment is what brings an asset into an employee's scope: afterwards it
 // appears in their GET /assets and they may PATCH it. Unassigning removes it

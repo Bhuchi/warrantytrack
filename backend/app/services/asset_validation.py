@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 
 from app.models.catalog import Category, Department, Location, Vendor
 from app.models.membership import Membership
+from app.models.workspace import Workspace, WorkspaceType
 
 
 @dataclass(frozen=True)
@@ -169,12 +170,16 @@ _CATALOG_REFERENCES = (
 def validate_references(
     db: Session, workspace_id: uuid.UUID, data: Any
 ) -> None:
-    """Check every id the caller sent belongs to their workspace.
+    """Check the references a caller sent are usable in their workspace.
 
-    Works for both `AssetCreate` and `AssetUpdate`: a `None` means "not sent"
-    on create and "clear this" on update, and neither needs checking — only a
-    concrete id does. `getattr` with a default covers the fields `AssetUpdate`
-    deliberately does not accept, such as `assigned_to_user_id`.
+    Two rules. Every id must belong to this workspace, and an assignee must
+    additionally be a member of it — and the workspace must be the kind that
+    has members to assign to.
+
+    Works for `AssetCreate`, `AssetUpdate` and `AssetAssign`: a `None` means
+    "not sent" on create, "clear this" on update, and "unassign" on assign,
+    and none of those needs checking — only a concrete id does. `getattr` with
+    a default covers the fields a schema deliberately does not accept.
 
     Collects rather than raising on the first problem, so a form with two bad
     pickers reports both.
@@ -198,19 +203,40 @@ def validate_references(
 
     assignee: uuid.UUID | None = getattr(data, "assigned_to_user_id", None)
     if assignee is not None:
-        member = db.scalar(
-            select(Membership.id).where(
-                Membership.workspace_id == workspace_id,
-                Membership.user_id == assignee,
-            )
+        workspace_type = db.scalar(
+            select(Workspace.type).where(Workspace.id == workspace_id)
         )
-        if member is None:
+        if workspace_type is WorkspaceType.personal:
+            # Assignment is an organization concept. docs/architecture.md:
+            # "type = 'personal' -> exactly one member, role owner", and
+            # docs/api.md describes assign as handing an asset "to an
+            # employee" — a personal workspace has none. The proposed schema
+            # says the same with a CHECK (assets_org_only_fields).
+            #
+            # Checked before membership, because in a personal workspace the
+            # only possible assignee is yourself, which *would* pass the
+            # membership test and give a confusing "that user is not a
+            # member" when the real answer is that nobody can be assigned.
             errors.append(
                 FieldError(
                     "assigned_to_user_id",
-                    "That user is not a member of this workspace",
+                    "A personal workspace has no employees to assign assets to",
                 )
             )
+        else:
+            member = db.scalar(
+                select(Membership.id).where(
+                    Membership.workspace_id == workspace_id,
+                    Membership.user_id == assignee,
+                )
+            )
+            if member is None:
+                errors.append(
+                    FieldError(
+                        "assigned_to_user_id",
+                        "That user is not a member of this workspace",
+                    )
+                )
 
     if errors:
         raise AssetValidationError(errors)

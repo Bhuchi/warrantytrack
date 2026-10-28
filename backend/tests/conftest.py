@@ -52,8 +52,30 @@ def db() -> Generator[Session, None, None]:
 
 @pytest.fixture
 def workspace(db: Session) -> Workspace:
-    """The tenant a request acts inside."""
-    workspace = Workspace(name="Test Workspace", type=WorkspaceType.personal)
+    """The tenant a request acts inside.
+
+    An **organization**, because that is the workspace type with roles worth
+    testing. docs/architecture.md says a personal workspace has "exactly one
+    member, role owner", so it cannot have an admin or an employee — and most
+    tests here give their member one of those roles. A personal default would
+    be modelling something the product does not allow.
+
+    Use `personal_workspace` for the rules that only apply to the other kind.
+    """
+    workspace = Workspace(name="Test Workspace", type=WorkspaceType.organization)
+    db.add(workspace)
+    db.flush()
+    return workspace
+
+
+@pytest.fixture
+def personal_workspace(db: Session) -> Workspace:
+    """A one-person workspace — "exactly one member, role owner".
+
+    Exists so the rules that distinguish the two kinds can be tested, such as
+    assignment, which has nobody to assign to here.
+    """
+    workspace = Workspace(name="Personal", type=WorkspaceType.personal)
     db.add(workspace)
     db.flush()
     return workspace
