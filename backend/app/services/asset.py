@@ -65,6 +65,25 @@ def _status_condition(status: WarrantyStatus, today: date) -> ColumnElement[bool
     return Warranty.end_date > soon
 
 
+def _scoped_to(
+    conditions: list[ColumnElement[bool]], assigned_to_user_id: uuid.UUID | None
+) -> list[ColumnElement[bool]]:
+    """Narrow to one employee's own assets, if that is who is asking.
+
+    `None` means an owner or admin, who sees the whole workspace. The caller
+    gets that value from `employee_scope()` in app/api/deps.py rather than
+    inspecting the role here, so the rule lives in one place — the same shape
+    `app/services/dashboard.py` uses.
+
+    This is the second of the two checks in docs/architecture.md: the first is
+    `workspace_id`, which keeps tenants apart; this one keeps employees to the
+    assets assigned to them.
+    """
+    if assigned_to_user_id is None:
+        return conditions
+    return [*conditions, Asset.assigned_to_user_id == assigned_to_user_id]
+
+
 def _conditions(
     workspace_id: uuid.UUID,
     q: str | None,
@@ -112,8 +131,14 @@ def list_assets(
     page: int = 1,
     page_size: int = 20,
     today: date | None = None,
+    assigned_to_user_id: uuid.UUID | None = None,
 ) -> tuple[int, list[Asset]]:
     """Return (total matching, one page of assets) for the Assets List.
+
+    `assigned_to_user_id` narrows the list to one employee's own assets; pass
+    None for an owner or admin. It constrains the COUNT as well as the page,
+    so an employee is told how many assets *they* have, not how many the
+    organization has.
 
     `today` is injectable so tests can pin the clock when checking the status
     filter's boundaries; callers pass nothing in production.
@@ -128,7 +153,10 @@ def list_assets(
     appear twice and another not at all.
     """
     today = today or date.today()
-    conditions = _conditions(workspace_id, q, status, category_id, vendor_id, today)
+    conditions = _scoped_to(
+        _conditions(workspace_id, q, status, category_id, vendor_id, today),
+        assigned_to_user_id,
+    )
 
     total = db.scalar(
         select(func.count())
@@ -406,15 +434,28 @@ def delete_asset(db: Session, asset: Asset) -> None:
 
 
 def get_asset(
-    db: Session, workspace_id: uuid.UUID, asset_id: uuid.UUID
+    db: Session,
+    workspace_id: uuid.UUID,
+    asset_id: uuid.UUID,
+    assigned_to_user_id: uuid.UUID | None = None,
 ) -> Asset | None:
     """One asset with everything the detail screen draws, or None.
 
-    None covers both "no such asset" and "exists, but in a workspace you are
-    not in" — the caller turns both into 404. Telling them apart would confirm
+    None covers "no such asset", "exists, but in a workspace you are not in"
+    and — when `assigned_to_user_id` is given — "exists, but is not assigned to
+    you". The caller turns all three into 404. Telling them apart would confirm
     the record exists to someone who should not know, which is the leak
     docs/api.md warns against.
+
+    `assigned_to_user_id` defaults to None so the write paths can read back an
+    asset they have just created or edited without tripping over their own
+    scope.
     """
+    conditions = _scoped_to(
+        [Asset.id == asset_id, Asset.workspace_id == workspace_id],
+        assigned_to_user_id,
+    )
+
     return (
         db.scalars(
             select(Asset)
@@ -426,7 +467,7 @@ def get_asset(
                 joinedload(Asset.assigned_to),
                 joinedload(Asset.documents),
             )
-            .where(Asset.id == asset_id, Asset.workspace_id == workspace_id)
+            .where(*conditions)
         )
         .unique()
         .one_or_none()
