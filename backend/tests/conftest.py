@@ -4,9 +4,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_workspace
+from app.api.deps import get_current_user, get_current_workspace
 from app.db.session import engine, get_db
 from app.main import app
+from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceType
 
 
@@ -29,11 +30,17 @@ def db() -> Generator[Session, None, None]:
     handed this same session via the `get_db` override below) while staying
     invisible to everything else.
 
+    `join_transaction_mode="create_savepoint"` is what lets this survive a
+    route that commits: the session's commit releases a SAVEPOINT instead of
+    committing the connection's transaction, so the rollback below still undoes
+    everything. Without it, the first write endpoint under test would leave its
+    rows behind for every later test to trip over.
+
     Needs a database. Tests that do not touch one should use `client`.
     """
     connection = engine.connect()
     transaction = connection.begin()
-    session = Session(bind=connection)
+    session = Session(bind=connection, join_transaction_mode="create_savepoint")
     try:
         yield session
     finally:
@@ -65,19 +72,42 @@ def other_workspace(db: Session) -> Workspace:
 
 
 @pytest.fixture
-def api(db: Session, workspace: Workspace) -> Generator[TestClient, None, None]:
-    """A client whose requests run on `db` and act inside `workspace`.
+def user(db: Session) -> User:
+    """The signed-in user making the request.
+
+    Created by the test rather than taken from `app.api.deps.DEV_USER_ID`.
+    That constant is only a real row if `scripts/seed_dev.py` has been run,
+    which is true on a developer's machine and false on CI — so leaning on it
+    makes tests that pass locally and fail in the pipeline with a foreign key
+    violation on `assets.created_by_user_id`.
+    """
+    user = User(
+        cognito_sub="test-sub",
+        email="test@warrantytrack.local",
+        display_name="Test User",
+    )
+    db.add(user)
+    db.flush()
+    return user
+
+
+@pytest.fixture
+def api(
+    db: Session, workspace: Workspace, user: User
+) -> Generator[TestClient, None, None]:
+    """A client whose requests run on `db` and act as `user` in `workspace`.
 
     Overriding the dependencies rather than the functions themselves is what
     lets a test choose the caller: `get_db` hands the route the test's
-    transaction, and `get_current_workspace` stands in for auth, which is
-    still a stub (see app/api/deps.py).
+    transaction, while `get_current_workspace` and `get_current_user` stand in
+    for auth, which is still a stub (see app/api/deps.py).
 
-    When the real Cognito dependency lands, only the override changes — the
+    When the real Cognito dependency lands, only these overrides change — the
     tests and the routes stay as they are.
     """
     app.dependency_overrides[get_db] = lambda: db
     app.dependency_overrides[get_current_workspace] = lambda: workspace.id
+    app.dependency_overrides[get_current_user] = lambda: user.id
     try:
         yield TestClient(app)
     finally:

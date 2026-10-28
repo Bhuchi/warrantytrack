@@ -15,7 +15,8 @@ from __future__ import annotations
 import uuid
 from typing import TypeVar
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.catalog import Category, Department, Location, Vendor
@@ -45,3 +46,51 @@ def list_for_workspace(
             .order_by(model.name)
         )
     )
+
+
+def get_or_create(
+    db: Session, model: type[CatalogModel], workspace_id: uuid.UUID, name: str
+) -> CatalogModel:
+    """Find a catalog row by name in this workspace, or create it.
+
+    This is what lets `POST /assets` accept a vendor *name*. The Add Asset form
+    collects free text and OCR returns "Power Buy", not a UUID
+    (frontend/src/features/add-asset/draft.ts), and bulk import will read the
+    same names out of a spreadsheet — so the backend has to be able to turn a
+    name into a row.
+
+    The lookup is **case-insensitive** but the row is created with the caller's
+    capitalisation. The unique constraint is case-sensitive, so without this
+    "power buy" from a receipt would happily become a second vendor alongside
+    "Power Buy" and the dashboard would count them separately.
+
+    The INSERT runs in a savepoint: if another request creates the same name
+    between our SELECT and our INSERT, the constraint fires, we roll back just
+    that savepoint rather than the caller's whole transaction, and return the
+    row that won.
+    """
+    cleaned = name.strip()
+
+    existing = db.scalars(
+        select(model).where(
+            model.workspace_id == workspace_id,
+            func.lower(model.name) == cleaned.lower(),
+        )
+    ).first()
+    if existing is not None:
+        return existing
+
+    row = model(workspace_id=workspace_id, name=cleaned)
+    try:
+        with db.begin_nested():
+            db.add(row)
+    except IntegrityError:
+        # Lost the race — the other writer's row is the one that exists.
+        return db.scalars(
+            select(model).where(
+                model.workspace_id == workspace_id,
+                func.lower(model.name) == cleaned.lower(),
+            )
+        ).one()
+
+    return row

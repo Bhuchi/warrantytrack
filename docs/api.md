@@ -138,12 +138,8 @@ inline:
 
 ### Assets · owner: Sirawich (Leg A)
 
-> **`GET /assets` and `GET /assets/{id}` are built.** The write half below is
-> still planned — it waits on three open decisions: who computes
-> `warranty.end_date` (it is `NOT NULL` and the client never sends it), whether
-> `POST` accepts a `vendor_name` or requires a `vendor_id`
-> (frontend/src/features/add-asset/draft.ts), and which fields are genuinely
-> required.
+> **`GET /assets`, `GET /assets/{id}` and `POST /assets` are built.** `PATCH`
+> and `DELETE` are still planned.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -183,19 +179,23 @@ Rows are newest-first. `page_size` defaults to 20 and is capped at 100.
 
 ```jsonc
 // POST /assets   (request)
-// required: name, serial_number, condition, purchase_date (+ purchase info)
-// optional: location (box/storage), *_image_key, department_id, document_ids,
-//           assigned_to_user_id, warranty
+// required: name, serial_number, condition, purchase_date, price, vendor
+//           (the 18 Oct decision — see docs/frontend-plan.md)
+// optional: category, department_id, invoice_number, location (box/storage),
+//           *_image_key, document_ids, assigned_to_user_id, warranty
 {
   "name": "Dell Latitude 5540",
   "serial_number": "ABC123",
   "condition": "new",                  // new | good | fair | damaged
   "purchase_date": "2025-03-01",
   "price": "32900.00",
-  "currency": "THB",
+  "currency": "THB",                   // optional, defaults to THB
   "invoice_number": "INV-2025-001",
-  "category_id": "uuid",
-  "vendor_id": "uuid",
+  // Vendor and category take EITHER an id OR a name. A name is looked up in
+  // this workspace's catalog and created if missing — the Add Asset form and
+  // OCR both produce "Power Buy", not a UUID. An id wins if both are sent.
+  "vendor_name": "Power Buy",          // or "vendor_id": "uuid"
+  "category_name": "Laptop",           // or "category_id": "uuid"
   "department_id": "uuid",             // optional
   "location": "Shelf B2",             // optional (box / storage)
   "location_image_key": null,          // optional S3 key
@@ -209,6 +209,20 @@ Rows are newest-first. `page_size` defaults to 20 and is capped at 100.
 }
 // → 201  (body = GET /assets/{id} below)
 ```
+
+**`end_date` is computed**, never sent: `start_date` plus `duration_months`
+calendar months. Month-end purchases roll over rather than clamp — 31 Jan + 1
+month is 3 Mar, not 28 Feb — because that is what the form's own preview shows
+(`warrantyEndLabel` in add-asset/draft.ts uses JavaScript's `setMonth`). The
+two must agree or the saved date contradicts what the user was shown.
+
+**`409 Conflict`** if the serial number already exists *in this workspace*.
+Serials are unique per workspace, never globally: two organizations can own
+hardware with the same serial. This is what makes the bulk importer's
+`"serial_number": "duplicate"` error possible.
+
+`workspace_id` and `created_by_user_id` are taken from the request context and
+ignored if sent in the body.
 
 ```jsonc
 // GET /assets/{id}  → detail (D08)

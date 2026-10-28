@@ -13,10 +13,11 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status as http_status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_workspace
+from app.api.deps import get_current_user, get_current_workspace
 from app.db.session import get_db
-from app.schemas.asset import AssetDetail, AssetList, AssetListItem
+from app.schemas.asset import AssetCreate, AssetDetail, AssetList, AssetListItem
 from app.services import asset as asset_service
+from app.services.asset import DuplicateSerialNumber, UnknownDocument
 from app.services.warranty import WarrantyStatus
 
 # No prefix here — main.py mounts this router at "/assets", so the collection
@@ -67,6 +68,49 @@ def list_assets(
         page=page,
         page_size=page_size,
     )
+
+
+@router.post("", response_model=AssetDetail, status_code=http_status.HTTP_201_CREATED)
+def create_asset(
+    data: AssetCreate,
+    db: Session = Depends(get_db),
+    workspace_id: uuid.UUID = Depends(get_current_workspace),
+    user_id: uuid.UUID = Depends(get_current_user),
+) -> AssetDetail:
+    """POST /assets — manual entry (D06) or a confirmed single OCR result.
+
+    `workspace_id` and `created_by_user_id` come from the dependencies, never
+    from the request body: a caller must not be able to file an asset into
+    someone else's workspace by sending its id.
+
+    Returns the same shape as `GET /assets/{id}`, so the wizard can show the
+    saved asset without a second round trip.
+    """
+    try:
+        asset = asset_service.create_asset(db, workspace_id, user_id, data)
+    except DuplicateSerialNumber:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=f"An asset with serial number {data.serial_number} already exists.",
+        ) from None
+    except UnknownDocument as error:
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Unknown document_ids: {', '.join(error.args[0])}",
+        ) from None
+
+    db.commit()
+
+    # Read back after the commit so the response reflects what is actually
+    # stored, with every relationship the detail shape needs loaded.
+    created = asset_service.get_asset(db, workspace_id, asset.id)
+    if created is None:  # pragma: no cover - it was just committed
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Asset could not be read back after creation.",
+        )
+
+    return AssetDetail.from_asset(created)
 
 
 @router.get("/{asset_id}", response_model=AssetDetail)
