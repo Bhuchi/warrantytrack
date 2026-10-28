@@ -25,7 +25,14 @@ from decimal import Decimal
 
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 from app.models.asset import Asset, AssetCondition
 from app.models.document import DocumentKind, DocumentStatus
@@ -41,6 +48,31 @@ AssetName = Annotated[
 ]
 SerialNumber = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
+]
+#: Optional, but "   " is a mistake rather than a value. CLOUDAPPG5-118 asks
+#: for whitespace-only invoice numbers to be rejected, so this errors rather
+#: than quietly becoming null — the user typed something and should be told it
+#: did not count. Omitting the field, or sending null, remains fine.
+InvoiceNumber = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
+]
+
+
+def _blank_to_none(value: object) -> object:
+    """Treat a whitespace-only string as "not given"."""
+    if isinstance(value, str):
+        return value.strip() or None
+    return value
+
+
+#: Free text where blank genuinely means absent. Unlike the invoice number,
+#: there is nothing to tell the user off about: leaving the step 3 note empty,
+#: or typing spaces into it, both mean the same thing.
+#: The length limit sits on the `str` arm, not on the union: applied to the
+#: whole thing it would be handed a None and raise.
+StorageNote = Annotated[
+    Annotated[str, StringConstraints(max_length=200)] | None,
+    BeforeValidator(_blank_to_none),
 ]
 
 
@@ -83,7 +115,7 @@ class AssetCreate(BaseModel):
     purchase_date: date
     price: Decimal
     currency: str = Field(default="THB", min_length=3, max_length=3)
-    invoice_number: str | None = Field(default=None, max_length=100)
+    invoice_number: InvoiceNumber | None = None
 
     category_id: uuid.UUID | None = None
     category_name: str | None = Field(default=None, max_length=120)
@@ -99,7 +131,7 @@ class AssetCreate(BaseModel):
     # Add Asset form labels this field "Note" (BoxPhotoStep.tsx) and FE-11
     # calls it a free-text note, so that is what the API calls it. It is stored
     # in the `assets.location` column, which predates the name.
-    storage_note: str | None = Field(default=None, max_length=200)
+    storage_note: StorageNote = None
     image_key: str | None = Field(default=None, max_length=1024)
     location_image_key: str | None = Field(default=None, max_length=1024)
 
@@ -143,7 +175,7 @@ class AssetUpdate(BaseModel):
     purchase_date: date | None = None
     price: Decimal | None = None
     currency: str | None = Field(default=None, min_length=3, max_length=3)
-    invoice_number: str | None = Field(default=None, max_length=100)
+    invoice_number: InvoiceNumber | None = None
 
     category_id: uuid.UUID | None = None
     category_name: str | None = Field(default=None, max_length=120)
@@ -153,7 +185,7 @@ class AssetUpdate(BaseModel):
     location_id: uuid.UUID | None = None
     location_name: str | None = Field(default=None, max_length=120)
 
-    storage_note: str | None = Field(default=None, max_length=200)
+    storage_note: StorageNote = None
     image_key: str | None = Field(default=None, max_length=1024)
     location_image_key: str | None = Field(default=None, max_length=1024)
 
