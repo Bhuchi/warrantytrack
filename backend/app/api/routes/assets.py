@@ -31,6 +31,7 @@ from app.schemas.asset import (
 )
 from app.services import asset as asset_service
 from app.services.asset import DuplicateSerialNumber, UnknownDocument
+from app.services.asset_validation import AssetValidationError
 from app.services.warranty import WarrantyStatus
 
 # No prefix here — main.py mounts this router at "/assets", so the collection
@@ -106,6 +107,14 @@ def create_asset(
     """
     try:
         asset = asset_service.create_asset(db, workspace_id, user_id, data)
+    except AssetValidationError as error:
+        # Handed through in FastAPI's own 422 shape, so a caller cannot tell
+        # these from the schema's own errors — `loc[1]` names the field either
+        # way, which is what the form needs to show it inline.
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=error.detail,
+        ) from None
     except DuplicateSerialNumber:
         raise HTTPException(
             status_code=http_status.HTTP_409_CONFLICT,
@@ -221,6 +230,11 @@ def update_asset(
 
     try:
         asset_service.update_asset(db, asset, data)
+    except AssetValidationError as error:
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=error.detail,
+        ) from None
     except DuplicateSerialNumber:
         raise HTTPException(
             status_code=http_status.HTTP_409_CONFLICT,
