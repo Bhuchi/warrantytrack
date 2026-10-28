@@ -23,6 +23,7 @@ from app.api.deps import (
 from app.models.membership import Membership
 from app.db.session import get_db
 from app.schemas.asset import (
+    AssetAssign,
     AssetCreate,
     AssetDetail,
     AssetList,
@@ -30,6 +31,7 @@ from app.schemas.asset import (
     AssetUpdate,
 )
 from app.services import asset as asset_service
+from app.services import asset_validation
 from app.services.asset import DuplicateSerialNumber, UnknownDocument
 from app.services.asset_validation import AssetValidationError
 from app.services.warranty import WarrantyStatus
@@ -166,6 +168,56 @@ def get_asset(
         )
 
     return AssetDetail.from_asset(asset)
+
+
+@router.post("/{asset_id}/assign", response_model=AssetDetail)
+def assign_asset(
+    asset_id: uuid.UUID,
+    data: AssetAssign,
+    db: Session = Depends(get_db),
+    membership: Membership = Depends(require_manager),
+) -> AssetDetail:
+    """POST /assets/{id}/assign — give an asset to an employee, or take it back.
+
+    Owners and admins only; `null` unassigns. Reassigning is the same call with
+    a different id, so assign, reassign and unassign cannot drift apart.
+
+    Three different answers for three different problems:
+
+    - **403** — an employee: they belong to this workspace but may not hand
+      assets around. Settled by `require_manager` before the asset is looked
+      up, so it cannot be used to probe for ids.
+    - **404** — no such asset, or one in another workspace.
+    - **422** — the proposed assignee is not a member of this workspace.
+      Checked through the same `validate_references` the create and edit paths
+      use, so "who may hold an asset" has one definition.
+    """
+    asset = asset_service.get_asset(db, membership.workspace_id, asset_id)
+
+    if asset is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND, detail="Asset not found"
+        )
+
+    try:
+        asset_validation.validate_references(db, membership.workspace_id, data)
+    except AssetValidationError as error:
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=error.detail,
+        ) from None
+
+    asset_service.assign_asset(db, asset, data.assigned_to_user_id)
+    db.commit()
+
+    updated = asset_service.get_asset(db, membership.workspace_id, asset_id)
+    if updated is None:  # pragma: no cover - it was just committed
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Asset could not be read back after assignment.",
+        )
+
+    return AssetDetail.from_asset(updated)
 
 
 @router.delete("/{asset_id}", status_code=http_status.HTTP_204_NO_CONTENT)

@@ -139,8 +139,8 @@ inline:
 ### Assets · owner: Sirawich (Leg A)
 
 > **Built:** the full CRUD set — `GET /assets`, `GET /assets/{id}`,
-> `POST /assets`, `PATCH /assets/{id}`, `DELETE /assets/{id}`.
-> **Still planned:** `assign`, `import`.
+> `POST /assets`, `PATCH /assets/{id}`, `DELETE /assets/{id}` — plus
+> `POST /assets/{id}/assign`. **Still planned:** `import`.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -295,6 +295,19 @@ ignored if sent in the body.
 // POST /assets/{id}/assign   (request)
 { "assigned_to_user_id": "uuid" }      // null to unassign
 // → 200  (updated asset)
+//
+// Owners and admins only. One endpoint covers assign, reassign and unassign:
+// reassigning is the same call with a different id.
+//
+//   403  an employee — they belong here but may not hand assets around,
+//        settled before the asset is read so it cannot probe for ids
+//   404  no such asset, or one in another workspace
+//   422  the proposed assignee is not a member of this workspace, or the
+//        body omits assigned_to_user_id ({} is not a silent unassign)
+//
+// Assignment is what brings an asset into an employee's scope: afterwards it
+// appears in their GET /assets and they may PATCH it. Unassigning removes it
+// from their view without deleting anything.
 
 // DELETE /assets/{id}   → 204, no body
 //

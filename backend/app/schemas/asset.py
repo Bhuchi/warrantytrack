@@ -165,6 +165,25 @@ class AssetCreate(BaseModel):
     warranty: WarrantyInput
 
 
+class AssetAssign(BaseModel):
+    """POST /assets/{id}/assign — hand an asset to an employee, or take it back.
+
+    One endpoint covers assign, reassign and unassign: reassigning is the same
+    call with a different id, and `null` unassigns. That is the shape agreed in
+    docs/api.md, and it keeps "who holds this asset" a single operation rather
+    than three that could disagree.
+
+    The field has no default, so `{}` is a 422 rather than a silent unassign.
+    Giving an asset back is a decision and should be spelled out.
+
+    Separate from `AssetUpdate` on purpose: assignment is owner/admin only,
+    while editing is open to the employee holding the asset. Folding it into
+    PATCH would be a second door into the same change with weaker rules.
+    """
+
+    assigned_to_user_id: uuid.UUID | None
+
+
 class AssetUpdate(BaseModel):
     """PATCH /assets/{id} — any subset of the create fields.
 

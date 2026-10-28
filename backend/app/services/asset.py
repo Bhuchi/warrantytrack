@@ -447,6 +447,29 @@ def _apply_warranty(db: Session, asset: Asset, warranty: WarrantyInput | None) -
         asset.warranty.end_date = end_date
 
 
+def assign_asset(
+    db: Session, asset: Asset, assigned_to_user_id: uuid.UUID | None
+) -> Asset:
+    """Hand an asset to a workspace member, or take it back with None.
+
+    Takes the Asset rather than an id because the caller has already fetched
+    it inside their workspace — which is what stops this reassigning someone
+    else's asset.
+
+    Deliberately thin: who may call it is the route's business
+    (`require_manager`), and whether the new holder is a member of this
+    workspace is `asset_validation`'s. Both run before this does.
+
+    Unassigning is not a deletion. The asset stays, and the former assignee
+    simply stops seeing it — `employee_scope()` filters them out on the next
+    request.
+    """
+    asset.assigned_to_user_id = assigned_to_user_id
+    db.flush()
+    db.refresh(asset)
+    return asset
+
+
 def delete_asset(db: Session, asset: Asset) -> None:
     """Remove an asset, its warranty and its document links.
 
