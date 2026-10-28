@@ -23,7 +23,7 @@ from app.models.asset import Asset
 from app.models.catalog import Category, Vendor
 from app.models.document import AssetDocument, Document
 from app.models.warranty import Warranty
-from app.schemas.asset import AssetCreate
+from app.schemas.asset import AssetCreate, AssetUpdate, WarrantyInput
 from app.services import catalog as catalog_service
 from app.services import warranty as warranty_service
 from app.services.warranty import WarrantyStatus
@@ -288,6 +288,104 @@ def _link_documents(
                 workspace_id=workspace_id,
             )
         )
+
+
+#: Fields copied straight from the payload onto the asset when present.
+_PLAIN_UPDATE_FIELDS = (
+    "name",
+    "serial_number",
+    "condition",
+    "purchase_date",
+    "price",
+    "currency",
+    "invoice_number",
+    "department_id",
+    "location",
+    "image_key",
+    "location_image_key",
+)
+
+
+def update_asset(
+    db: Session, asset: Asset, data: AssetUpdate
+) -> Asset:
+    """Apply a partial update to an asset already fetched for this workspace.
+
+    Takes the Asset rather than an id because the caller has already loaded it
+    — which is also what proves it is in the caller's workspace, so this
+    function cannot be tricked into editing someone else's row.
+
+    `model_fields_set` is what makes PATCH partial: it holds only the keys the
+    client actually sent, so omitting `invoice_number` leaves it untouched
+    while sending it as `null` clears it. Reading `data.invoice_number is not
+    None` instead would make it impossible to ever clear a field.
+    """
+    sent = data.model_fields_set
+
+    if "serial_number" in sent and data.serial_number != asset.serial_number:
+        clash = db.scalars(
+            select(Asset).where(
+                Asset.workspace_id == asset.workspace_id,
+                Asset.serial_number == data.serial_number,
+                Asset.id != asset.id,
+            )
+        ).first()
+        if clash is not None:
+            raise DuplicateSerialNumber(data.serial_number)
+
+    for field in _PLAIN_UPDATE_FIELDS:
+        if field in sent:
+            value = getattr(data, field)
+            setattr(asset, field, value.strip() if isinstance(value, str) else value)
+
+    # A name and an id are two ways of setting the same column, so they share
+    # one branch: whichever the client sent decides the new value.
+    if "category_id" in sent or "category_name" in sent:
+        asset.category_id = _resolve_catalog_id(
+            db, Category, asset.workspace_id, data.category_id, data.category_name
+        )
+    if "vendor_id" in sent or "vendor_name" in sent:
+        asset.vendor_id = _resolve_catalog_id(
+            db, Vendor, asset.workspace_id, data.vendor_id, data.vendor_name
+        )
+
+    if "warranty" in sent:
+        _apply_warranty(db, asset, data.warranty)
+
+    db.flush()
+    db.refresh(asset)
+    return asset
+
+
+def _apply_warranty(db: Session, asset: Asset, warranty: WarrantyInput | None) -> None:
+    """Add, replace or remove an asset's warranty.
+
+    `"warranty": null` removes it — an asset can legitimately have none, and
+    the status simply becomes `unknown`. Sending an object either updates the
+    existing row or creates one, recomputing `end_date` from the new start and
+    duration so a stored date never survives the inputs it came from.
+    """
+    if warranty is None:
+        if asset.warranty is not None:
+            db.delete(asset.warranty)
+        return
+
+    end_date = add_months(warranty.start_date, warranty.duration_months)
+
+    if asset.warranty is None:
+        db.add(
+            Warranty(
+                workspace_id=asset.workspace_id,
+                asset_id=asset.id,
+                provider=warranty.provider,
+                start_date=warranty.start_date,
+                end_date=end_date,
+            )
+        )
+    else:
+        asset.warranty.provider = warranty.provider
+        asset.warranty.start_date = warranty.start_date
+        asset.warranty.end_date = end_date
 
 
 def get_asset(

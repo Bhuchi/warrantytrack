@@ -98,6 +98,45 @@ class AssetCreate(BaseModel):
         return self
 
 
+class AssetUpdate(BaseModel):
+    """PATCH /assets/{id} — any subset of the create fields.
+
+    Every field is optional, and "absent" means something different from
+    "null": omitting `invoice_number` leaves it alone, sending it as `null`
+    clears it. The service reads `model_fields_set` to tell the two apart,
+    which is why nothing here has a non-None default.
+
+    Two fields from POST are deliberately **not** accepted:
+
+    - `assigned_to_user_id` — assignment has its own endpoint
+      (`POST /assets/{id}/assign`) which is admin-only. Allowing it here would
+      be a second door into the same change with weaker rules.
+    - `document_ids` — "replace the list" and "add to the list" are both
+      reasonable readings and the contract does not say which. Documents are
+      attached at creation; changing them needs its own agreed shape.
+    """
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    serial_number: str | None = Field(default=None, min_length=1, max_length=120)
+    condition: AssetCondition | None = None
+    purchase_date: date | None = None
+    price: Decimal | None = None
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
+    invoice_number: str | None = Field(default=None, max_length=100)
+
+    category_id: uuid.UUID | None = None
+    category_name: str | None = Field(default=None, max_length=120)
+    vendor_id: uuid.UUID | None = None
+    vendor_name: str | None = Field(default=None, max_length=120)
+    department_id: uuid.UUID | None = None
+
+    location: str | None = Field(default=None, max_length=200)
+    image_key: str | None = Field(default=None, max_length=1024)
+    location_image_key: str | None = Field(default=None, max_length=1024)
+
+    warranty: WarrantyInput | None = None
+
+
 class CatalogRef(BaseModel):
     """A catalog row as it appears nested inside an asset."""
 

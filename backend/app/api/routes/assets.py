@@ -15,7 +15,13 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_current_workspace
 from app.db.session import get_db
-from app.schemas.asset import AssetCreate, AssetDetail, AssetList, AssetListItem
+from app.schemas.asset import (
+    AssetCreate,
+    AssetDetail,
+    AssetList,
+    AssetListItem,
+    AssetUpdate,
+)
 from app.services import asset as asset_service
 from app.services.asset import DuplicateSerialNumber, UnknownDocument
 from app.services.warranty import WarrantyStatus
@@ -133,3 +139,43 @@ def get_asset(
         )
 
     return AssetDetail.from_asset(asset)
+
+
+@router.patch("/{asset_id}", response_model=AssetDetail)
+def update_asset(
+    asset_id: uuid.UUID,
+    data: AssetUpdate,
+    db: Session = Depends(get_db),
+    workspace_id: uuid.UUID = Depends(get_current_workspace),
+) -> AssetDetail:
+    """PATCH /assets/{id} — change any subset of the create fields.
+
+    Fetching inside the workspace first is what makes an asset belonging to
+    someone else a 404 rather than an edit: there is no path here that reaches
+    a row the caller cannot already read.
+    """
+    asset = asset_service.get_asset(db, workspace_id, asset_id)
+
+    if asset is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND, detail="Asset not found"
+        )
+
+    try:
+        asset_service.update_asset(db, asset, data)
+    except DuplicateSerialNumber:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=f"An asset with serial number {data.serial_number} already exists.",
+        ) from None
+
+    db.commit()
+
+    updated = asset_service.get_asset(db, workspace_id, asset_id)
+    if updated is None:  # pragma: no cover - it was just committed
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Asset could not be read back after update.",
+        )
+
+    return AssetDetail.from_asset(updated)

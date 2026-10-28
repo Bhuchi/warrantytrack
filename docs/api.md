@@ -138,8 +138,8 @@ inline:
 
 ### Assets · owner: Sirawich (Leg A)
 
-> **`GET /assets`, `GET /assets/{id}` and `POST /assets` are built.** `PATCH`
-> and `DELETE` are still planned.
+> **Built:** `GET /assets`, `GET /assets/{id}`, `POST /assets`,
+> `PATCH /assets/{id}`. **Still planned:** `DELETE`, `assign`, `import`.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -253,6 +253,18 @@ ignored if sent in the body.
 }
 
 // PATCH /assets/{id}   → any subset of the POST fields. Returns the asset.
+//
+// Omitting a field leaves it unchanged; sending it as null clears it. These
+// are different instructions — { } changes nothing, { "invoice_number": null }
+// clears the invoice number.
+//
+// "warranty": { ... }  replaces the warranty and recomputes end_date
+// "warranty": null     removes it; the asset's status becomes "unknown"
+//
+// Not accepted here: assigned_to_user_id (use POST /assets/{id}/assign, which
+// is admin-only) and document_ids (replace-vs-append is not agreed).
+// 409 if the new serial number is already used by another asset in the
+// workspace; resending the asset's own serial is fine.
 
 // POST /assets/{id}/assign   (request)
 { "assigned_to_user_id": "uuid" }      // null to unassign
