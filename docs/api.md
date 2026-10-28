@@ -245,6 +245,46 @@ inline:
 { "created": 47, "skipped": 3 }
 ```
 
+### Catalog · owner: Sirawich (Leg A)
+
+The four lookup lists an asset points at. They fill the pickers on Add Asset
+(D06) and the filters on the Assets List (D05).
+
+**Workspace-scoped, not global.** One organization's "IT" department is not
+another's, and a shared list would leak names across tenants. A new workspace
+therefore starts with four empty lists — an empty dropdown, not an error.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/categories` | What kind of thing an asset is — "Laptop", "Monitor" |
+| `GET` | `/vendors` | Who it was bought from — "Power Buy", "JIB" |
+| `GET` | `/departments` | Which part of the organization holds it — "IT" |
+| `GET` | `/locations` | The site it lives at — "HQ Floor 3" |
+
+```jsonc
+// GET /categories  (/vendors, /departments and /locations are identical)
+{
+  "items": [
+    { "id": "uuid", "name": "Laptop" },
+    { "id": "uuid", "name": "Monitor" }
+  ]
+}
+```
+
+Sorted A–Z. **Not paginated** — the caller is filling a dropdown and wants the
+whole list; a page of 20 would just make the frontend loop to rebuild it.
+
+`{id, name}` is the same object a catalog row already appears as when nested
+in `GET /assets/{id}`, so the frontend sees one shape either way.
+
+> `locations` is the **site** picker; `assets.location` is free text for the
+> spot inside it ("Shelf B2"). Two different things — see docs/erd.md.
+
+**Creating and editing these is not built yet.** Nothing in the frontend writes
+to them — there is no catalog-management screen — so the write endpoints land
+with the ticket that first needs them (bulk import, which has to create missing
+rows).
+
 ### Documents and OCR · owner: Bhuchi (Leg B)
 
 | Method | Path | Purpose |
