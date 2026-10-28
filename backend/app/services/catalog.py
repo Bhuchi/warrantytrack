@@ -131,3 +131,49 @@ def create(
     db.add(row)
     db.flush()
     return row
+
+
+def get(
+    db: Session, model: type[CatalogModel], workspace_id: uuid.UUID, row_id: uuid.UUID
+) -> CatalogModel | None:
+    """One row by id, inside this workspace, or None.
+
+    Scoped like everything else: a row in another workspace is simply not
+    found, which is what lets the route answer 404 without deciding whether it
+    exists.
+    """
+    return db.scalars(
+        select(model).where(model.id == row_id, model.workspace_id == workspace_id)
+    ).first()
+
+
+def rename(
+    db: Session, model: type[CatalogModel], row: CatalogModel, name: str
+) -> CatalogModel:
+    """Change a row's name, or raise if another row already has it.
+
+    The row's own name does not count as a clash with itself, so re-sending an
+    unchanged name succeeds rather than 409-ing — a form that submits every
+    field should not fail because one of them did not change.
+    """
+    cleaned = name.strip()
+
+    clash = _find_by_name(db, model, row.workspace_id, cleaned)
+    if clash is not None and clash.id != row.id:
+        raise DuplicateCatalogName(cleaned)
+
+    row.name = cleaned
+    db.flush()
+    return row
+
+
+def delete(db: Session, row: CatalogModel) -> None:
+    """Remove a catalog row.
+
+    Assets pointing at it are **not** deleted: every catalog foreign key on
+    `assets` is `ON DELETE SET NULL` (docs/erd.md — "deleting a category or a
+    user must not delete assets"). Those assets simply lose that
+    classification, which is why this needs no check for rows in use.
+    """
+    db.delete(row)
+    db.flush()

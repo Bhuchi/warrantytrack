@@ -326,6 +326,8 @@ therefore starts with four empty lists — an empty dropdown, not an error.
 | `GET` | `/departments` | Which part of the organization holds it — "IT" |
 | `GET` | `/locations` | The site it lives at — "HQ Floor 3" |
 | `POST` | each of the four | Add one option. **Owner or admin only** |
+| `PATCH` | `…/{id}` | Rename one. **Owner or admin only** |
+| `DELETE` | `…/{id}` | Remove one. **Owner or admin only** |
 
 **Reading is open to everyone in the workspace** — an employee filling in Add
 Asset needs the same pickers as an admin. **Writing is owner/admin**, matching
@@ -369,9 +371,24 @@ saving an asset. These endpoints are for managing a list directly — and are th
 only way to create a **department** or a **location**, which `POST /assets`
 references by id but never creates.
 
-**Editing and deleting a catalog row is not built yet** — no screen renames or
-removes one. Assets referencing a deleted row would keep working regardless:
-the foreign keys are `ON DELETE SET NULL` (docs/erd.md).
+```jsonc
+// PATCH /categories/{id}
+{ "name": "Notebook" }
+// → 200
+{ "id": "uuid", "name": "Notebook" }
+
+// DELETE /categories/{id}   → 204, no body
+```
+
+Renaming follows the same rules as creating: trimmed, non-blank, and **409** if
+another row already has the name (case-insensitively). A row does not clash
+with itself, so re-sending its current name succeeds — a form that submits
+every field should not fail because one did not change.
+
+**Deleting a catalog row never deletes assets.** Every catalog foreign key on
+`assets` is `ON DELETE SET NULL` (docs/erd.md — *"deleting a category or a user
+must not delete assets"*), so the assets survive and simply lose that
+classification. There is therefore no "in use" check and no 409 for it.
 
 ### Documents and OCR · owner: Bhuchi (Leg B)
 
