@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api.routes import catalog, health, notifications
+from app.api.routes import assets, catalog, health, notifications
 from app.core.config import settings
 
 app = FastAPI(
@@ -30,6 +30,4 @@ app.include_router(catalog.categories_router, prefix="/categories")
 app.include_router(catalog.vendors_router, prefix="/vendors")
 app.include_router(catalog.departments_router, prefix="/departments")
 app.include_router(catalog.locations_router, prefix="/locations")
-# Next, following the same pattern:
-#   from app.api.routes import assets
-#   app.include_router(assets.router, prefix="/assets")
+app.include_router(assets.router, prefix="/assets")
