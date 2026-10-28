@@ -138,9 +138,16 @@ inline:
 
 ### Assets · owner: Sirawich (Leg A)
 
+> **`GET /assets` and `GET /assets/{id}` are built.** The write half below is
+> still planned — it waits on three open decisions: who computes
+> `warranty.end_date` (it is `NOT NULL` and the client never sends it), whether
+> `POST` accepts a `vendor_name` or requires a `vendor_id`
+> (frontend/src/features/add-asset/draft.ts), and which fields are genuinely
+> required.
+
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/assets` | List; filters `status`, `category_id`, `vendor_id`, `q`, `page` |
+| `GET` | `/assets` | List; filters `status`, `category_id`, `vendor_id`, `q`, `page`, `page_size` |
 | `POST` | `/assets` | Create (manual entry D06, or confirmed single OCR) |
 | `GET` | `/assets/{id}` | Detail (D08) |
 | `PATCH` | `/assets/{id}` | Update |
@@ -157,14 +164,22 @@ inline:
       "name": "Dell Latitude 5540",
       "serial_number": "ABC123",
       "purchase_date": "2025-03-01",
-      "warranty_end_date": "2028-03-01",
+      "warranty_end_date": "2028-03-01",   // null when there is no warranty
       "warranty_status": "active",       // active | expiring_soon | expired | unknown
-      "assigned_to_user_id": null
+      "assigned_to_user_id": null,
+      // Flattened, not nested: the D05 table draws these as plain cells.
+      "category_name": "Laptop",
+      "vendor_name": "Power Buy",
+      "location": "Shelf B2"
     }
   ],
   "total": 1, "page": 1, "page_size": 20
 }
 ```
+
+`q` matches **name, serial number or invoice number**, case-insensitively.
+`total` counts every asset matching the filters, not just the returned page.
+Rows are newest-first. `page_size` defaults to 20 and is capped at 100.
 
 ```jsonc
 // POST /assets   (request)
