@@ -4,23 +4,26 @@ Four resources, one file, because the four tables are identical in shape. Each
 gets its own router so main.py keeps defining every path in exactly one place,
 the same way /notifications does.
 
-Read-only for now. Nothing in the frontend creates or edits these yet — there
-is no catalog-management screen — so the write half is deliberately left for
-the ticket that needs it (bulk import, which has to create missing rows).
+Reading is open to everyone in the workspace — an employee filling in the Add
+Asset form needs the same pickers as an admin. Creating is owner/admin only,
+matching "Organization Administrator ... manages departments, locations,
+vendors, asset categories" in the requirements.
 """
 
 from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status as http_status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_workspace
+from app.api.deps import get_current_workspace, require_manager
 from app.db.session import get_db
 from app.models.catalog import Category, Department, Location, Vendor
-from app.schemas.catalog import CatalogList
+from app.models.membership import Membership
+from app.schemas.catalog import CatalogCreate, CatalogItem, CatalogList
 from app.services import catalog as catalog_service
+from app.services.catalog import DuplicateCatalogName
 
 # No prefix here — main.py mounts each router at its own path, so the
 # collection root is "".
@@ -28,6 +31,29 @@ categories_router = APIRouter(tags=["catalog"])
 vendors_router = APIRouter(tags=["catalog"])
 departments_router = APIRouter(tags=["catalog"])
 locations_router = APIRouter(tags=["catalog"])
+
+
+def _create(
+    db: Session,
+    model: type[Category] | type[Vendor] | type[Department] | type[Location],
+    membership: Membership,
+    data: CatalogCreate,
+) -> CatalogItem:
+    """Shared body for the four POST routes.
+
+    The routes stay separate so each gets its own path, docstring and OpenAPI
+    entry; only the part that would be copied four times verbatim lives here.
+    """
+    try:
+        row = catalog_service.create(db, model, membership.workspace_id, data.name)
+    except DuplicateCatalogName as error:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=f"'{error.args[0]}' is already in this list.",
+        ) from None
+
+    db.commit()
+    return CatalogItem.model_validate(row)
 
 
 @categories_router.get("", response_model=CatalogList)
@@ -47,6 +73,22 @@ def list_categories(
     )
 
 
+@categories_router.post(
+    "", response_model=CatalogItem, status_code=http_status.HTTP_201_CREATED
+)
+def create_category(
+    data: CatalogCreate,
+    db: Session = Depends(get_db),
+    membership: Membership = Depends(require_manager),
+) -> CatalogItem:
+    """POST /categories — add a category. Owner or admin only.
+
+    409 if the name is already on this workspace's list, matched without
+    regard to case so "laptop" cannot join "Laptop".
+    """
+    return _create(db, Category, membership, data)
+
+
 @vendors_router.get("", response_model=CatalogList)
 def list_vendors(
     db: Session = Depends(get_db),
@@ -56,6 +98,23 @@ def list_vendors(
     return CatalogList(
         items=catalog_service.list_for_workspace(db, Vendor, workspace_id)
     )
+
+
+@vendors_router.post(
+    "", response_model=CatalogItem, status_code=http_status.HTTP_201_CREATED
+)
+def create_vendor(
+    data: CatalogCreate,
+    db: Session = Depends(get_db),
+    membership: Membership = Depends(require_manager),
+) -> CatalogItem:
+    """POST /vendors — add a vendor. Owner or admin only.
+
+    Note that `POST /assets` also creates vendors, by name, when the Add Asset
+    form sends one that does not exist yet. This endpoint is for managing the
+    list directly rather than as a side effect of saving an asset.
+    """
+    return _create(db, Vendor, membership, data)
 
 
 @departments_router.get("", response_model=CatalogList)
@@ -73,6 +132,23 @@ def list_departments(
     )
 
 
+@departments_router.post(
+    "", response_model=CatalogItem, status_code=http_status.HTTP_201_CREATED
+)
+def create_department(
+    data: CatalogCreate,
+    db: Session = Depends(get_db),
+    membership: Membership = Depends(require_manager),
+) -> CatalogItem:
+    """POST /departments — add a department. Owner or admin only.
+
+    Until this existed there was no way to create one at all: `POST /assets`
+    takes a `department_id` but never makes the row. That left the dashboard's
+    `by_department` breakdown permanently empty, since it joins this table.
+    """
+    return _create(db, Department, membership, data)
+
+
 @locations_router.get("", response_model=CatalogList)
 def list_locations(
     db: Session = Depends(get_db),
@@ -86,3 +162,19 @@ def list_locations(
     return CatalogList(
         items=catalog_service.list_for_workspace(db, Location, workspace_id)
     )
+
+
+@locations_router.post(
+    "", response_model=CatalogItem, status_code=http_status.HTTP_201_CREATED
+)
+def create_location(
+    data: CatalogCreate,
+    db: Session = Depends(get_db),
+    membership: Membership = Depends(require_manager),
+) -> CatalogItem:
+    """POST /locations — add a site. Owner or admin only.
+
+    A site ("HQ Floor 3"), not the free-text spot inside it ("Shelf B2") that
+    lives on the asset as `location`. See docs/erd.md.
+    """
+    return _create(db, Location, membership, data)

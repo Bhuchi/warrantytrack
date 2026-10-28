@@ -90,3 +90,28 @@ def employee_scope(membership: Membership) -> uuid.UUID | None:
     if membership.role is MembershipRole.employee:
         return membership.user_id
     return None
+
+
+def require_manager(
+    membership: Membership = Depends(get_current_membership),
+) -> Membership:
+    """Allow owners and admins through; refuse employees with 403.
+
+    The guard for everything an employee may not do at all: deleting an asset,
+    and managing the catalog lists an organization's admin owns (departments,
+    locations, vendors, categories).
+
+    **403 here, not 404.** The caller does belong to this workspace — they are
+    simply not allowed — so there is nothing to hide. That is the opposite of
+    `get_current_membership`, which returns 404 precisely because a stranger
+    must not learn the workspace exists.
+
+    Used as the dependency instead of `get_current_membership` so the check
+    runs before the route body, and before any lookup that could otherwise
+    reveal whether an id exists.
+    """
+    if membership.role is MembershipRole.employee:
+        raise HTTPException(
+            status_code=403, detail="Only an owner or admin can do this."
+        )
+    return membership

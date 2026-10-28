@@ -325,6 +325,13 @@ therefore starts with four empty lists — an empty dropdown, not an error.
 | `GET` | `/vendors` | Who it was bought from — "Power Buy", "JIB" |
 | `GET` | `/departments` | Which part of the organization holds it — "IT" |
 | `GET` | `/locations` | The site it lives at — "HQ Floor 3" |
+| `POST` | each of the four | Add one option. **Owner or admin only** |
+
+**Reading is open to everyone in the workspace** — an employee filling in Add
+Asset needs the same pickers as an admin. **Writing is owner/admin**, matching
+"Organization Administrator … manages departments, locations, vendors, asset
+categories". An employee gets **403**, not 404: they belong here, they are
+simply not allowed.
 
 ```jsonc
 // GET /categories  (/vendors, /departments and /locations are identical)
@@ -345,10 +352,26 @@ in `GET /assets/{id}`, so the frontend sees one shape either way.
 > `locations` is the **site** picker; `assets.location` is free text for the
 > spot inside it ("Shelf B2"). Two different things — see docs/erd.md.
 
-**Creating and editing these is not built yet.** Nothing in the frontend writes
-to them — there is no catalog-management screen — so the write endpoints land
-with the ticket that first needs them (bulk import, which has to create missing
-rows).
+```jsonc
+// POST /categories  (/vendors, /departments and /locations are identical)
+{ "name": "Laptop" }
+// → 201
+{ "id": "uuid", "name": "Laptop" }
+```
+
+Names are trimmed, and must not be blank once trimmed. **409** if the name is
+already on this workspace's list, matched without regard to case — otherwise
+"laptop" would sit beside "Laptop" and the dashboard would count them as two
+different things.
+
+`POST /assets` also creates categories and vendors by name, as a side effect of
+saving an asset. These endpoints are for managing a list directly — and are the
+only way to create a **department** or a **location**, which `POST /assets`
+references by id but never creates.
+
+**Editing and deleting a catalog row is not built yet** — no screen renames or
+removes one. Assets referencing a deleted row would keep working regardless:
+the foreign keys are `ON DELETE SET NULL` (docs/erd.md).
 
 ### Documents and OCR · owner: Bhuchi (Leg B)
 

@@ -18,8 +18,9 @@ from app.api.deps import (
     get_current_membership,
     get_current_user,
     get_current_workspace,
+    require_manager,
 )
-from app.models.membership import Membership, MembershipRole
+from app.models.membership import Membership
 from app.db.session import get_db
 from app.schemas.asset import (
     AssetCreate,
@@ -162,32 +163,25 @@ def get_asset(
 def delete_asset(
     asset_id: uuid.UUID,
     db: Session = Depends(get_db),
-    membership: Membership = Depends(get_current_membership),
+    membership: Membership = Depends(require_manager),
 ) -> None:
     """DELETE /assets/{id} — owners and admins only (docs/api.md).
 
     The two failure codes mean different things and the order they are checked
     in matters:
 
-    - `get_current_membership` raises **404** if the caller has no membership
-      in this workspace at all. Not 403 — that would confirm the workspace
-      exists.
-    - An employee who *is* a member gets **403**: they belong here, they are
-      just not allowed to delete. This is checked before the asset is looked
-      up, so the answer does not depend on whether the id exists and cannot be
-      used to probe for one.
+    - **404** if the caller has no membership in this workspace at all. Not
+      403 — that would confirm the workspace exists.
+    - **403** for an employee who *is* a member: they belong here, they are
+      just not allowed to delete. `require_manager` is a dependency, so this
+      is settled before the route body runs and before the asset is looked up
+      — the answer cannot be used to probe for which ids exist.
     - A missing asset, or one in another workspace, is **404**.
 
     Deletion is permanent — there is no soft-delete column anywhere in the
     schema (docs/erd.md). If the team wants assets archived instead, that is a
     migration and a contract change, not a flag here.
     """
-    if membership.role is MembershipRole.employee:
-        raise HTTPException(
-            status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="Only an owner or admin can delete an asset.",
-        )
-
     asset = asset_service.get_asset(db, membership.workspace_id, asset_id)
 
     if asset is None:
