@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.services import storage
 from app.models.asset import Asset
 from app.models.document import AssetDocument, Document, DocumentStatus
 from app.models.membership import Membership, MembershipRole
@@ -124,6 +125,32 @@ def test_submit_extracts_and_records_the_fields(api: TestClient, db: Session) ->
     # The fake backend deliberately leaves the date blank, like a real photo.
     assert document.extracted_json["purchase_date"] is None
     assert len(document.extracted_json["line_items"]) == 2
+
+
+def test_a_real_jpeg_survives_the_upload_path(api: TestClient, db: Session) -> None:
+    """The stored bytes must be the bytes that were sent.
+
+    Runs on the `local` backend, so it checks our own plumbing rather than
+    Textract: a real 73KB JPEG, byte-for-byte, because an upload path that
+    mangles binary would show up as unexplainable OCR failures later.
+    tests/test_ocr_live.py sends this same file to the real API.
+    """
+    receipt = Path(__file__).parent / "fixtures" / "receipts" / "jib-receipt.jpg"
+    if not receipt.exists():
+        pytest.skip(f"fixture not present: {receipt.name}")
+    original = receipt.read_bytes()
+
+    reserved = presign(api, filename="jib-receipt.jpg")
+    upload(api, reserved["document_id"], body=original)
+
+    stored = storage.read_bytes(reserved["s3_key"])
+    assert stored == original
+    # A JPEG still starts with the JPEG magic number after the round trip.
+    assert stored[:3] == b"\xff\xd8\xff"
+
+    response = api.post(f"/documents/{reserved['document_id']}/submit")
+    assert response.status_code == 202
+    assert response.json()["status"] == "extracted"
 
 
 def test_get_returns_what_the_review_screen_polls(api: TestClient) -> None:
