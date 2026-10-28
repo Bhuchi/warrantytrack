@@ -14,7 +14,26 @@ docker compose exec backend alembic upgrade head
 
 # Run the tests
 docker compose exec backend pytest
+
+# Dev data: a workspace, a user and a few notifications
+docker compose exec backend python -m scripts.seed_dev
+
+# The daily warranty-expiry scan, by hand (--today to try another date)
+docker compose exec backend python -m scripts.scan_warranties
+docker compose exec backend python -m scripts.scan_warranties --today 2026-12-01
 ```
+
+### S3, Textract and SES without an AWS account
+
+`STORAGE_BACKEND`, `OCR_BACKEND` and `EMAIL_BACKEND` default to `local`,
+`fake` and `log`, so receipt upload, OCR and the expiry scan all work on
+`docker compose up` with nothing configured and nothing spent. On those
+defaults the browser PUTs its file to `/documents/{id}/dev-upload` instead of
+to S3, OCR returns canned fields, and email goes to the log.
+
+Set all three to `s3` / `textract` / `ses` (plus `S3_BUCKET_NAME` and
+`SES_SENDER_EMAIL`) once the account exists — see `backend/.env.example`. The
+app refuses to start in production on a development backend.
 
 To run it standalone (needs Python 3.11+ and a PostgreSQL you can reach):
 

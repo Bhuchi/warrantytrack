@@ -397,7 +397,7 @@ every field should not fail because one did not change.
 must not delete assets"*), so the assets survive and simply lose that
 classification. There is therefore no "in use" check and no 409 for it.
 
-### Documents and OCR · owner: Bhuchi (Leg B)
+### Documents and OCR · owner: Bhuchi (Leg B) — **built**
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -410,6 +410,25 @@ The browser uploads **straight to S3** with the presigned URL — the file never
 passes through the API. Then it polls `GET /documents/{id}` until `status`
 leaves `pending`/`processing`.
 
+**Running it without AWS.** `STORAGE_BACKEND` and `OCR_BACKEND` default to
+`local` and `fake`, so the whole flow works on `docker compose up` with no AWS
+account and no spend. On those defaults `upload_url` points at
+`PUT /documents/{id}/dev-upload` instead of at S3 — the one case where a file
+passes through the API. That route 404s on any other backend, and the app
+refuses to start in production on a development backend. Set
+`STORAGE_BACKEND=s3 OCR_BACKEND=textract EMAIL_BACKEND=ses` once the account
+exists; nothing else changes.
+
+**Errors.** `submit` before anything was uploaded is `409`. A *failed*
+extraction is not an error here — the row carries `status: "failed"` and the
+reason in `error`, which is what the review screen shows. `confirm` on a
+document that is not `extracted` (including one already confirmed, so a
+double-tap cannot create the assets twice) is `409`.
+
+**An employee sees only the receipts they uploaded themselves** — a receipt
+shows what the company paid for things that are none of their business, even
+for an asset assigned to them. Anything else is `404`, never `403`.
+
 ```jsonc
 // POST /documents/presign   (request)
 { "filename": "receipt.jpg", "content_type": "image/jpeg" }
@@ -419,6 +438,9 @@ leaves `pending`/`processing`.
   "s3_key": "ws/<workspace>/receipt.jpg" }
 
 // POST /documents/{id}/submit   → 202, then poll GET /documents/{id}
+// Extraction is still synchronous, so the first poll usually already says
+// "extracted". The contract is written for the async version that replaces
+// it — see docs/architecture.md, Decision 3.
 
 // GET /documents/{id}
 {
@@ -437,9 +459,14 @@ leaves `pending`/`processing`.
 }
 ```
 
-Store the raw `extracted` values alongside whatever the user confirms, so the
-OCR Review screen (D07) can show what changed — and so we can report OCR
-accuracy in the final presentation.
+Every field in `extracted` is optional, including `purchase_date`: a receipt
+photographed at an angle gives some of them up, and the review screen is built
+to be filled in by hand. A wrong guess is worse than a blank field, because the
+user accepts it without looking.
+
+The raw `extracted` values are kept alongside whatever the user confirms (in
+`documents.confirmed_json`), so the OCR Review screen (D07) can show what
+changed — and so we can report OCR accuracy in the final presentation.
 
 ```jsonc
 // POST /documents/{id}/confirm
@@ -455,6 +482,25 @@ accuracy in the final presentation.
 // → 201
 { "created_asset_ids": ["uuid"], "document_id": "uuid" }
 ```
+
+**Confirm is all or nothing.** A five-line invoice where line two has a
+duplicate serial number creates nothing, so there is one clean state to retry
+from. The `422` names the offending entry by position, which is what lets the
+review screen mark that row rather than show one unattributable error:
+
+```jsonc
+// 422 Unprocessable Content
+{ "detail": [
+    { "type": "value_error",
+      "loc": ["body", "assets", 1, "serial_number"],
+      "msg": "An asset with serial number ABC123 already exists." }
+] }
+```
+
+Each asset is created through Leg A's `asset_service.create_asset()`, so the
+required fields, the vendor-by-name lookup and the warranty end-date
+calculation are identical to `POST /assets`. The document is linked to every
+asset it produced, without the client having to ask for it.
 
 ### Warranty status · owner: Bhuchi (Leg B)
 
@@ -516,3 +562,16 @@ No standalone endpoints — warranty is embedded in the asset (set via
 
 The scheduled job (Leg B) that scans expiring warranties writes these rows and
 sends the SES email; the frontend bell just reads this list.
+
+**The job is built** — `backend/scripts/scan_warranties.py`, run as a one-off
+ECS task by EventBridge Scheduler, not as a thread inside the API (with more
+than one Fargate task an in-process timer fires in each of them and everyone
+gets duplicate mail). It also takes a Postgres advisory lock, so a double-fired
+schedule still sends once.
+
+It tells the workspace's owners and admins, plus the employee an asset is
+assigned to, and it tells each of them at most once every 30 days per asset —
+a daily scan would otherwise write the same row every day for a month. Each
+person gets **one digest email**, not one per asset. The in-app row is written
+and committed before the email is attempted, so a broken mailer still leaves
+the bell menu correct.
