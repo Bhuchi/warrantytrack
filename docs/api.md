@@ -187,11 +187,10 @@ tenants, `assigned_to_user_id` separates people inside one.
 
 ```jsonc
 // POST /assets   (request)
-// required: name, serial_number, condition, purchase_date, price, vendor
-//           (the 18 Oct decision — see docs/frontend-plan.md)
-// optional: category, location (site), department_id, invoice_number,
-//           storage_note, *_image_key, document_ids, assigned_to_user_id,
-//           warranty
+// required: name, serial_number, condition, purchase_date, price, vendor,
+//           category, invoice_number, warranty (with a provider)
+// optional: location (site), department_id, storage_note, *_image_key,
+//           document_ids, assigned_to_user_id
 {
   "name": "Dell Latitude 5540",
   "serial_number": "ABC123",
@@ -225,6 +224,22 @@ calendar months. Month-end purchases roll over rather than clamp — 31 Jan + 1
 month is 3 Mar, not 28 Feb — because that is what the form's own preview shows
 (`warrantyEndLabel` in add-asset/draft.ts uses JavaScript's `setMonth`). The
 two must agree or the saved date contradicts what the user was shown.
+
+**Required fields** come from `docs/database/WarrantyTrack-ERD-v1.2/README.md`
+("Explicit design decisions"), which traces them to the kick-off report and
+Jira CLOUDAPPG5-116 / -118: product name, purchase date, price, serial number,
+vendor, category, invoice number — and **a warranty**, because "a committed
+asset must have 1..N warranties" and "the old `No Warranty Info` status is no
+longer generated for valid committed assets".
+
+> **Frontend impact, flagged by that same document** ("if existing UI shows it,
+> update the frontend separately"): Add Asset has no Category field yet, marks
+> Invoice Number optional, and offers a "No warranty" duration. All three need
+> to change before the wizard can save. The dashboard's `no_warranty` count and
+> the Assets List "No warranty" filter will stop matching anything.
+
+`PATCH` will not let an edit remove one of these either — clearing a required
+field is a **422**, not a silent null.
 
 **`409 Conflict`** if the serial number already exists *in this workspace*.
 Serials are unique per workspace, never globally: two organizations can own

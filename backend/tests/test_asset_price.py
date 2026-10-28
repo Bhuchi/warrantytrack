@@ -33,6 +33,13 @@ def body(**overrides: object) -> dict[str, object]:
         "purchase_date": "2025-03-01",
         "price": "32900.00",
         "vendor_name": "Power Buy",
+        "category_name": "Laptop",
+        "invoice_number": "INV-2025-001",
+        "warranty": {
+            "provider": "Dell",
+            "start_date": "2025-03-01",
+            "duration_months": 36,
+        },
     }
     payload.update(overrides)
     return payload
@@ -74,14 +81,19 @@ def test_a_negative_price_is_rejected_on_patch(api: TestClient) -> None:
     assert api.get(f"/assets/{created['id']}").json()["price"] == "32900.00"
 
 
-def test_patch_can_still_clear_the_price(api: TestClient) -> None:
-    """The guard must not block the way to unset an optional column."""
+def test_patch_cannot_clear_the_price(api: TestClient) -> None:
+    """Price is a required field, so an edit must not take it away.
+
+    Before this rule the column was set to NULL, the flush raised an
+    IntegrityError and the caller got a 500. Now it is a 422 naming the field.
+    """
     created = api.post("/assets", json=body()).json()
 
     updated = api.patch(f"/assets/{created['id']}", json={"price": None})
 
-    assert updated.status_code == 200
-    assert updated.json()["price"] is None
+    assert updated.status_code == 422
+    assert "price" in fields_in(updated)
+    assert api.get(f"/assets/{created['id']}").json()["price"] == "32900.00"
 
 
 def test_a_rejected_price_writes_nothing(api: TestClient, db: Session) -> None:

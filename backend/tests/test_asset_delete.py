@@ -30,6 +30,8 @@ def create(api: TestClient, **overrides: object) -> dict:
         "purchase_date": "2025-03-01",
         "price": "32900.00",
         "vendor_name": "Power Buy",
+        "category_name": "Laptop",
+        "invoice_number": "INV-2025-001",
         "warranty": {
             "provider": "Dell",
             "start_date": "2025-03-01",

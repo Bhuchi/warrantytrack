@@ -47,6 +47,13 @@ def body(**overrides: object) -> dict[str, object]:
         "purchase_date": "2025-03-01",
         "price": "32900.00",
         "vendor_name": "Power Buy",
+        "category_name": "Laptop",
+        "invoice_number": "INV-2025-001",
+        "warranty": {
+            "provider": "Dell",
+            "start_date": "2025-03-01",
+            "duration_months": 36,
+        },
     }
     payload.update(overrides)
     return payload
@@ -243,7 +250,7 @@ def test_patch_accepts_a_reference_in_the_callers_workspace(
     api: TestClient, db: Session, workspace: Workspace
 ) -> None:
     created = api.post("/assets", json=body()).json()
-    ours = Category(workspace_id=workspace.id, name="Laptop")
+    ours = Category(workspace_id=workspace.id, name="Monitor")
     db.add(ours)
     db.flush()
 
@@ -252,17 +259,21 @@ def test_patch_accepts_a_reference_in_the_callers_workspace(
     )
 
     assert response.status_code == 200
-    assert response.json()["category"]["name"] == "Laptop"
+    assert response.json()["category"]["name"] == "Monitor"
 
 
-def test_patch_can_still_clear_a_reference(api: TestClient) -> None:
-    """`null` means "clear it", not "an id to check"."""
-    created = api.post("/assets", json=body(category_name="Laptop")).json()
+def test_patch_can_still_clear_an_optional_reference(api: TestClient) -> None:
+    """`null` means "clear it", not "an id to check" — for optional ones.
 
-    updated = api.patch(f"/assets/{created['id']}", json={"category_id": None})
+    Category and vendor are required, so clearing those is rejected; the site
+    is optional and still clears.
+    """
+    created = api.post("/assets", json=body(location_name="HQ Floor 3")).json()
+
+    updated = api.patch(f"/assets/{created['id']}", json={"location_id": None})
 
     assert updated.status_code == 200
-    assert updated.json()["category"] is None
+    assert updated.json()["location"] is None
 
 
 # --- the error shape --------------------------------------------------------

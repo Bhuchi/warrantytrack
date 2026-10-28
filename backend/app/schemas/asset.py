@@ -31,7 +31,6 @@ from pydantic import (
     ConfigDict,
     Field,
     StringConstraints,
-    model_validator,
 )
 
 from app.models.asset import Asset, AssetCondition
@@ -97,9 +96,15 @@ class WarrantyInput(BaseModel):
     `warrantyEndLabel` in add-asset/draft.ts computes the same value for the
     form's preview and says outright that it is "display only: the backend
     computes the real end date".
+
+    `provider` is required, per CLOUDAPPG5-118: "warranty details, including
+    provider". The column stays nullable because warranties created before
+    this rule may not have one.
     """
 
-    provider: str | None = None
+    provider: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
+    ]
     start_date: date
     duration_months: int = Field(gt=0, le=600)
 
@@ -107,13 +112,20 @@ class WarrantyInput(BaseModel):
 class AssetCreate(BaseModel):
     """POST /assets.
 
-    Required fields follow the team's 18 Oct decision, recorded in
-    docs/frontend-plan.md and enforced by `isReceiptComplete` in
-    add-asset/draft.ts: name, vendor, purchase date, price, condition — plus
-    the serial number, which the same decision made non-skippable.
+    Required: **product name, purchase date, price, serial number, vendor,
+    category, invoice number and a warranty** — the list in
+    docs/database/WarrantyTrack-ERD-v1.2/README.md ("Explicit design
+    decisions", lines 35-36), which traces to the kick-off report and Jira
+    CLOUDAPPG5-116 / -118. The same document adds that a committed asset must
+    have a warranty and that "the old `No Warranty Info` status is no longer
+    generated for valid committed assets", so the optional-warranty UI is what
+    has to change, not this.
 
-    Category, vendor, department and location are all optional, as are the
-    invoice number, the storage note, the documents and the warranty itself.
+    `condition` is required too, which that document postpones — it shipped
+    first and the frontend collects it.
+
+    Optional: department, location (the site), the storage note and photos,
+    and attached documents.
 
     **Category, vendor and location accept either an id or a name.** The form
     and OCR produce "Power Buy", not a UUID, and there is no picker in the UI
@@ -128,7 +140,7 @@ class AssetCreate(BaseModel):
     purchase_date: date
     price: Price
     currency: str = Field(default="THB", min_length=3, max_length=3)
-    invoice_number: InvoiceNumber | None = None
+    invoice_number: InvoiceNumber
 
     category_id: uuid.UUID | None = None
     category_name: str | None = Field(default=None, max_length=120)
@@ -150,18 +162,7 @@ class AssetCreate(BaseModel):
 
     document_ids: list[uuid.UUID] = Field(default_factory=list)
     assigned_to_user_id: uuid.UUID | None = None
-    warranty: WarrantyInput | None = None
-
-    @model_validator(mode="after")
-    def check_vendor_given(self) -> AssetCreate:
-        """Vendor is required, by either route.
-
-        Rejected here rather than in the service so the caller gets a 422 with
-        the field named, which is what the form shows inline.
-        """
-        if self.vendor_id is None and not (self.vendor_name or "").strip():
-            raise ValueError("vendor_id or vendor_name is required")
-        return self
+    warranty: WarrantyInput
 
 
 class AssetUpdate(BaseModel):

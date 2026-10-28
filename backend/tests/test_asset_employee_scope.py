@@ -280,6 +280,10 @@ def test_creating_an_unassigned_asset_still_returns_it(api: TestClient) -> None:
             "purchase_date": "2025-03-01",
             "price": "100.00",
             "vendor_name": "Power Buy",
+            "category_name": "Laptop",
+            "invoice_number": "INV-2025-001",
+            "warranty": {"provider": "Dell", "start_date": "2025-03-01",
+                         "duration_months": 36},
         },
     )
 

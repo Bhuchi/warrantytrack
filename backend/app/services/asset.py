@@ -233,6 +233,7 @@ def create_asset(
     vendor-by-name lookup that would otherwise create a catalog row — so a
     rejected save leaves the database exactly as it found it.
     """
+    asset_validation.validate_required_catalog_refs(data)
     asset_validation.validate_references(db, workspace_id, data)
 
     clash = db.scalars(
@@ -362,8 +363,10 @@ def update_asset(
     None` instead would make it impossible to ever clear a field.
 
     References are checked the same way as on create: an edit must not be a
-    way to attach an asset to another workspace's vendor.
+    way to attach an asset to another workspace's vendor, nor to strip a
+    required field the schema insisted on when the asset was created.
     """
+    asset_validation.validate_nothing_required_is_cleared(data)
     asset_validation.validate_references(db, asset.workspace_id, data)
 
     sent = data.model_fields_set
