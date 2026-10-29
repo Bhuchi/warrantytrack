@@ -208,7 +208,11 @@ async def import_assets(
     The file arrives as the **raw request body**, not multipart, following
     `PUT /documents/{id}/dev-upload`: FastAPI's `UploadFile` needs
     `python-multipart`, which is not a dependency, and the repo already chose
-    to avoid it once for the same reason. `Content-Type: text/csv`.
+    to avoid it once for the same reason.
+
+    CSV or `.xlsx`, told apart by the bytes rather than by `Content-Type` —
+    which browsers and curl get wrong constantly, and which a raw-body upload
+    gives no filename to fall back on.
 
     Two modes over one implementation. `validate` is `commit` with the writes
     skipped, so a dry run cannot report a row as valid that the real run then
@@ -234,7 +238,7 @@ async def import_assets(
         )
 
     try:
-        rows = asset_import.parse_csv(raw)
+        rows = asset_import.parse(raw)
     except asset_import.ImportError_ as error:
         raise HTTPException(
             status_code=http_status.HTTP_422_UNPROCESSABLE_CONTENT,
