@@ -140,7 +140,7 @@ inline:
 
 > **Built:** the full CRUD set — `GET /assets`, `GET /assets/{id}`,
 > `POST /assets`, `PATCH /assets/{id}`, `DELETE /assets/{id}` — plus
-> `POST /assets/{id}/assign`. **Still planned:** `import`.
+> `POST /assets/{id}/assign` and `POST /assets/import` (CSV).
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -332,7 +332,14 @@ ignored if sent in the body.
 
 ```jsonc
 // Bulk import is two-step so the user sees errors before anything is saved.
-// POST /assets/import?mode=validate   (multipart file)  → dry run, saves nothing
+// Owner/admin only. The file is the **raw request body** with
+// `Content-Type: text/csv` — not multipart, because FastAPI's UploadFile
+// needs python-multipart, which is not a dependency. Same choice as
+// PUT /documents/{id}/dev-upload.
+//
+// CSV today; .xlsx needs openpyxl, which is not pinned yet.
+//
+// POST /assets/import?mode=validate   → dry run, saves nothing
 {
   "total_rows": 50,
   "valid": 47,
@@ -342,8 +349,31 @@ ignored if sent in the body.
   ]
 }
 // POST /assets/import?mode=commit      → creates the valid rows
-{ "created": 47, "skipped": 3 }
+{ "created": 47, "skipped": 3, "errors": [ ... ] }
 ```
+
+**Partial by design.** Three bad rows do not discard forty-seven good ones —
+each row is created in its own savepoint. `commit` repeats every check first,
+so a clean dry run cannot be followed by a surprise.
+
+**Rows are judged by exactly the rules `POST /assets` uses.** Import owns no
+validation of its own, so a row rejected here would be rejected there, with
+the same wording.
+
+`row` counts the header as row 1, so it is the line number in the user's own
+file. `field` is the **column name**.
+
+**Columns** — required: `name`, `serial_number`, `condition`, `purchase_date`,
+`price`, `invoice_number`, `vendor`, `category`, `warranty_provider`,
+`warranty_start_date`, `warranty_duration_months`. Optional, and may be left
+out entirely: `currency`, `department`, `location`, `storage_note`.
+
+Vendor, category and location are given **by name**; a name not yet in the
+workspace's list is added to it, exactly as `POST /assets` does.
+
+A whole-file problem — not UTF-8, a missing required column, more than 1000
+rows — is a **422 with a plain message**, because there is no row to blame.
+Empty body is **400**; over 15MB is **413**.
 
 ### Catalog · owner: Sirawich (Leg A)
 
