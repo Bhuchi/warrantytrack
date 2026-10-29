@@ -140,7 +140,7 @@ inline:
 
 > **Built:** the full CRUD set — `GET /assets`, `GET /assets/{id}`,
 > `POST /assets`, `PATCH /assets/{id}`, `DELETE /assets/{id}` — plus
-> `POST /assets/{id}/assign` and `POST /assets/import` (CSV).
+> `POST /assets/{id}/assign` and `POST /assets/import` (CSV and .xlsx).
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -337,7 +337,12 @@ ignored if sent in the body.
 // needs python-multipart, which is not a dependency. Same choice as
 // PUT /documents/{id}/dev-upload.
 //
-// CSV today; .xlsx needs openpyxl, which is not pinned yet.
+// CSV or .xlsx, told apart by the bytes rather than by Content-Type —
+// an .xlsx is a zip and always starts "PK". .xls is not supported.
+//
+// Excel quirks are handled: real date cells, numeric cells, cached formula
+// results, and the trailing blank rows Excel keeps. Only the first worksheet
+// is read.
 //
 // POST /assets/import?mode=validate   → dry run, saves nothing
 {
