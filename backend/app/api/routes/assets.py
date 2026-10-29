@@ -10,7 +10,15 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status as http_status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    status as http_status,
+)
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -30,7 +38,13 @@ from app.schemas.asset import (
     AssetListItem,
     AssetUpdate,
 )
+from app.schemas.asset_import import (
+    ImportCommitResponse,
+    ImportMode,
+    ImportValidateResponse,
+)
 from app.services import asset as asset_service
+from app.services import asset_import
 from app.services import asset_validation
 from app.services.asset import DuplicateSerialNumber, UnknownDocument
 from app.services.asset_validation import AssetValidationError
@@ -168,6 +182,87 @@ def get_asset(
         )
 
     return AssetDetail.from_asset(asset)
+
+
+#: The same ceiling PUT /documents/{id}/dev-upload uses. A spreadsheet that
+#: large is not a spreadsheet, and the body is held in memory while it parses.
+_MAX_IMPORT_BYTES = 15 * 1024 * 1024
+
+
+@router.post("/import")
+async def import_assets(
+    request: Request,
+    mode: ImportMode = Query(
+        ...,
+        description="validate runs a dry run and writes nothing; commit creates "
+        "the rows that pass.",
+    ),
+    db: Session = Depends(get_db),
+    membership: Membership = Depends(require_manager),
+) -> ImportValidateResponse | ImportCommitResponse:
+    """POST /assets/import — create many assets from a spreadsheet.
+
+    Owner/admin only, per the requirements: bulk import is an organization
+    administrator's job.
+
+    The file arrives as the **raw request body**, not multipart, following
+    `PUT /documents/{id}/dev-upload`: FastAPI's `UploadFile` needs
+    `python-multipart`, which is not a dependency, and the repo already chose
+    to avoid it once for the same reason. `Content-Type: text/csv`.
+
+    Two modes over one implementation. `validate` is `commit` with the writes
+    skipped, so a dry run cannot report a row as valid that the real run then
+    rejects.
+
+    Rows are judged by the same rules as `POST /assets` — this endpoint owns
+    no validation of its own. A row rejected here would have been rejected
+    there, with the same wording.
+
+    A whole-file problem (not UTF-8, missing a required column, past the row
+    limit) is a **422 with a plain message**: there is no row to blame.
+    """
+    raw = await request.body()
+
+    if not raw:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST, detail="Empty upload."
+        )
+    if len(raw) > _MAX_IMPORT_BYTES:
+        raise HTTPException(
+            status_code=http_status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="File is larger than 15MB.",
+        )
+
+    try:
+        rows = asset_import.parse_csv(raw)
+    except asset_import.ImportError_ as error:
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from None
+
+    # Off the event loop: the session is synchronous and a thousand rows is a
+    # few thousand queries, which would otherwise stall every other request
+    # for the duration. Starlette runs sync dependencies this way already.
+    report = await run_in_threadpool(
+        asset_import.run_import,
+        db,
+        membership.workspace_id,
+        membership.user_id,
+        rows,
+        commit=mode is ImportMode.commit,
+    )
+    errors = [error.as_dict() for error in report.errors]
+
+    if mode is ImportMode.commit:
+        db.commit()
+        return ImportCommitResponse(
+            created=report.created, skipped=report.skipped, errors=errors
+        )
+
+    return ImportValidateResponse(
+        total_rows=report.total_rows, valid=report.valid, errors=errors
+    )
 
 
 @router.post("/{asset_id}/assign", response_model=AssetDetail)
