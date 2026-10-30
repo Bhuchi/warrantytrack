@@ -35,6 +35,8 @@ Thumbs.db
 
 # Claude Code / local AI tooling
 .claude/
+# Generated diagrams and their check receipts.
+.archify/
 CLAUDE.md
 CLAUDE.local.md
 AGENTS.md
