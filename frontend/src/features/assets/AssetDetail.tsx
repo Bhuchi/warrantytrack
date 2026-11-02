@@ -114,7 +114,7 @@ function Panel({
 
 function AssetHeader() {
   return (
-    <header className="flex h-[60px] items-center justify-between border-b border-border bg-surface px-4 md:h-20 md:px-8 lg:px-12">
+    <header className="hidden h-20 items-center justify-between border-b border-border bg-surface px-4 md:flex md:px-8 lg:px-12">
       <div className="flex items-center gap-3">
         <Link
           href="/workspace"
