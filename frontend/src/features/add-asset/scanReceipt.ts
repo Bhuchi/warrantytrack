@@ -2,7 +2,7 @@ import { ApiError, api } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/config";
 import type { OcrDocument } from "@/types/documents";
 
-/** A Promise that resolves after `ms` milliseconds. */
+/** A Promise that resolves after `ms` milliseconds. Also used by scanSerial.ts. */
 export function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -60,7 +60,7 @@ export async function scanReceipt(file: File): Promise<OcrDocument> {
       if (!upload.ok) return failed(documentId, "The upload did not finish. Please try again.");
     }
 
-    let document = await api.post<OcrDocument>(`/documents/${documentId}/submit`);
+    let document = await api.post<OcrDocument>(`/documents/${encodeURIComponent(documentId)}/submit`);
 
     const startedAt = Date.now();
     while (document.status === "pending" || document.status === "processing") {
@@ -68,7 +68,7 @@ export async function scanReceipt(file: File): Promise<OcrDocument> {
         return failed(documentId, "Reading the receipt took too long.");
       }
       await wait(POLL_EVERY_MS);
-      document = await api.get<OcrDocument>(`/documents/${documentId}`);
+      document = await api.get<OcrDocument>(`/documents/${encodeURIComponent(documentId)}`);
     }
     return document;
   } catch (error) {

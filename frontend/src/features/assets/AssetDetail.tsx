@@ -1,25 +1,33 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+
+import type { WarrantyStatus } from "@/types";
+import type { AssetDetail as Asset } from "@/types/assets";
+
+import { getAsset } from "./getAsset";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const asset = {
-  name: "MacBook Pro 14-inch (M3)",
-  brand: "Apple",
-  category: "Laptop",
-  serialNumber: "C02X1234ABC",
-  purchaseDate: "2025-10-27",
-  price: "฿ 51,599.00",
-  invoiceNumber: "INV-2025-1027",
-  warrantyProvider: "Apple Limited Warranty",
-  warrantyStartDate: "2025-10-27",
-  warrantyExpiryDate: "2027-10-27",
-  invoiceFile: "Invoice_INV-2025-1027.pdf",
-  invoiceSize: "1.2 MB",
-  storageLocation: "Home office · shelf 2",
-  storageNote: "Original packaging is stored on the top shelf.",
-} as const;
+type Warranty = NonNullable<Asset["warranty"]>;
+type Document = Asset["documents"][number];
+
+/** What the status pill says for each warranty status from the API. */
+const STATUS_LABELS: Record<WarrantyStatus, string> = {
+  active: "Active",
+  expiring_soon: "Expiring Soon",
+  expired: "Expired",
+  unknown: "No warranty",
+};
+
+const DOCUMENT_KINDS: Record<Document["kind"], string> = {
+  invoice: "Invoice",
+  receipt: "Receipt",
+  warranty_card: "Warranty card",
+  other: "Document",
+};
 
 function toUtcDay(date: string): number {
   const [year, month, day] = date.split("-").map(Number);
@@ -41,7 +49,9 @@ function getBangkokDate(date: Date): string {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-function formatDate(date: string): string {
+/** "19 May 2026", or "—" when there is no date. */
+function formatDate(date: string | null | undefined): string {
+  if (!date) return "—";
   return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
@@ -50,31 +60,39 @@ function formatDate(date: string): string {
   }).format(new Date(`${date}T00:00:00Z`));
 }
 
-function getWarrantyDetails() {
-  const today = getBangkokDate(new Date());
-  const daysRemaining = daysBetween(today, asset.warrantyExpiryDate);
-  const warrantyDuration = daysBetween(
-    asset.warrantyStartDate,
-    asset.warrantyExpiryDate,
-  );
-  const progress = Math.min(
-    100,
-    Math.max(0, Math.round((Math.max(daysRemaining, 0) / warrantyDuration) * 100)),
-  );
-
-  if (daysRemaining <= 0) {
-    return { daysRemaining: 0, progress, status: "Expired" as const };
-  }
-  if (daysRemaining <= 30) {
-    return { daysRemaining, progress, status: "Expiring Soon" as const };
-  }
-  return { daysRemaining, progress, status: "Active" as const };
+/** "฿51,599.00", or "—" when there is no price. */
+function formatPrice(price: string | null, currency: string): string {
+  if (price === null) return "—";
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency,
+    currencyDisplay: "narrowSymbol",
+  }).format(Number(price));
 }
 
-function statusClasses(status: "Active" | "Expiring Soon" | "Expired") {
-  if (status === "Expired") return "bg-red-100 text-red-700";
-  if (status === "Expiring Soon") return "bg-amber-100 text-amber-700";
+/**
+ * Days left and how full the bar is. The status itself comes from the API;
+ * this is only for the countdown. Without a start date the bar is empty.
+ */
+function getCountdown(warranty: Warranty) {
+  const today = getBangkokDate(new Date());
+  const daysRemaining = Math.max(0, daysBetween(today, warranty.end_date));
+  const duration = warranty.start_date ? daysBetween(warranty.start_date, warranty.end_date) : 0;
+  const progress =
+    duration > 0 ? Math.min(100, Math.max(0, Math.round((daysRemaining / duration) * 100))) : 0;
+  return { daysRemaining, progress };
+}
+
+function statusClasses(status: WarrantyStatus) {
+  if (status === "expired") return "bg-red-100 text-red-700";
+  if (status === "expiring_soon") return "bg-amber-100 text-amber-700";
+  if (status === "unknown") return "bg-canvas text-muted";
   return "bg-green-100 text-green-700";
+}
+
+/** The file name at the end of an S3 key: "workspace/abc/receipt.pdf" → "receipt.pdf". */
+function fileName(s3Key: string): string {
+  return s3Key.split("/").pop() || s3Key;
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -112,45 +130,11 @@ function Panel({
   );
 }
 
-function AssetHeader() {
-  return (
-    <header className="flex h-[60px] items-center justify-between border-b border-border bg-surface px-4 md:h-20 md:px-8 lg:px-12">
-      <div className="flex items-center gap-3">
-        <Link
-          href="/workspace"
-          aria-label="Go to workspace"
-          className="flex size-9 items-center justify-center rounded-lg"
-        >
-          <Image src="/icons/asset-menu.svg" alt="" width={22} height={22} />
-        </Link>
-        <Link href="/" className="flex items-center gap-3">
-          <Image
-            src="/icons/asset-logo.svg"
-            alt=""
-            width={36}
-            height={36}
-          />
-          <span className="text-[17px] font-bold text-brand md:text-[22px]">
-            WarrantyTrack
-          </span>
-        </Link>
-      </div>
-      <div className="flex items-center gap-2.5">
-        <Image
-          src="/icons/asset-bell.svg"
-          alt="Notifications"
-          width={36}
-          height={36}
-        />
-        <span className="flex size-9 items-center justify-center rounded-full bg-brand-subtle text-xs font-bold text-brand">
-          CA
-        </span>
-      </div>
-    </header>
-  );
-}
+function ProductSummary({ asset }: { asset: Asset }) {
+  const status = asset.warranty?.status ?? "unknown";
+  // "Apple · Laptop", leaving out whichever is missing.
+  const subtitle = [asset.vendor?.name, asset.category?.name].filter(Boolean).join(" · ");
 
-function ProductSummary({ status }: { status: "Active" | "Expiring Soon" | "Expired" }) {
   return (
     <section className="flex w-full items-center gap-[14px] rounded-[14px] border border-border bg-surface p-4">
       <span className="flex size-16 shrink-0 items-center justify-center rounded-xl bg-brand-subtle">
@@ -164,25 +148,21 @@ function ProductSummary({ status }: { status: "Active" | "Expiring Soon" | "Expi
           <span
             className={`rounded-full px-[9px] py-1 text-[10px] font-semibold tracking-[-0.2px] ${statusClasses(status)}`}
           >
-            {status}
+            {STATUS_LABELS[status]}
           </span>
-          <span className="text-xs tracking-[-0.24px] text-muted">
-            {asset.brand} · {asset.category}
-          </span>
+          {subtitle && (
+            <span className="text-xs tracking-[-0.24px] text-muted">{subtitle}</span>
+          )}
         </div>
       </div>
     </section>
   );
 }
 
-function WarrantyCountdown({
-  daysRemaining,
-  progress,
-}: {
-  daysRemaining: number;
-  progress: number;
-}) {
-  const expired = daysRemaining === 0;
+function WarrantyCountdown({ warranty }: { warranty: Warranty }) {
+  const { daysRemaining, progress } = getCountdown(warranty);
+  const expired = warranty.status === "expired";
+
   return (
     <section
       aria-label="Warranty countdown"
@@ -212,14 +192,14 @@ function WarrantyCountdown({
               </span>
             </div>
             <time
-              dateTime={asset.warrantyExpiryDate}
+              dateTime={warranty.end_date}
               className="text-[13px] font-semibold tracking-[-0.26px] text-muted-light"
             >
-              {formatDate(asset.warrantyExpiryDate)}
+              {formatDate(warranty.end_date)}
             </time>
           </div>
           <p className="mt-1 text-[11px] tracking-[-0.22px] text-muted">
-            {asset.warrantyProvider} · expires {formatDate(asset.warrantyExpiryDate)}
+            {warranty.provider ?? "Warranty"} · expires {formatDate(warranty.end_date)}
           </p>
         </div>
       </div>
@@ -240,7 +220,7 @@ function WarrantyCountdown({
   );
 }
 
-function DocumentRow() {
+function DocumentRow({ document }: { document: Document }) {
   return (
     <div className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-surface px-[14px] py-[13px]">
       <span className="flex size-[38px] shrink-0 items-center justify-center rounded-[9px] bg-brand-subtle">
@@ -248,23 +228,19 @@ function DocumentRow() {
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-semibold tracking-[-0.26px] text-foreground">
-          {asset.invoiceFile}
+          {fileName(document.s3_key)}
         </p>
         <p className="text-[11px] text-muted-light">
-          {asset.invoiceSize} · stored in S3
+          {DOCUMENT_KINDS[document.kind]} · stored in S3
         </p>
       </div>
-      <Image
-        src="/icons/asset-download.svg"
-        alt="Download invoice"
-        width={17}
-        height={17}
-      />
+      {/* TODO: make this a download link once the API hands out presigned GET URLs. */}
+      <Image src="/icons/asset-download.svg" alt="" width={17} height={17} />
     </div>
   );
 }
 
-function StoragePanel() {
+function StoragePanel({ asset }: { asset: Asset }) {
   return (
     <Panel title="Box / Storage">
       <div className="flex flex-col gap-3 sm:flex-row md:flex-col lg:flex-row">
@@ -279,13 +255,13 @@ function StoragePanel() {
           <div>
             <dt className="text-[11px] text-muted">Storage location</dt>
             <dd className="text-[13px] font-semibold text-foreground">
-              {asset.storageLocation}
+              {asset.location?.name ?? "—"}
             </dd>
           </div>
           <div>
             <dt className="text-[11px] text-muted">Note</dt>
             <dd className="text-[13px] leading-5 text-foreground">
-              {asset.storageNote}
+              {asset.storage_note ?? "—"}
             </dd>
           </div>
         </dl>
@@ -306,26 +282,52 @@ function QuickActions() {
         <Image src="/icons/asset-edit.svg" alt="" width={17} height={17} />
         Edit Asset
       </button>
-      <button
-        type="button"
-        aria-disabled="true"
-        title="Asset creation will be connected in a later task"
+      <Link
+        href="/assets/new"
         className="flex h-[54px] w-full items-center justify-center gap-2.5 rounded-[10px] bg-brand text-base font-bold tracking-[-0.32px] text-brand-foreground"
       >
         <Image src="/icons/asset-add.svg" alt="" width={17} height={17} />
         Add Asset
-      </button>
+      </Link>
     </div>
   );
 }
 
+/** Not found, couldn't load: a message with a way back to the list. */
+function Message({ title, body }: { title: string; body: string }) {
+  return (
+    <section className="flex flex-col items-center gap-1 rounded-[14px] border border-border bg-surface px-4 py-10 text-center">
+      <h1 className="text-[15px] font-bold text-foreground">{title}</h1>
+      <p className="text-[13px] text-muted">{body}</p>
+    </section>
+  );
+}
+
+/**
+ * Asset Detail (D08). Loads the asset from GET /assets/{id} in the browser.
+ *
+ * `undefined` = still loading, `null` = not found (404), otherwise the asset.
+ */
 export default function AssetDetail({ assetId }: { assetId: string }) {
-  const warranty = getWarrantyDetails();
-  const status = warranty.status;
+  const [asset, setAsset] = useState<Asset | null | undefined>(undefined);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+    getAsset(assetId)
+      .then((result) => {
+        if (!ignore) setAsset(result);
+      })
+      .catch(() => {
+        if (!ignore) setFailed(true);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [assetId]);
 
   return (
-    <div className="min-h-screen bg-canvas" data-asset-id={assetId}>
-      <AssetHeader />
+    <div className="min-h-screen bg-canvas">
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-5 pb-8 pt-4 md:gap-4 md:px-8 md:pt-8 lg:px-12">
         <Link
           href="/assets"
@@ -335,40 +337,51 @@ export default function AssetDetail({ assetId }: { assetId: string }) {
           Assets
         </Link>
 
-        <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] md:gap-5">
-          <div className="flex min-w-0 flex-col gap-3 md:gap-4">
-            <ProductSummary status={status} />
-            <WarrantyCountdown
-              daysRemaining={warranty.daysRemaining}
-              progress={warranty.progress}
-            />
+        {failed ? (
+          <Message
+            title="Couldn't load this asset."
+            body="Check your connection, then refresh the page."
+          />
+        ) : asset === undefined ? (
+          <p className="py-10 text-center text-[13px] text-muted">Loading asset…</p>
+        ) : asset === null ? (
+          <Message
+            title="Asset not found."
+            body="It may have been deleted, or it is not in this workspace."
+          />
+        ) : (
+          <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] md:gap-5">
+            <div className="flex min-w-0 flex-col gap-3 md:gap-4">
+              <ProductSummary asset={asset} />
+              {asset.warranty && <WarrantyCountdown warranty={asset.warranty} />}
 
-            <Panel title="Asset Information">
-              <dl className="flex flex-col gap-[11px]">
-                <DetailRow label="Serial Number" value={asset.serialNumber} />
-                <DetailRow
-                  label="Purchase Date"
-                  value={formatDate(asset.purchaseDate)}
-                />
-                <DetailRow
-                  label="Expiry Date"
-                  value={formatDate(asset.warrantyExpiryDate)}
-                />
-                <DetailRow label="Price" value={asset.price} />
-                <DetailRow label="Invoice" value={asset.invoiceNumber} />
-                <DetailRow label="Category" value={asset.category} />
-              </dl>
-            </Panel>
-          </div>
+              <Panel title="Asset Information">
+                <dl className="flex flex-col gap-[11px]">
+                  <DetailRow label="Serial Number" value={asset.serial_number} />
+                  <DetailRow label="Purchase Date" value={formatDate(asset.purchase_date)} />
+                  <DetailRow label="Expiry Date" value={formatDate(asset.warranty?.end_date)} />
+                  <DetailRow label="Price" value={formatPrice(asset.price, asset.currency)} />
+                  <DetailRow label="Invoice" value={asset.invoice_number ?? "—"} />
+                  <DetailRow label="Category" value={asset.category?.name ?? "—"} />
+                </dl>
+              </Panel>
+            </div>
 
-          <div className="flex min-w-0 flex-col gap-3 md:gap-4">
-            <Panel title="Linked Documents">
-              <DocumentRow />
-            </Panel>
-            <StoragePanel />
-            <QuickActions />
+            <div className="flex min-w-0 flex-col gap-3 md:gap-4">
+              <Panel title="Linked Documents">
+                {asset.documents.length > 0 ? (
+                  asset.documents.map((document) => (
+                    <DocumentRow key={document.id} document={document} />
+                  ))
+                ) : (
+                  <p className="text-[13px] text-muted">No documents attached.</p>
+                )}
+              </Panel>
+              <StoragePanel asset={asset} />
+              <QuickActions />
+            </div>
           </div>
-        </div>
+        )}
       </main>
     </div>
   );

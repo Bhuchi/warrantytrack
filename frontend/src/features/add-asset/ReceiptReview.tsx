@@ -33,8 +33,12 @@ const DURATIONS = [
  * Step 1's review: check and correct what OCR read, or type it all in for
  * manual entry. Mobile 3569:361, desktop 3570:451.
  *
- * TODO: Category, Department and Location (desktop frame) need lists from the
- * backend (/categories, /departments) that do not exist yet.
+ * Required fields follow issue #34: everything except Condition, including
+ * Category, Invoice Number and the whole warranty.
+ *
+ * Category is typed, like Vendor: POST /assets adds a new name to the list.
+ * TODO: Department and Location (desktop frame) need lists from the backend
+ * (/departments) that do not exist yet.
  */
 export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCancel }: ReceiptReviewProps) {
   // What OCR filled in, to decide where the "OCR" badges go.
@@ -89,7 +93,7 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
                 onChange={(event) => onChange({ name: event.target.value })}
               />
             </Field>
-            <Field id="invoice-number" label="Invoice Number">
+            <Field id="invoice-number" label="Invoice Number" required>
               <input
                 id="invoice-number"
                 className={inputClasses}
@@ -106,7 +110,16 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
                 onChange={(event) => onChange({ price: event.target.value })}
               />
             </Field>
-            <Field id="condition" label="Condition" required wide>
+            <Field id="category" label="Category" required>
+              <input
+                id="category"
+                className={inputClasses}
+                placeholder="e.g. Laptop"
+                value={draft.category_name}
+                onChange={(event) => onChange({ category_name: event.target.value })}
+              />
+            </Field>
+            <Field id="condition" label="Condition">
               <select
                 id="condition"
                 className={inputClasses}
@@ -130,11 +143,11 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
               Warranty Details
             </h2>
             <p className="text-[11px] tracking-[-0.22px] text-muted-light md:text-[12px]">
-              Optional. The expiry date is worked out for you.
+              Required. The expiry date is worked out for you.
             </p>
           </div>
 
-          <Field id="warranty-provider" label="Warranty Provider">
+          <Field id="warranty-provider" label="Warranty Provider" required>
             <input
               id="warranty-provider"
               className={inputClasses}
@@ -143,7 +156,7 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
               onChange={(event) => onChange({ warranty_provider: event.target.value })}
             />
           </Field>
-          <Field id="warranty-start" label="Start Date">
+          <Field id="warranty-start" label="Start Date" required>
             <input
               id="warranty-start"
               type="date"
@@ -152,14 +165,14 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
               onChange={(event) => onChange({ warranty_start_date: event.target.value })}
             />
           </Field>
-          <Field id="warranty-duration" label="Duration">
+          <Field id="warranty-duration" label="Duration" required>
             <select
               id="warranty-duration"
               className={inputClasses}
               value={draft.warranty_duration_months}
               onChange={(event) => onChange({ warranty_duration_months: event.target.value })}
             >
-              <option value="">No warranty</option>
+              <option value="">Choose a duration</option>
               {DURATIONS.map((duration) => (
                 <option key={duration.value} value={duration.value}>
                   {duration.label}
