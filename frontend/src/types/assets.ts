@@ -16,7 +16,8 @@ export interface AssetDetail {
   id: string;
   name: string;
   serial_number: string;
-  condition: AssetCondition;
+  /** Null when the asset was saved without one (optional since issue #34). */
+  condition: AssetCondition | null;
   /** "YYYY-MM-DD". */
   purchase_date: string;
   /** Decimal as a string, e.g. "51599.00". */

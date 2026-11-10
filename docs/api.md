@@ -96,7 +96,7 @@ inline:
   "errors": {
     "serial_number": "required",
     "purchase_date": "must be a valid date (YYYY-MM-DD)",
-    "condition": "required"
+    "price": "required"
   }
 }
 ```
@@ -187,9 +187,9 @@ tenants, `assigned_to_user_id` separates people inside one.
 
 ```jsonc
 // POST /assets   (request)
-// required: name, serial_number, condition, purchase_date, price, vendor,
-//           category, invoice_number, warranty (with a provider)
-// optional: location (site), department_id, storage_note, *_image_key,
+// required: name, serial_number, purchase_date, price, vendor, category,
+//           invoice_number, warranty (with a provider)
+// optional: condition, location (site), department_id, storage_note, *_image_key,
 //           document_ids, assigned_to_user_id
 {
   "name": "Dell Latitude 5540",
@@ -368,10 +368,10 @@ the same wording.
 `row` counts the header as row 1, so it is the line number in the user's own
 file. `field` is the **column name**.
 
-**Columns** — required: `name`, `serial_number`, `condition`, `purchase_date`,
+**Columns** — required: `name`, `serial_number`, `purchase_date`,
 `price`, `invoice_number`, `vendor`, `category`, `warranty_provider`,
 `warranty_start_date`, `warranty_duration_months`. Optional, and may be left
-out entirely: `currency`, `department`, `location`, `storage_note`.
+out entirely: `condition`, `currency`, `department`, `location`, `storage_note`.
 
 Vendor, category and location are given **by name**; a name not yet in the
 workspace's list is added to it, exactly as `POST /assets` does.
