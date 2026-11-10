@@ -3,10 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+import type { Invite } from "@/types";
 
 import CreateOrganizationModal from "./CreateOrganizationModal";
 import CreateWorkspaceCard from "./CreateWorkspaceCard";
+import InviteCard from "./InviteCard";
+import { acceptInvite, declineInvite, getInvites } from "./invites";
 import WorkspaceCard from "./WorkspaceCard";
 import { rememberWorkspace } from "./workspaces";
 import { OrganizationIcon, PersonalIcon } from "./WorkspaceIcons";
@@ -25,6 +29,14 @@ import { OrganizationIcon, PersonalIcon } from "./WorkspaceIcons";
  *
  * A new user (`isNewUser`, CLOUDAPPG5-132) has only their personal
  * workspace, with nothing in it yet, plus a card to create an organization.
+ *
+ * Pending organization invites (CLOUDAPPG5-133, issue #37) show above the
+ * workspaces. Accepting one adds that organization as a workspace card and
+ * selects it; declining removes the invite. Figma 3641:18 / 3642:187.
+ *
+ * TODO (CLOUDAPPG5-133): once GET /me exists, list every organization the
+ * user belongs to. Until then, an accepted invite reuses the one organization
+ * card, renamed to the organization just joined.
  *
  * TODO: the counts below are the placeholder values from Figma. Replace with
  * real data from lib/api once the workspaces endpoint exists.
@@ -73,23 +85,113 @@ export default function WorkspaceSelector({ isNewUser = false }: { isNewUser?: b
   const [selected, setSelected] = useState<WorkspaceId>(isNewUser ? "personal" : "organization");
   const [creating, setCreating] = useState(false);
 
-  const workspaces = isNewUser
-    ? WORKSPACES.filter((workspace) => workspace.id === "personal")
-    : WORKSPACES;
+  const [invites, setInvites] = useState<Invite[]>([]);
+  /** The organization joined by accepting an invite on this page, if any. */
+  const [joinedName, setJoinedName] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+
+  // Load pending invites once, after the first render. If that fails the page
+  // still works; the user just doesn't see invites until they reload.
+  useEffect(() => {
+    let ignore = false;
+    getInvites()
+      .then((result) => {
+        if (!ignore) setInvites(result);
+      })
+      .catch(() => {});
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  /** Takes an invite off the screen once it has been accepted or declined. */
+  function removeInvite(invite: Invite) {
+    setInvites((list) =>
+      list.filter((item) => item.workspace.id !== invite.workspace.id),
+    );
+  }
+
+  async function handleAccept(invite: Invite) {
+    setInviteError(null);
+    try {
+      const membership = await acceptInvite(invite.workspace.id);
+      removeInvite(invite);
+      setJoinedName(membership.workspace.name);
+      setSelected("organization");
+    } catch {
+      setInviteError(
+        `Couldn't accept the invite to ${invite.workspace.name}. Please try again.`,
+      );
+    }
+  }
+
+  async function handleDecline(invite: Invite) {
+    setInviteError(null);
+    try {
+      await declineInvite(invite.workspace.id);
+      removeInvite(invite);
+    } catch {
+      setInviteError(
+        `Couldn't decline the invite to ${invite.workspace.name}. Please try again.`,
+      );
+    }
+  }
+
+  // A new user has no organization, unless they just accepted an invite.
+  const showOrganization = !isNewUser || joinedName !== null;
+  const workspaces = showOrganization
+    ? WORKSPACES
+    : WORKSPACES.filter((workspace) => workspace.id === "personal");
+
+  /** The organization's name goes in the cookie, so the nav panel shows it. */
+  const remember = (id: WorkspaceId) =>
+    rememberWorkspace(
+      id,
+      id === "organization" ? (joinedName ?? undefined) : undefined,
+    );
   const selectedWorkspace =
     workspaces.find((workspace) => workspace.id === selected) ?? workspaces[0];
 
   return (
     <div className="flex w-full flex-col gap-5 md:items-center md:gap-11">
+      {(invites.length > 0 || inviteError) && (
+        <div className="flex w-full flex-col gap-3">
+          {invites.map((invite) => (
+            <InviteCard
+              key={invite.workspace.id}
+              invite={invite}
+              onAccept={() => handleAccept(invite)}
+              onDecline={() => handleDecline(invite)}
+            />
+          ))}
+          {inviteError && (
+            <p
+              role="alert"
+              className="rounded-[10px] bg-red-50 px-4 py-3 text-[13px] text-red-700"
+            >
+              {inviteError}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="flex w-full flex-col gap-5 md:flex-row md:items-start md:gap-8">
         {workspaces.map((workspace) => (
           <WorkspaceCard
             key={workspace.id}
-            title={workspace.title}
+            title={
+              workspace.id === "organization" && joinedName
+                ? joinedName
+                : workspace.title
+            }
             description={workspace.description}
             descriptionShort={workspace.descriptionShort}
             href={workspace.href}
-            stats={isNewUser ? NEW_USER_STATS : [...workspace.stats]}
+            stats={
+              isNewUser && workspace.id === "personal"
+                ? NEW_USER_STATS
+                : [...workspace.stats]
+            }
             icon={
               workspace.id === "personal" ? (
                 <PersonalIcon className="size-6 md:size-[26px]" />
@@ -99,29 +201,32 @@ export default function WorkspaceSelector({ isNewUser = false }: { isNewUser?: b
             }
             selected={workspace.id === selected}
             onSelect={() => setSelected(workspace.id)}
-            onContinue={() => rememberWorkspace(workspace.id)}
+            onContinue={() => remember(workspace.id)}
           />
         ))}
 
         {isNewUser && <CreateWorkspaceCard onCreate={() => setCreating(true)} />}
       </div>
 
-      <p className="flex w-full items-center gap-2.5 rounded-[10px] bg-brand-subtle px-4 py-3.5 text-[13px] leading-[19px] tracking-[-0.26px] text-brand md:w-auto md:rounded-lg md:py-3.5 md:pr-5 md:pl-[18px] md:text-[14px] md:tracking-[-0.28px]">
-        <Image
-          src="/icons/info.svg"
-          alt=""
-          width={18}
-          height={18}
-          className="shrink-0"
-        />
-        {isNewUser
-          ? "Joining a company? Ask its admin to invite you."
-          : "You can switch workspaces anytime from Settings."}
-      </p>
+      {/* While an invite is showing, "ask its admin to invite you" makes no sense. */}
+      {invites.length === 0 && (
+        <p className="flex w-full items-center gap-2.5 rounded-[10px] bg-brand-subtle px-4 py-3.5 text-[13px] leading-[19px] tracking-[-0.26px] text-brand md:w-auto md:rounded-lg md:py-3.5 md:pr-5 md:pl-[18px] md:text-[14px] md:tracking-[-0.28px]">
+          <Image
+            src="/icons/info.svg"
+            alt=""
+            width={18}
+            height={18}
+            className="shrink-0"
+          />
+          {isNewUser
+            ? "Joining a company? Ask its admin to invite you."
+            : "You can switch workspaces anytime from Settings."}
+        </p>
+      )}
 
       <Link
         href={selectedWorkspace.href}
-        onClick={() => rememberWorkspace(selected)}
+        onClick={() => remember(selected)}
         className="flex h-14 w-full items-center justify-center rounded-[10px] bg-brand text-[17px] font-bold tracking-[-0.34px] text-brand-foreground md:hidden"
       >
         Continue

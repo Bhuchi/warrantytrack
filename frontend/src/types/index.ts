@@ -35,6 +35,20 @@ export interface Membership {
   role: MembershipRole;
 }
 
+/**
+ * A pending invite to an organization, from GET /me → `invites`. The person
+ * must accept it before they join (issue #37).
+ */
+export interface Invite {
+  workspace: Workspace;
+  /** The role they will have once they accept. Nobody is invited as owner. */
+  role: Exclude<MembershipRole, "owner">;
+  /** Display name of the admin who sent it. */
+  invited_by: string;
+  /** ISO timestamp, e.g. "2026-11-10T04:20:00Z". */
+  invited_at: string;
+}
+
 export type WarrantyStatus = "active" | "expiring_soon" | "expired" | "unknown";
 
 /** One bar in "Assets by Department". */
