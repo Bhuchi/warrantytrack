@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
 const reminders = ["60 days", "30 days", "14 days", "7 days", "1 day"] as const;
@@ -28,47 +27,6 @@ function Toggle({ checked, id, label, onChange }: ToggleProps) {
         className={`absolute left-[3px] top-[3px] size-5 rounded-full bg-white shadow-sm transition-transform ${checked ? "translate-x-[18px]" : "translate-x-0"}`}
       />
     </button>
-  );
-}
-
-function SettingsHeader() {
-  return (
-    <header className="flex h-[60px] items-center justify-between border-b border-border bg-surface px-4 md:h-[72px] md:px-8 lg:px-12">
-      <div className="flex items-center gap-3">
-        <Link
-          href="/workspace"
-          aria-label="Go to workspace"
-          className="flex size-9 items-center justify-center rounded-lg bg-surface"
-        >
-          <Image src="/icons/settings-menu.svg" alt="" width={22} height={22} />
-        </Link>
-        <Link href="/" className="flex items-center gap-3">
-          <Image
-            src="/warranty-logo-blue.svg"
-            alt=""
-            width={36}
-            height={36}
-          />
-          <span className="text-[17px] font-bold text-brand md:text-xl">
-            WarrantyTrack
-          </span>
-        </Link>
-      </div>
-
-      <div className="flex items-center gap-2.5">
-        <span className="flex size-9 items-center justify-center">
-          <Image
-            src="/icons/settings-bell-button.svg"
-            alt="Notifications"
-            width={36}
-            height={36}
-          />
-        </span>
-        <span className="flex size-9 items-center justify-center rounded-full bg-brand-subtle text-xs font-bold text-brand">
-          CA
-        </span>
-      </div>
-    </header>
   );
 }
 
@@ -140,8 +98,6 @@ export default function SettingsNotifications() {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <SettingsHeader />
-
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-5 pb-8 pt-[14px] md:gap-5 md:px-8 md:pt-8 lg:px-12">
         <div className="flex flex-col gap-1">
           <h1 className="text-[22px] font-bold leading-[27px] tracking-[-0.44px] text-brand">

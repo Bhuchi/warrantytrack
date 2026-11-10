@@ -4,6 +4,16 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
 
   /**
+   * Lets other devices on the same network use the dev server, e.g. a phone
+   * opening http://192.168.1.34:3000, while localhost keeps working. Next
+   * blocks its dev-only scripts for any other address, so the page would load
+   * but no button would work. Covers the private address ranges: iPhone
+   * hotspot (172.20.10.x), home Wi-Fi (192.168.x.x) and most campus or office
+   * networks (10.x.x.x). Dev only; the deployed app ignores this.
+   */
+  allowedDevOrigins: ["172.20.10.*", "192.168.*.*", "10.*.*.*"],
+
+  /**
    * Same-origin access to the API.
    *
    * The browser calls `/api/*`, which is rewritten to the FastAPI service with
