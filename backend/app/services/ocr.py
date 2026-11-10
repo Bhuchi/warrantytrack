@@ -12,7 +12,10 @@ which matters, because every real receipt has its own way of writing a date.
 
 Two backends, chosen by `OCR_BACKEND`:
 
-* `textract` — the real thing.
+* `textract` — Amazon Textract AnalyzeExpense.
+* `bedrock` — a Claude model on Amazon Bedrock reads the image and returns
+  JSON. Handles Thai and photos well; images only (no PDF) for now. Scored in
+  scripts/ocr_compare.
 * `fake` — canned fields, so the OCR Review screen (D07) can be built and
   demoed with no AWS account and no per-page charge.
 
@@ -24,6 +27,8 @@ a multi-page PDF needs Textract's async API, which this does not use yet.
 
 from __future__ import annotations
 
+import io
+import json
 import logging
 import re
 from datetime import date, datetime
@@ -195,6 +200,173 @@ def parse_expense_response(response: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# --- Model-based backends ----------------------------------------------------
+
+
+def _parse_ocr_date(text: str) -> str | None:
+    """`_parse_date`, plus Thai Buddhist-era years (2568 -> 2025)."""
+    found = _parse_date(text)
+    if found:
+        return found
+    match = re.search(r"(?<!\d)(25\d{2})(?!\d)", text)
+    if match:
+        return _parse_date(text.replace(match.group(1), str(int(match.group(1)) - 543)))
+    return None
+
+
+def parse_model_json(data: dict[str, Any]) -> dict[str, Any]:
+    """A model's JSON -> the `extracted` shape, re-validating every value.
+
+    The model is asked for clean values but is not trusted: dates and amounts
+    go back through the same parsers as the other backends, so a malformed
+    answer becomes an empty field instead of bad data in the review screen.
+    """
+    if not isinstance(data, dict):
+        raise OcrError("The model returned an unexpected answer.")
+
+    def text(value: Any) -> str | None:
+        return str(value).strip() or None if value is not None else None
+
+    items = []
+    for item in data.get("line_items") or []:
+        if not isinstance(item, dict):
+            continue
+        name, serial = text(item.get("name")), text(item.get("serial_number"))
+        price = _parse_amount(text(item.get("price")))
+        if any((name, serial, price)):
+            items.append({"name": name, "serial_number": serial, "price": price})
+
+    total_text = text(data.get("total_amount"))
+    currency = text(data.get("currency"))
+    return {
+        "vendor_name": text(data.get("vendor_name")),
+        "purchase_date": _parse_ocr_date(text(data.get("purchase_date")) or ""),
+        "total_amount": _parse_amount(total_text),
+        "currency": currency.upper() if currency else _sniff_currency(total_text),
+        "line_items": items,
+    }
+
+
+# --- Bedrock ---------------------------------------------------------------
+
+# The prompt that scripts/ocr_compare scored; change it there first, then here.
+_BEDROCK_SYSTEM_PROMPT = """You extract data from a purchase receipt or invoice. It may be in Thai, English, or both.
+
+Return ONLY one JSON object, no prose and no markdown, with exactly these keys:
+{
+  "vendor_name": string | null,
+  "purchase_date": "YYYY-MM-DD" | null,
+  "total_amount": string | null,
+  "currency": string | null,
+  "line_items": [
+    {"name": string | null, "price": string | null,
+     "serial_number": string | null, "warranty_months": integer | null}
+  ]
+}
+
+Rules:
+- Use null for anything you cannot read with confidence. Never guess: an empty
+  field is better than a wrong one.
+- purchase_date: the purchase / issue date. Dates are day-first (01/03/2025 is
+  1 March 2025). Thai receipts may use Buddhist Era years such as 2568 - convert
+  to Gregorian by subtracting 543. Ignore dates that belong to an address, a tax
+  ID, a document number or a due date.
+- total_amount: the final amount paid, as a plain decimal string without
+  thousands separators, e.g. "37570.00".
+- currency: ISO code. THB for ฿ or บาท.
+- vendor_name: the shop's name as printed in the logo or header.
+- line_items: one entry per purchased product, as printed. price is that line's
+  total amount as a decimal string.
+- serial_number: ONLY when printed with an explicit label such as S/N, SN or
+  Serial. Product codes, SKUs, barcodes and item numbers are NOT serial numbers.
+- warranty_months: the warranty length in months if it is printed for that
+  item ("3-Y" or "3 YEAR" is 36, "ประกัน 1 ปี" is 12). null if not printed,
+  and null for lifetime warranties."""
+
+_bedrock_client = None
+_MAX_IMAGE_SIDE = 2000  # Bedrock limits image size; a smaller image is cheaper too.
+
+
+def _bedrock():
+    global _bedrock_client
+    if _bedrock_client is None:
+        from botocore.config import Config
+
+        _bedrock_client = boto3.client(
+            "bedrock-runtime",
+            region_name=settings.bedrock_region or settings.aws_region,
+            config=Config(read_timeout=120, retries={"max_attempts": 3, "mode": "standard"}),
+        )
+    return _bedrock_client
+
+
+def _prepare_image(data: bytes) -> bytes:
+    """JPEG bytes with the long side capped, upright regardless of EXIF."""
+    from PIL import Image, ImageOps, UnidentifiedImageError
+
+    try:
+        image = ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
+    except UnidentifiedImageError as exc:
+        raise OcrError("This file is not an image the OCR can read.") from exc
+    longest = max(image.size)
+    if longest > _MAX_IMAGE_SIDE:
+        scale = _MAX_IMAGE_SIDE / longest
+        image = image.resize((int(image.width * scale), int(image.height * scale)), Image.LANCZOS)
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", quality=90)
+    return buffer.getvalue()
+
+
+def _json_from_reply(reply: str) -> dict[str, Any]:
+    """The JSON object in a model reply, tolerating a ```json fence."""
+    text = reply.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z]*\s*|\s*```$", "", text)
+    try:
+        return json.loads(text)
+    except ValueError as exc:
+        raise OcrError("The model did not return valid JSON.") from exc
+
+
+def _bedrock_extract(s3_key: str, filename: str | None, content_type: str | None) -> dict[str, Any]:
+    if not settings.bedrock_model_id:
+        raise OcrError("OCR_BACKEND=bedrock but BEDROCK_MODEL_ID is not set.")
+
+    data = storage.read_bytes(s3_key)
+    if (
+        data[:4] == b"%PDF"
+        or content_type == "application/pdf"
+        or (filename or "").lower().endswith(".pdf")
+    ):
+        raise OcrError("The Bedrock backend reads images only; upload a JPG or PNG.")
+
+    try:
+        response = _bedrock().converse(
+            modelId=settings.bedrock_model_id,
+            system=[{"text": _BEDROCK_SYSTEM_PROMPT}],
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"image": {"format": "jpeg", "source": {"bytes": _prepare_image(data)}}},
+                    {"text": "Extract the receipt in this image."},
+                ],
+            }],
+            # No temperature: some current models reject it as deprecated.
+            inferenceConfig={"maxTokens": 3000},
+        )
+        blocks = response["output"]["message"]["content"]
+    except (BotoCoreError, ClientError, KeyError) as exc:  # pragma: no cover - needs AWS
+        # The exception class (NoCredentialsError, AccessDeniedException,
+        # ValidationException ...) says what to fix and carries no secret, so
+        # it goes in the message the review screen shows. The full text is
+        # logged for whoever has the server logs.
+        logger.warning("Bedrock failed for %s: %s: %s", s3_key, type(exc).__name__, exc)
+        code = exc.response.get("Error", {}).get("Code") if isinstance(exc, ClientError) else None
+        raise OcrError(f"Bedrock could not read this file ({code or type(exc).__name__}).") from exc
+
+    return parse_model_json(_json_from_reply("".join(b.get("text", "") for b in blocks)))
+
+
 def _fake_extraction(filename: str | None) -> dict[str, Any]:
     """Canned fields for `OCR_BACKEND=fake`.
 
@@ -229,6 +401,9 @@ def extract(s3_key: str, filename: str | None, content_type: str | None) -> dict
     """
     if settings.ocr_backend == "fake":
         return _fake_extraction(filename)
+
+    if settings.ocr_backend == "bedrock":
+        return _bedrock_extract(s3_key, filename, content_type)
 
     if settings.storage_backend == "s3":
         document = {
