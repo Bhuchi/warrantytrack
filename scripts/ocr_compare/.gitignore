@@ -1,0 +1,6 @@
+# Real receipts and their hand-written answers contain personal data.
+receipts/
+out/
+ground_truth.json
+.venv/
+__pycache__/

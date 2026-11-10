@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "cd29a58e-633f-4e6d-aad7-b0a9379f69e1",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/Users/bhuchi/SIIT/Senior 1st/DES424_Cloud-based_Application_Developmrnt/project/warrantytrack/.archify/architecture-warrantytrack-dev-20261028-205910/candidate.json",
+  "output": "/Users/bhuchi/SIIT/Senior 1st/DES424_Cloud-based_Application_Developmrnt/project/warrantytrack/.archify/architecture-warrantytrack-dev-20261028-205910/warrantytrack-architecture.html",
+  "specification": {
+    "sha256": "dc3e4c7175272f36bc9ff71719cb9b2ad7d40ac3121bed848511072d46d409de",
+    "bytes": 12651
+  },
+  "artifact": {
+    "sha256": "31c6546ce21f0ec51d9c5fdc78da1088926e05b32273287357e69f99880ba9f6",
+    "bytes": 865601
+  }
+}

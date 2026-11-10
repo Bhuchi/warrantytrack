@@ -96,7 +96,7 @@ inline:
   "errors": {
     "serial_number": "required",
     "purchase_date": "must be a valid date (YYYY-MM-DD)",
-    "condition": "required"
+    "invoice_number": "required"
   }
 }
 ```
@@ -187,14 +187,14 @@ tenants, `assigned_to_user_id` separates people inside one.
 
 ```jsonc
 // POST /assets   (request)
-// required: name, serial_number, condition, purchase_date, price, vendor,
-//           category, invoice_number, warranty (with a provider)
-// optional: location (site), department_id, storage_note, *_image_key,
-//           document_ids, assigned_to_user_id
+// required: name, serial_number, purchase_date, price, vendor, category,
+//           invoice_number, warranty (with a provider)
+// optional: condition, location (site), department_id, storage_note,
+//           *_image_key, document_ids, assigned_to_user_id
 {
   "name": "Dell Latitude 5540",
   "serial_number": "ABC123",
-  "condition": "new",                  // new | good | fair | damaged
+  "condition": "new",                  // optional: new | good | fair | damaged
   "purchase_date": "2025-03-01",
   "price": "32900.00",
   "currency": "THB",                   // optional, defaults to THB
@@ -210,7 +210,7 @@ tenants, `assigned_to_user_id` separates people inside one.
   "location_image_key": null,          // optional S3 key
   "document_ids": ["uuid"],            // optional: receipts already uploaded
   "assigned_to_user_id": null,         // optional
-  "warranty": {                        // optional
+  "warranty": {                        // required, with a provider
     "provider": "Dell",
     "start_date": "2025-03-01",
     "duration_months": 36
@@ -225,18 +225,31 @@ month is 3 Mar, not 28 Feb — because that is what the form's own preview shows
 (`warrantyEndLabel` in add-asset/draft.ts uses JavaScript's `setMonth`). The
 two must agree or the saved date contradicts what the user was shown.
 
-**Required fields** come from `docs/database/WarrantyTrack-ERD-v1.2/README.md`
-("Explicit design decisions"), which traces them to the kick-off report and
-Jira CLOUDAPPG5-116 / -118: product name, purchase date, price, serial number,
-vendor, category, invoice number — and **a warranty**, because "a committed
-asset must have 1..N warranties" and "the old `No Warranty Info` status is no
-longer generated for valid committed assets".
+**Required fields** (proposed on issue #34, pending @SirErthh's reply): product
+name, purchase date, price, serial number, vendor, category, invoice number and
+**a warranty with a provider**. This follows the acceptance criteria of Jira
+CLOUDAPPG5-116 / -118 as edited on 26 Oct and `docs/database/WarrantyTrack-ERD-v1.2/README.md`
+("a committed asset must have 1..N warranties"; "the old `No Warranty Info`
+status is no longer generated for valid committed assets"). It supersedes the
+18 Oct list in `docs/frontend-plan.md`, under which category, invoice number
+and warranty were optional.
 
-> **Frontend impact, flagged by that same document** ("if existing UI shows it,
-> update the frontend separately"): Add Asset has no Category field yet, marks
-> Invoice Number optional, and offers a "No warranty" duration. All three need
-> to change before the wizard can save. The dashboard's `no_warranty` count and
-> the Assets List "No warranty" filter will stop matching anything.
+**Physical condition is optional.** The 26 Oct edits to -116 / -118 dropped it
+as a requirement, and the ERD postpones it. Until the backend change lands,
+`POST /assets` still rejects a missing `condition`; this section describes the
+target.
+
+> **Not yet reflected in the code:** the backend still requires `condition`,
+> and the frontend still follows the 18 Oct list. Add Asset has no Category
+> field, marks Invoice Number optional, and offers a "No warranty" duration, so
+> it will get a 422 from the real API until it changes. The dashboard's
+> `no_warranty` count and the Assets List "No warranty" filter stop matching
+> any asset saved after this rule. `no_warranty` stays in the summary response
+> for now so the dashboard keeps working.
+>
+> The kick-off report's Dashboard section still says it displays "assets
+> without warranty information". Note the change in the final report rather
+> than leaving the two documents to disagree.
 
 `PATCH` will not let an edit remove one of these either — clearing a required
 field is a **422**, not a silent null.
@@ -368,10 +381,11 @@ the same wording.
 `row` counts the header as row 1, so it is the line number in the user's own
 file. `field` is the **column name**.
 
-**Columns** — required: `name`, `serial_number`, `condition`, `purchase_date`,
-`price`, `invoice_number`, `vendor`, `category`, `warranty_provider`,
+**Columns** — required: `name`, `serial_number`, `purchase_date`, `price`,
+`invoice_number`, `vendor`, `category`, `warranty_provider`,
 `warranty_start_date`, `warranty_duration_months`. Optional, and may be left
-out entirely: `currency`, `department`, `location`, `storage_note`.
+out entirely: `condition`, `currency`, `department`, `location`,
+`storage_note`.
 
 Vendor, category and location are given **by name**; a name not yet in the
 workspace's list is added to it, exactly as `POST /assets` does.
@@ -542,8 +556,11 @@ changed — and so we can report OCR accuracy in the final presentation.
 {
   "assets": [
     { "name": "Dell Latitude 5540", "serial_number": "ABC123",
-      "condition": "new", "purchase_date": "2025-03-01",
-      "price": "32900.00", "category_id": "uuid", "vendor_id": "uuid" }
+      "purchase_date": "2025-03-01", "price": "32900.00",
+      "invoice_number": "INV-2025-001",
+      "category_id": "uuid", "vendor_id": "uuid",
+      "warranty": { "provider": "Dell", "start_date": "2025-03-01",
+                    "duration_months": 36 } }
   ]
 }
 // → 201
