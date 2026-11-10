@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { ReactNode } from "react";
 
@@ -28,8 +27,6 @@ export default function AppShell({
   unreadCount,
 }: AppShellProps) {
   const [navOpen, setNavOpen] = useState(false);
-  const pathname = usePathname();
-  const hideAppBar = pathname === "/notifications" || pathname === "/settings";
   const closeNav = () => setNavOpen(false);
 
   return (
@@ -55,13 +52,11 @@ export default function AppShell({
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {!hideAppBar && (
-          <AppBar
-            onMenuClick={() => setNavOpen(true)}
-            initials={user?.initials ?? workspace.initials}
-            unreadCount={unreadCount}
-          />
-        )}
+        <AppBar
+          onMenuClick={() => setNavOpen(true)}
+          initials={user?.initials ?? workspace.initials}
+          unreadCount={unreadCount}
+        />
         {children}
       </div>
     </div>
