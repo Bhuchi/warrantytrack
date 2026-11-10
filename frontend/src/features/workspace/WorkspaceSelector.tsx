@@ -2,8 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import CreateOrganizationModal from "./CreateOrganizationModal";
+import CreateWorkspaceCard from "./CreateWorkspaceCard";
 import WorkspaceCard from "./WorkspaceCard";
 import { rememberWorkspace } from "./workspaces";
 import { OrganizationIcon, PersonalIcon } from "./WorkspaceIcons";
@@ -19,6 +22,9 @@ import { OrganizationIcon, PersonalIcon } from "./WorkspaceIcons";
  *
  * Continue saves the choice in a cookie (rememberWorkspace), so the nav panel
  * and every signed-in page show this workspace, even after a refresh.
+ *
+ * A new user (`isNewUser`, CLOUDAPPG5-132) has only their personal
+ * workspace, with nothing in it yet, plus a card to create an organization.
  *
  * TODO: the counts below are the placeholder values from Figma. Replace with
  * real data from lib/api once the workspaces endpoint exists.
@@ -53,24 +59,37 @@ const WORKSPACES = [
 
 type WorkspaceId = (typeof WORKSPACES)[number]["id"];
 
-export default function WorkspaceSelector() {
-  // Figma shows the organization card selected by default.
-  const [selected, setSelected] = useState<WorkspaceId>("organization");
+/** A new user's personal workspace is empty (Figma 3640:18). */
+const NEW_USER_STATS = [
+  { value: "0", label: "Assets" },
+  { value: "0", label: "Expiring soon" },
+];
 
+export default function WorkspaceSelector({ isNewUser = false }: { isNewUser?: boolean }) {
+  const router = useRouter();
+
+  // Figma shows the organization card selected by default; a new user only
+  // has their personal workspace, so that one starts selected.
+  const [selected, setSelected] = useState<WorkspaceId>(isNewUser ? "personal" : "organization");
+  const [creating, setCreating] = useState(false);
+
+  const workspaces = isNewUser
+    ? WORKSPACES.filter((workspace) => workspace.id === "personal")
+    : WORKSPACES;
   const selectedWorkspace =
-    WORKSPACES.find((workspace) => workspace.id === selected) ?? WORKSPACES[0];
+    workspaces.find((workspace) => workspace.id === selected) ?? workspaces[0];
 
   return (
     <div className="flex w-full flex-col gap-5 md:items-center md:gap-11">
       <div className="flex w-full flex-col gap-5 md:flex-row md:items-start md:gap-8">
-        {WORKSPACES.map((workspace) => (
+        {workspaces.map((workspace) => (
           <WorkspaceCard
             key={workspace.id}
             title={workspace.title}
             description={workspace.description}
             descriptionShort={workspace.descriptionShort}
             href={workspace.href}
-            stats={[...workspace.stats]}
+            stats={isNewUser ? NEW_USER_STATS : [...workspace.stats]}
             icon={
               workspace.id === "personal" ? (
                 <PersonalIcon className="size-6 md:size-[26px]" />
@@ -83,6 +102,8 @@ export default function WorkspaceSelector() {
             onContinue={() => rememberWorkspace(workspace.id)}
           />
         ))}
+
+        {isNewUser && <CreateWorkspaceCard onCreate={() => setCreating(true)} />}
       </div>
 
       <p className="flex w-full items-center gap-2.5 rounded-[10px] bg-brand-subtle px-4 py-3.5 text-[13px] leading-[19px] tracking-[-0.26px] text-brand md:w-auto md:rounded-lg md:py-3.5 md:pr-5 md:pl-[18px] md:text-[14px] md:tracking-[-0.28px]">
@@ -93,7 +114,9 @@ export default function WorkspaceSelector() {
           height={18}
           className="shrink-0"
         />
-        You can switch workspaces anytime from Settings.
+        {isNewUser
+          ? "Joining a company? Ask its admin to invite you."
+          : "You can switch workspaces anytime from Settings."}
       </p>
 
       <Link
@@ -103,6 +126,16 @@ export default function WorkspaceSelector() {
       >
         Continue
       </Link>
+
+      <CreateOrganizationModal
+        open={creating}
+        onClose={() => setCreating(false)}
+        onCreated={(workspace) => {
+          // The new organization becomes the chosen workspace, then straight in.
+          rememberWorkspace("organization", workspace.name);
+          router.push("/dashboard");
+        }}
+      />
     </div>
   );
 }
