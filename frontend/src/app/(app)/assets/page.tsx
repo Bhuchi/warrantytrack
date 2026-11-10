@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AddAssetIcon } from "@/components/NavIcons";
+import AssetCount from "@/features/assets/AssetCount";
 import AssetsList from "@/features/assets/AssetsList";
-import { getAssets } from "@/features/assets/getAssets";
 import { getCurrentWorkspace } from "@/features/workspace/currentWorkspace";
 
 export const metadata: Metadata = {
@@ -15,12 +15,11 @@ export const metadata: Metadata = {
  * The page stays on the server; the search, filters and list run in the
  * browser inside AssetsList.
  *
- * The subtitle names the workspace chosen on /workspace. The asset list itself
- * is still the same mock data for both workspaces.
+ * The subtitle names the workspace chosen on /workspace (read here, on the
+ * server, from its cookie). The count and the list come from GET /assets in
+ * the browser: AssetCount and AssetsList are client components.
  */
 export default async function AssetsPage() {
-  // Everything registered, ignoring filters: the count under the title.
-  const { total } = await getAssets();
   const { workspace } = await getCurrentWorkspace();
 
   return (
@@ -31,7 +30,7 @@ export default async function AssetsPage() {
             Assets
           </h1>
           <p className="text-[12px] tracking-[-0.24px] text-muted md:text-[14px] md:tracking-[-0.28px]">
-            {total} registered in {workspace.name}
+            <AssetCount workspaceName={workspace.name} />
           </p>
         </div>
         {/* Desktop: next to the title (D05). Mobile has it at the bottom instead. */}

@@ -14,7 +14,8 @@ import TextField from "@/components/TextField";
  * checkbox are a best guess built to match the sign-in card. Re-check against
  * the real frame once it exists.
  *
- * For now Create Account only moves on to workspace selection, like Sign In.
+ * For now Create Account only moves on to workspace selection, like Sign In,
+ * but with `?new=1` so it shows the new-user state (CLOUDAPPG5-132).
  *
  * TODO (FE-04, CLOUDAPPG5-122): create the account with Cognito, same wiring
  * plan as SignInForm.
@@ -27,7 +28,7 @@ export default function SignUpForm() {
       className="flex w-full flex-col gap-[22px]"
       onSubmit={(event) => {
         event.preventDefault();
-        router.push("/workspace");
+        router.push("/workspace?new=1");
       }}
     >
       <TextField
