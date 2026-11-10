@@ -113,6 +113,11 @@ resource "aws_iam_role_policy" "task" {
       },
       {
         Effect   = "Allow"
+        Action   = ["cognito-idp:AdminGetUser"]
+        Resource = aws_cognito_user_pool.main.arn
+      },
+      {
+        Effect   = "Allow"
         Action   = ["ses:SendEmail"]
         Resource = "*"
         Condition = {

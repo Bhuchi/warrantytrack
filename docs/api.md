@@ -65,6 +65,14 @@ target group.
 { "status": "ok", "service": "warrantytrack-api", "version": "0.1.0" }
 ```
 
+### Auth and workspace foundation
+
+`GET /me` returns the signed-in user and every current workspace membership.
+It creates the user's personal workspace on first successful Cognito sign-in.
+`POST /workspaces` creates an organization and makes the caller its owner.
+Both use the request and response shapes below. Role checks on scoped routes
+read `memberships` on every request. The member invite endpoints remain planned.
+
 ---
 
 ## Planned
@@ -105,8 +113,8 @@ inline:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/me` | Current user + every workspace they belong to |
-| `POST` | `/workspaces` | Create an organization workspace |
+| `GET` | `/me` | **Implemented** — current user + every workspace they belong to |
+| `POST` | `/workspaces` | **Implemented** — create an organization workspace |
 | `GET` | `/workspaces/{id}/members` | List members (admin only) |
 | `POST` | `/workspaces/{id}/members` | Invite a member (admin only) |
 

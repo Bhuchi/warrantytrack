@@ -35,6 +35,11 @@ export interface Membership {
   role: MembershipRole;
 }
 
+export interface MeResponse {
+  user: User;
+  memberships: Membership[];
+}
+
 /**
  * A pending invite to an organization, from GET /me → `invites`. The person
  * must accept it before they join (issue #37).

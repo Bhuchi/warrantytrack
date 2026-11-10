@@ -44,7 +44,7 @@ type TokenProvider = () => string | null | Promise<string | null>;
 let tokenProvider: TokenProvider = () => null;
 
 /**
- * Register how the client obtains the bearer token (Cognito id/access token).
+ * Register how the client obtains the Cognito ID token.
  * Call this once from the auth feature so `lib/api` stays auth-agnostic.
  */
 export function setAuthTokenProvider(provider: TokenProvider): void {
@@ -107,6 +107,13 @@ async function request<T>(
   const token = await tokenProvider();
   if (token && !requestHeaders.has("Authorization")) {
     requestHeaders.set("Authorization", `Bearer ${token}`);
+  }
+  if (!requestHeaders.has("X-Workspace-Id") && typeof document !== "undefined") {
+    const workspaceId = document.cookie
+      .split("; ")
+      .find((cookie) => cookie.startsWith("workspace_id="))
+      ?.slice("workspace_id=".length);
+    if (workspaceId) requestHeaders.set("X-Workspace-Id", workspaceId);
   }
 
   const response = await fetch(buildUrl(path, query), {
