@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 type NotificationCategory = "Warranties" | "Assets" | "System";
@@ -80,50 +79,6 @@ const initialNotifications: NotificationItem[] = [
 
 const filters: NotificationFilter[] = ["All", "Warranties", "Assets", "System"];
 const groups: NotificationGroup[] = ["TODAY", "YESTERDAY"];
-
-function NotificationsHeader() {
-  return (
-    <header className="flex h-[60px] items-center justify-between border-b border-border bg-surface px-4 md:h-20 md:px-8 lg:px-12">
-      <div className="flex items-center gap-3">
-        <Link
-          href="/workspace"
-          aria-label="Go to workspace"
-          className="flex size-9 items-center justify-center rounded-lg"
-        >
-          <Image
-            src="/icons/notifications-menu.svg"
-            alt=""
-            width={22}
-            height={22}
-          />
-        </Link>
-        <Link href="/" className="flex items-center gap-3">
-          <Image
-            src="/icons/notifications-logo.svg"
-            alt=""
-            width={36}
-            height={36}
-          />
-          <span className="text-[17px] font-bold text-brand md:text-[22px]">
-            WarrantyTrack
-          </span>
-        </Link>
-      </div>
-
-      <div className="flex items-center gap-2.5">
-        <Image
-          src="/icons/notifications-bell.svg"
-          alt="Notifications"
-          width={36}
-          height={36}
-        />
-        <span className="flex size-9 items-center justify-center rounded-full bg-brand-subtle text-xs font-bold text-brand">
-          CA
-        </span>
-      </div>
-    </header>
-  );
-}
 
 function NotificationRow({
   item,
@@ -239,7 +194,6 @@ export default function Notifications() {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <NotificationsHeader />
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-5 pb-8 pt-4 md:gap-5 md:px-8 md:pt-8 lg:px-12">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-1">
