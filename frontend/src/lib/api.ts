@@ -96,10 +96,13 @@ async function request<T>(
 
   const isFormData =
     typeof FormData !== "undefined" && body instanceof FormData;
+  // A File/Blob is sent as-is (e.g. the dev receipt upload); the caller sets
+  // its Content-Type. Only plain objects are JSON-encoded.
+  const isBlob = typeof Blob !== "undefined" && body instanceof Blob;
 
   const requestHeaders = new Headers(headers);
   requestHeaders.set("Accept", "application/json");
-  if (body !== undefined && !isFormData && !requestHeaders.has("Content-Type")) {
+  if (body !== undefined && !isFormData && !isBlob && !requestHeaders.has("Content-Type")) {
     // FormData must set its own Content-Type so the multipart boundary is correct.
     requestHeaders.set("Content-Type", "application/json");
   }
@@ -114,7 +117,11 @@ async function request<T>(
     method,
     headers: requestHeaders,
     body:
-      body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
+      body === undefined
+        ? undefined
+        : isFormData || isBlob
+          ? (body as BodyInit)
+          : JSON.stringify(body),
   });
 
   if (!response.ok) {
