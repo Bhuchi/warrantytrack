@@ -6,23 +6,28 @@ import type { AssetCondition } from "./documents";
 
 /** The warranty part of POST /assets. The backend works out end_date. */
 export interface WarrantyInput {
-  provider: string | null;
+  /** Required (issue #34). The form fills it from the vendor. */
+  provider: string;
   /** "YYYY-MM-DD". */
   start_date: string;
   duration_months: number;
 }
 
-/** POST /assets. Required: name, serial_number, condition, purchase_date (+ purchase info). */
+/**
+ * POST /assets. Required (issue #34): name, serial number, purchase date,
+ * price, vendor, category, invoice number and a warranty with a provider.
+ * Condition is optional.
+ */
 export interface CreateAssetRequest {
   name: string;
   serial_number: string;
-  condition: AssetCondition;
+  condition?: AssetCondition;
   /** "YYYY-MM-DD". */
   purchase_date: string;
   /** Decimal as a string, e.g. "51599.00". */
   price: string;
   currency: string;
-  invoice_number?: string | null;
+  invoice_number: string;
   category_id?: string | null;
   category_name?: string | null;
   vendor_id?: string | null;
@@ -42,5 +47,5 @@ export interface CreateAssetRequest {
   /** Receipts already uploaded, e.g. the OCR document. */
   document_ids?: string[];
   assigned_to_user_id?: string | null;
-  warranty?: WarrantyInput | null;
+  warranty: WarrantyInput;
 }
