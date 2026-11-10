@@ -1,8 +1,53 @@
 /**
- * Asset request shapes, from docs/api.md "Assets". Keep in sync with the
- * backend's Pydantic schemas.
+ * Asset request and response shapes, from docs/api.md "Assets". Keep in sync
+ * with the backend's Pydantic schemas (backend/app/schemas/asset.py).
  */
-import type { AssetCondition } from "./documents";
+import type { AssetCondition, DocumentStatus } from "./documents";
+import type { WarrantyStatus } from "./index";
+
+/** A catalog entry (category, vendor, department or site) as the API nests it. */
+export interface CatalogRef {
+  id: string;
+  name: string;
+}
+
+/** GET /assets/{id}, the Asset Detail screen (D08). */
+export interface AssetDetail {
+  id: string;
+  name: string;
+  serial_number: string;
+  condition: AssetCondition;
+  /** "YYYY-MM-DD". */
+  purchase_date: string;
+  /** Decimal as a string, e.g. "51599.00". */
+  price: string | null;
+  currency: string;
+  invoice_number: string | null;
+  category: CatalogRef | null;
+  vendor: CatalogRef | null;
+  department: CatalogRef | null;
+  /** The site ("HQ Floor 3"). */
+  location: CatalogRef | null;
+  /** Free text from Add Asset step 3, shown under "Box / Storage". */
+  storage_note: string | null;
+  assigned_to: { user_id: string; display_name: string | null } | null;
+  /** Null only for assets saved before a warranty became required. */
+  warranty: {
+    provider: string | null;
+    /** "YYYY-MM-DD". */
+    start_date: string | null;
+    end_date: string;
+    status: WarrantyStatus;
+  } | null;
+  documents: {
+    id: string;
+    /** Where the file is in S3; the bucket is private, so this is not a link. */
+    s3_key: string;
+    status: DocumentStatus;
+    kind: "invoice" | "receipt" | "warranty_card" | "other";
+  }[];
+  created_at: string;
+}
 
 /** The warranty part of POST /assets. The backend works out end_date. */
 export interface WarrantyInput {
