@@ -112,44 +112,6 @@ function Panel({
   );
 }
 
-function AssetHeader() {
-  return (
-    <header className="hidden h-20 items-center justify-between border-b border-border bg-surface px-4 md:flex md:px-8 lg:px-12">
-      <div className="flex items-center gap-3">
-        <Link
-          href="/workspace"
-          aria-label="Go to workspace"
-          className="flex size-9 items-center justify-center rounded-lg"
-        >
-          <Image src="/icons/asset-menu.svg" alt="" width={22} height={22} />
-        </Link>
-        <Link href="/" className="flex items-center gap-3">
-          <Image
-            src="/icons/asset-logo.svg"
-            alt=""
-            width={36}
-            height={36}
-          />
-          <span className="text-[17px] font-bold text-brand md:text-[22px]">
-            WarrantyTrack
-          </span>
-        </Link>
-      </div>
-      <div className="flex items-center gap-2.5">
-        <Image
-          src="/icons/asset-bell.svg"
-          alt="Notifications"
-          width={36}
-          height={36}
-        />
-        <span className="flex size-9 items-center justify-center rounded-full bg-brand-subtle text-xs font-bold text-brand">
-          CA
-        </span>
-      </div>
-    </header>
-  );
-}
-
 function ProductSummary({ status }: { status: "Active" | "Expiring Soon" | "Expired" }) {
   return (
     <section className="flex w-full items-center gap-[14px] rounded-[14px] border border-border bg-surface p-4">
@@ -325,7 +287,6 @@ export default function AssetDetail({ assetId }: { assetId: string }) {
 
   return (
     <div className="min-h-screen bg-canvas" data-asset-id={assetId}>
-      <AssetHeader />
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-5 pb-8 pt-4 md:gap-4 md:px-8 md:pt-8 lg:px-12">
         <Link
           href="/assets"
