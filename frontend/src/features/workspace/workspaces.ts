@@ -6,6 +6,9 @@ export type WorkspaceKind = "personal" | "organization";
 /** Name of the browser cookie that remembers the chosen workspace. */
 export const WORKSPACE_COOKIE = "workspace";
 
+/** Name of the cookie holding an organization created on /workspace (CLOUDAPPG5-132). */
+export const WORKSPACE_NAME_COOKIE = "workspace_name";
+
 /** Reads the cookie's value; anything unexpected (or no cookie) means organization, as before. */
 export function toWorkspaceKind(value: string | undefined): WorkspaceKind {
   return value === "personal" ? "personal" : "organization";
@@ -37,9 +40,29 @@ export const WORKSPACE_PLACEHOLDERS: Record<
 };
 
 /**
+ * First letters of the first and last word, the same rule as a person's
+ * initials: "Acme Trading Co" → "AC". One word gives its first two letters.
+ */
+export function initialsOf(name: string): string {
+  const words = name.trim().split(/\s+/);
+  const letters = words.length > 1 ? words[0][0] + words[words.length - 1][0] : words[0].slice(0, 2);
+  return letters.toUpperCase();
+}
+
+/**
  * Remembers the chosen workspace for a year. Runs in the browser (it uses
  * `document`), so call it from a click handler, not from a server component.
+ *
+ * `name` is only passed for an organization just created on /workspace. Any
+ * other choice clears it, so the placeholder organization shows again.
+ *
+ * TODO (CLOUDAPPG5-132): drop the name cookie once GET /me returns real
+ * workspaces.
  */
-export function rememberWorkspace(kind: WorkspaceKind): void {
-  document.cookie = `${WORKSPACE_COOKIE}=${kind}; path=/; max-age=31536000; samesite=lax`;
+export function rememberWorkspace(kind: WorkspaceKind, name?: string): void {
+  const options = "path=/; max-age=31536000; samesite=lax";
+  document.cookie = `${WORKSPACE_COOKIE}=${kind}; ${options}`;
+  document.cookie = name
+    ? `${WORKSPACE_NAME_COOKIE}=${encodeURIComponent(name)}; ${options}`
+    : `${WORKSPACE_NAME_COOKIE}=; path=/; max-age=0`;
 }
