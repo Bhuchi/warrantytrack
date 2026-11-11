@@ -1,7 +1,7 @@
 # WarrantyTrack
 
 Cloud-based warranty management for individuals and organizations. Register
-products/assets, upload receipts (OCR-extracted via AWS Textract), track
+products/assets, upload receipts (read by Claude Haiku 5.5 on Amazon Bedrock), track
 warranty status, and get expiration notifications.
 
 **Course:** DES424 Cloud-based Application Development · Semester 1, 2026 · Group 5
@@ -27,7 +27,7 @@ Then find your slice in the [team table](#team-who-owns-what) and start on your 
 | Backend | FastAPI (Python) |
 | Database | PostgreSQL + SQLAlchemy + Alembic |
 | Auth | Amazon Cognito |
-| Storage / OCR | Amazon S3 + Amazon Textract |
+| Storage / OCR | Amazon S3 + Amazon Bedrock (Claude Haiku 5.5) |
 | Notifications | Amazon SES |
 | Hosting | Amazon ECS Fargate + ALB |
 | Containers | Docker |
@@ -91,7 +91,7 @@ docker compose down -v    # stop and wipe the database
 
 ### Adding AWS credentials later
 
-Only needed once we have an AWS account, for S3/Textract/Cognito/SES work:
+Only needed once we have an AWS account, for S3/Bedrock/Cognito/SES work:
 
 ```bash
 cp backend/.env.example backend/.env
@@ -121,7 +121,7 @@ what's assigned on the Jira board.
 | Poonnawit Wongprateepwilai | 6622772455 | [@Aphelios514](https://github.com/Aphelios514) | Frontend screens Asset Detail D08, Notifications D09, Settings, loading/empty/error states; requirements docs (functional + roles matrix); backend Pytest + OCR-accuracy testing |
 | Chaitawat Boonkitticharoen | 6622780342 | [@fongctw](https://github.com/fongctw) | Foundation: Cognito auth & RBAC, workspace switching; architecture diagram; non-functional requirements; all AWS deployment (VPC, ECS Fargate + ALB + ECR, RDS, IAM + CloudWatch, Docker→ECR, AWS account setup) |
 | Sirawich Narakulsookpipat | 6622782298 | [@SirErthh](https://github.com/SirErthh) | Backend **Leg A** — asset write-path: asset data model + CRUD (Asset, Category, Vendor, Department, Location), assignment, bulk import (CSV/Excel), asset-save validation |
-| Bhuchi Kumprakob | 6622782215 | [@Bhuchi](https://github.com/Bhuchi) | Backend **Leg B** — pipeline & signals: S3 + Textract OCR, multi-line invoices, warranty model + status, Dashboard API, Notifications API + scheduled scan + SES; plus repo/Jira setup, database schema/ERD |
+| Bhuchi Kumprakob | 6622782215 | [@Bhuchi](https://github.com/Bhuchi) | Backend **Leg B** — pipeline & signals: S3 + Bedrock OCR, multi-line invoices, warranty model + status, Dashboard API, Notifications API + scheduled scan + SES; plus repo/Jira setup, database schema/ERD |
 
 Frontend tickets, owners and dates are in
 [docs/frontend-plan.md](docs/frontend-plan.md).

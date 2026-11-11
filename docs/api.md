@@ -477,7 +477,7 @@ classification. There is therefore no "in use" check and no 409 for it.
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/documents/presign` | Get a presigned S3 PUT URL + document id |
-| `POST` | `/documents/{id}/submit` | Upload finished; start Textract |
+| `POST` | `/documents/{id}/submit` | Upload finished; start OCR (Bedrock) |
 | `GET` | `/documents/{id}` | Poll OCR status + extracted fields |
 | `POST` | `/documents/{id}/confirm` | Create asset(s) from reviewed OCR (multi-line) |
 
@@ -491,8 +491,9 @@ account and no spend. On those defaults `upload_url` points at
 `PUT /documents/{id}/dev-upload` instead of at S3 — the one case where a file
 passes through the API. That route 404s on any other backend, and the app
 refuses to start in production on a development backend. Set
-`STORAGE_BACKEND=s3 OCR_BACKEND=textract EMAIL_BACKEND=ses` once the account
-exists; nothing else changes.
+`STORAGE_BACKEND=s3 OCR_BACKEND=bedrock EMAIL_BACKEND=ses` (plus
+`BEDROCK_MODEL_ID`, the Claude Haiku 5.5 model) once the account exists;
+nothing else changes. `OCR_BACKEND=textract` is still supported.
 
 **Errors.** `submit` before anything was uploaded is `409`. A *failed*
 extraction is not an error here — the row carries `status: "failed"` and the
