@@ -77,6 +77,10 @@ Rules:
   product's own page. If results disagree, return null.
 - Convert to months: "3 years" or "3 ปี" is 36, "1 year" is 12, "6 months" is 6.
   Lifetime warranty is null.
+- Thai shops print the length in short form: "รับประกัน 2 - y" means 2 years
+  (24), "รับประกัน 1 - y" is 12, "รับประกัน 6 - m" is 6 months. A shop's own
+  product page that says this counts as stating the warranty for that product.
+- The model name must match exactly: "SoloCast 2" is NOT "SoloCast".
 - source_url: copy it exactly from one of the results.
 - evidence: the short phrase from that page that states the warranty, at most
   120 characters."""
@@ -146,11 +150,29 @@ def _ask_model(product: str, vendor: str | None, results: list[dict[str, str]]) 
             "role": "user",
             "content": [{"text": f"Product: {product}\nSold by: {vendor or 'unknown'}\n\nResults:\n{listing}"}],
         }],
-        inferenceConfig={"maxTokens": 300},
+        # Generous on purpose: the model may spend tokens reasoning before it
+        # writes the JSON, and a cut-off answer is an unparseable one.
+        inferenceConfig={"maxTokens": 1500},
     )
     blocks = response["output"]["message"]["content"]
-    answer = ocr._json_from_reply("".join(b.get("text", "") for b in blocks))
+    answer = _json_object("".join(b.get("text", "") for b in blocks))
     return _validate(answer, results)
+
+
+def _json_object(reply: str) -> Any:
+    """The first {...} object in a reply, or None. Prose around it is ignored.
+
+    A reply with no JSON means "no confident answer", not an error worth failing
+    the lookup over.
+    """
+    text = reply.strip()
+    for candidate in (text, *re.findall(r"\{.*\}", text, flags=re.DOTALL)):
+        try:
+            return json.loads(candidate)
+        except ValueError:
+            continue
+    logger.info("Warranty lookup: the model reply held no JSON object.")
+    return None
 
 
 def _validate(answer: Any, results: list[dict[str, str]]) -> WarrantyFinding | None:

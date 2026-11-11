@@ -114,3 +114,17 @@ def test_lookups_per_receipt_are_capped(on, monkeypatch):
     data = {"vendor_name": "JIB", "line_items": [{"name": f"Item {i}", "warranty_months": None} for i in range(10)]}
     wl.fill_missing_warranties(data)
     assert len(calls) == wl.MAX_LOOKUPS_PER_RECEIPT
+
+
+@pytest.mark.parametrize(
+    ("reply", "expected"),
+    [
+        ('{"warranty_months": 24}', {"warranty_months": 24}),
+        ('```json\n{"warranty_months": 24}\n```', {"warranty_months": 24}),
+        ('I checked the pages. {"warranty_months": 12, "source_url": null} Done.', {"warranty_months": 12, "source_url": None}),
+        ("I could not find it.", None),
+        ("", None),
+    ],
+)
+def test_json_object_tolerates_prose_and_fences(reply, expected):
+    assert wl._json_object(reply) == expected
