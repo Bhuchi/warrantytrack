@@ -109,9 +109,48 @@ def _vendor_domain(vendor: str | None) -> str | None:
     return None
 
 
+def _query(vendor: str | None, product: str, domain: str | None) -> str:
+    """A short search query: the shop's brand, the product, and the word warranty.
+
+    A receipt's company name ("บริษัท เจ ไอ บี คอมพิวเตอร์ กรุ๊ป จำกัด") and a
+    Thai gloss in brackets ("Microphone (ไมโครโฟน) ...") only dilute the search,
+    and change which part of a page the search engine quotes back.
+    """
+    core = re.sub(r"\([^)]*\)", " ", product)
+    core = re.sub(r"\s+", " ", core).strip() or product
+    shop = domain.split(".")[0].upper() if domain else (vendor or "")
+    return f"{shop} {core} ประกัน warranty".strip()
+
+
+_WARRANTY_WORDS = re.compile(r"รับประกัน|การประกัน|ประกัน|warrant(?:y|ies)|guarantee|\bปี\b|เดือน", re.IGNORECASE)
+
+
+def _excerpt(raw: str, snippet: str) -> str:
+    """The parts of a page that talk about warranty, falling back to the snippet.
+
+    The search engine's own snippet is chosen for the query and may skip the
+    one line that matters, so the full page text is searched here instead.
+    """
+    spans: list[tuple[int, int]] = []
+    for match in _WARRANTY_WORDS.finditer(raw or ""):
+        start, end = max(0, match.start() - 120), min(len(raw), match.end() + 160)
+        if spans and start <= spans[-1][1]:
+            spans[-1] = (spans[-1][0], end)
+        else:
+            spans.append((start, end))
+    text = " … ".join(raw[a:b] for a, b in spans)
+    text = re.sub(r"\s+", " ", text).strip()
+    return (text or snippet)[:_MAX_SNIPPET_CHARS]
+
+
 def _search(query: str, domain: str | None) -> list[dict[str, str]]:
     """Top web results as {title, url, content}; https pages only."""
-    body: dict[str, Any] = {"query": query, "max_results": _MAX_RESULTS, "search_depth": "basic"}
+    body: dict[str, Any] = {
+        "query": query,
+        "max_results": _MAX_RESULTS,
+        "search_depth": "basic",
+        "include_raw_content": True,
+    }
     if domain:
         body["include_domains"] = [domain]
     req = urlrequest.Request(
@@ -134,7 +173,7 @@ def _search(query: str, domain: str | None) -> list[dict[str, str]]:
         results.append({
             "title": str(item.get("title") or "")[:200],
             "url": url,
-            "content": str(item.get("content") or "")[:_MAX_SNIPPET_CHARS],
+            "content": _excerpt(str(item.get("raw_content") or ""), str(item.get("content") or "")),
         })
     return results
 
@@ -192,8 +231,8 @@ def _validate(answer: Any, results: list[dict[str, str]]) -> WarrantyFinding | N
 
 def lookup(vendor: str | None, product: str) -> WarrantyFinding | None:
     """Search for the product's warranty. Raises on network or model errors."""
-    query = f"{vendor or ''} {product} ประกัน warranty".strip()
     domain = _vendor_domain(vendor)
+    query = _query(vendor, product, domain)
 
     # The shop's own site first, then the open web.
     for scope in ([domain, None] if domain else [None]):

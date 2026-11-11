@@ -128,3 +128,22 @@ def test_lookups_per_receipt_are_capped(on, monkeypatch):
 )
 def test_json_object_tolerates_prose_and_fences(reply, expected):
     assert wl._json_object(reply) == expected
+
+
+def test_query_drops_company_boilerplate_and_thai_gloss():
+    q = wl._query("บริษัท เจ ไอ บี คอมพิวเตอร์ กรุ๊ป จำกัด", "Microphone (ไมโครโฟน) Hyperx Solocast", "jib.co.th")
+    assert q == "JIB Microphone Hyperx Solocast ประกัน warranty"
+    # An unknown shop keeps its own name.
+    assert wl._query("Corner Shop", "Mouse X", None) == "Corner Shop Mouse X ประกัน warranty"
+
+
+def test_excerpt_pulls_the_warranty_line_out_of_a_long_page():
+    page = ("เมนู " * 400) + "HYPERX SOLOCAST รับประกัน 2 - y" + (" ส่วนท้าย" * 400)
+    out = wl._excerpt(page, "unrelated snippet")
+    assert "รับประกัน 2 - y" in out
+    assert len(out) <= wl._MAX_SNIPPET_CHARS
+
+
+def test_excerpt_falls_back_to_the_snippet_when_the_page_has_no_warranty_words():
+    assert wl._excerpt("nothing relevant here", "the snippet") == "the snippet"
+    assert wl._excerpt("", "the snippet") == "the snippet"
