@@ -72,3 +72,9 @@ export function selectedWorkspaceId(): string | null {
   return document.cookie.split("; ").find((value) => value.startsWith(`${WORKSPACE_ID_COOKIE}=`))
     ?.slice(WORKSPACE_ID_COOKIE.length + 1) ?? null;
 }
+
+export function clearWorkspace(): void {
+  for (const key of [WORKSPACE_COOKIE, WORKSPACE_NAME_COOKIE, WORKSPACE_ID_COOKIE]) {
+    document.cookie = `${key}=; path=/; max-age=0; samesite=lax`;
+  }
+}

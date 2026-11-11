@@ -20,6 +20,8 @@ export default function SocialLogins() {
       <div className="flex gap-3.5">
         <button
           type="button"
+          disabled
+          title="Google sign-in is not configured"
           className="flex h-[54px] flex-1 items-center justify-center gap-2.5 rounded-[10px] border border-border md:h-[52px] md:rounded-lg"
         >
           <span className="text-[19px] font-bold text-[#4285f4] md:text-[20px]">
@@ -32,6 +34,8 @@ export default function SocialLogins() {
 
         <button
           type="button"
+          disabled
+          title="Microsoft sign-in is not configured"
           className="flex h-[54px] flex-1 items-center justify-center gap-2.5 rounded-[10px] border border-border md:h-[52px] md:rounded-lg"
         >
           <span className="text-[19px] font-bold text-brand md:hidden">M</span>

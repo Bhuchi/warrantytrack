@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AddAssetIcon, ChevronDownIcon } from "@/components/NavIcons";
 
 import DepartmentBreakdown from "@/features/dashboard/DepartmentBreakdown";
+import DashboardGreeting from "@/features/dashboard/DashboardGreeting";
 import ExpiringList from "@/features/dashboard/ExpiringList";
 import { percent } from "@/features/dashboard/format";
 import { getDashboard } from "@/features/dashboard/getDashboard";
@@ -39,7 +40,7 @@ export default async function DashboardPage() {
     <main className="flex flex-1 flex-col gap-3 px-5 pt-4 pb-6 md:gap-5 md:px-8 md:pt-6 md:pb-8">
       <div className="flex flex-col gap-1 md:gap-1.5">
         <h1 className="text-[22px] font-bold tracking-[-0.44px] text-brand md:text-[30px] md:tracking-[-0.6px]">
-          Welcome back, Chaiyapat
+          <DashboardGreeting />
         </h1>
         <p className="text-[13px] tracking-[-0.26px] text-muted md:text-[15px] md:tracking-[-0.3px]">
           Here&apos;s what&apos;s happening with your warranties.

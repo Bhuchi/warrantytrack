@@ -17,8 +17,14 @@ export const API_BASE_URL = stripTrailingSlash(
   process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL,
 );
 
-/** Amazon Cognito app client ID. Empty until auth is wired up. */
+/** Public Cognito user pool and browser client identifiers (never secrets). */
+export const COGNITO_USER_POOL_ID = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID ?? "";
 export const COGNITO_CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID ?? "";
+
+/** Local design demos omit both IDs; a deployed build requires both. */
+export const AUTH_REQUIRED =
+  process.env.NODE_ENV === "production" || Boolean(COGNITO_USER_POOL_ID || COGNITO_CLIENT_ID);
+export const COGNITO_ENABLED = Boolean(COGNITO_USER_POOL_ID && COGNITO_CLIENT_ID);
 
 if (!process.env.NEXT_PUBLIC_API_URL && process.env.NODE_ENV !== "production") {
   console.warn(

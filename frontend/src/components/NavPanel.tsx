@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
+import SignOutButton from "@/features/auth/SignOutButton";
 
 import {
   AddAssetIcon,
@@ -199,13 +200,11 @@ export default function NavPanel({
           </div>
         )}
 
-        <Link
-          href="/login"
+        <SignOutButton
           className="flex items-center gap-3 rounded-[10px] px-3.5 py-3 text-[15px] font-medium tracking-[-0.3px] text-muted"
         >
           <SignOutIcon className="size-[19px] shrink-0" />
-          Sign out
-        </Link>
+        </SignOutButton>
       </div>
     </aside>
   );

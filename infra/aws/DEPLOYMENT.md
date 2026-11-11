@@ -22,7 +22,7 @@ Never commit `terraform.tfvars`.
 ## Why the order matters
 
 Next.js inlines `NEXT_PUBLIC_*` at **build time**, so the web image cannot be
-built until the Cognito client ID exists. Deployment is therefore:
+built until the Cognito user pool and client IDs exist. Deployment is therefore:
 
 ```
 apply (free resources) → read outputs → build images → push → apply (the rest)
@@ -47,10 +47,10 @@ Read the plan, then:
 terraform apply phase1.tfplan
 ```
 
-Collect the two values the web image needs:
+Collect the values the web image needs:
 
 ```bash
-terraform output -raw cognito_client_id && terraform output -raw web_repository_url
+terraform output -raw cognito_user_pool_id && terraform output -raw cognito_client_id && terraform output -raw web_repository_url
 ```
 
 > `-target` is a deliberate exception here, not a habit. It exists only to keep
@@ -77,11 +77,11 @@ aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --
 docker build --platform linux/amd64 --target prod -f infra/docker/backend.Dockerfile -t $ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/warrantytrack-api:$TAG .
 ```
 
-The web build needs the Cognito client ID from phase 1. `NEXT_PUBLIC_API_URL`
+The web build needs both Cognito IDs from phase 1. `NEXT_PUBLIC_API_URL`
 stays the relative `/api`, which is the Dockerfile default:
 
 ```bash
-docker build --platform linux/amd64 --target prod -f infra/docker/frontend.Dockerfile --build-arg NEXT_PUBLIC_API_URL=/api --build-arg NEXT_PUBLIC_COGNITO_CLIENT_ID=$(terraform -chdir=infra/aws output -raw cognito_client_id) -t $ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/warrantytrack-web:$TAG .
+docker build --platform linux/amd64 --target prod -f infra/docker/frontend.Dockerfile --build-arg NEXT_PUBLIC_API_URL=/api --build-arg NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(terraform -chdir=infra/aws output -raw cognito_user_pool_id) --build-arg NEXT_PUBLIC_COGNITO_CLIENT_ID=$(terraform -chdir=infra/aws output -raw cognito_client_id) -t $ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/warrantytrack-web:$TAG .
 ```
 
 ```bash

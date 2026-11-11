@@ -27,10 +27,12 @@ ENV NODE_ENV=production
 #
 # NEXT_PUBLIC_API_URL stays relative: the web container rewrites /api/* to the
 # api container, so the browser never needs the load balancer hostname.
-# NEXT_PUBLIC_COGNITO_CLIENT_ID comes from `terraform output cognito_client_id`.
+# Both Cognito IDs come from the Terraform outputs.
 ARG NEXT_PUBLIC_API_URL=/api
+ARG NEXT_PUBLIC_COGNITO_USER_POOL_ID=
 ARG NEXT_PUBLIC_COGNITO_CLIENT_ID=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_COGNITO_USER_POOL_ID=$NEXT_PUBLIC_COGNITO_USER_POOL_ID
 ENV NEXT_PUBLIC_COGNITO_CLIENT_ID=$NEXT_PUBLIC_COGNITO_CLIENT_ID
 
 COPY --from=deps /app/node_modules ./node_modules

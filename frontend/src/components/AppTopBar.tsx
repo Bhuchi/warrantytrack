@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import SignOutButton from "@/features/auth/SignOutButton";
 
 interface AppTopBarProps {
   /** Signed-in user's email, shown on the right. */
@@ -24,12 +25,7 @@ export default function AppTopBar({ email, initials }: AppTopBarProps) {
         <span className="flex size-9 items-center justify-center rounded-full bg-brand-subtle text-[13px] font-bold text-brand">
           {initials}
         </span>
-        <Link
-          href="/login"
-          className="text-[14px] font-semibold tracking-[-0.28px] text-brand"
-        >
-          Sign out
-        </Link>
+        <SignOutButton className="text-[14px] font-semibold tracking-[-0.28px] text-brand" />
       </div>
     </header>
   );

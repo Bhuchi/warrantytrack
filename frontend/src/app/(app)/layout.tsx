@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import AppShell from "@/components/AppShell";
 import ToastProvider from "@/components/ToastProvider";
 import { getCurrentWorkspace } from "@/features/workspace/currentWorkspace";
+import AuthenticatedAppShell from "@/features/auth/AuthenticatedAppShell";
+import { AUTH_REQUIRED } from "@/lib/config";
 
 /**
  * Wraps every signed-in screen with the navigation panel and mobile top bar,
@@ -18,6 +20,7 @@ import { getCurrentWorkspace } from "@/features/workspace/currentWorkspace";
  * Figma placeholders; read them from GET /me once /workspaces exists.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
+  if (AUTH_REQUIRED) return <AuthenticatedAppShell>{children}</AuthenticatedAppShell>;
   const { workspace, user, unreadCount } = await getCurrentWorkspace();
 
   return (

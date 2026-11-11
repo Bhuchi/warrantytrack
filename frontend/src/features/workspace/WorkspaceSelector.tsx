@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import type { Invite, MeResponse, Membership } from "@/types";
 import { api } from "@/lib/api";
 import { COGNITO_CLIENT_ID } from "@/lib/config";
+import type { AssetListResponse } from "@/types/assetList";
 
 import CreateOrganizationModal from "./CreateOrganizationModal";
 import CreateWorkspaceCard from "./CreateWorkspaceCard";
@@ -76,13 +77,17 @@ const NEW_USER_STATS = [
   { value: "0", label: "Expiring soon" },
 ];
 
-export default function WorkspaceSelector({ isNewUser = false }: { isNewUser?: boolean }) {
+export default function WorkspaceSelector({ isNewUser = false, onMeLoaded }: {
+  isNewUser?: boolean;
+  onMeLoaded?: (me: MeResponse) => void;
+}) {
   const router = useRouter();
 
   // Figma shows the organization card selected by default; a new user only
   // has their personal workspace, so that one starts selected.
   const [selected, setSelected] = useState<string>(isNewUser ? "personal" : "organization");
   const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [counts, setCounts] = useState<Record<string, { value: string; label: string }[]>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(COGNITO_CLIENT_ID));
   const [creating, setCreating] = useState(false);
@@ -96,8 +101,10 @@ export default function WorkspaceSelector({ isNewUser = false }: { isNewUser?: b
     if (!COGNITO_CLIENT_ID) return;
     let ignore = false;
     api.get<MeResponse>("/me")
-      .then(({ memberships: result }) => {
+      .then((me) => {
         if (ignore) return;
+        onMeLoaded?.(me);
+        const result = me.memberships;
         setMemberships(result);
         const saved = selectedWorkspaceId();
         setSelected(result.find((item) => item.workspace.id === saved)?.workspace.id
@@ -108,7 +115,33 @@ export default function WorkspaceSelector({ isNewUser = false }: { isNewUser?: b
       })
       .finally(() => { if (!ignore) setLoading(false); });
     return () => { ignore = true; };
-  }, []);
+  }, [onMeLoaded]);
+
+  useEffect(() => {
+    if (!COGNITO_CLIENT_ID || memberships.length === 0) return;
+    let ignore = false;
+    async function loadCounts(membership: Membership) {
+      const id = membership.workspace.id;
+      const headers = { "X-Workspace-Id": id };
+      const assets = await api.get<AssetListResponse>("/assets", {
+        headers, query: { page_size: 1 },
+      });
+      const second = membership.workspace.type === "personal"
+        ? (await api.get<AssetListResponse>("/assets", {
+            headers, query: { page_size: 1, status: "expiring_soon" },
+          })).total
+        : (await api.get<{ items: unknown[] }>("/departments", { headers })).items.length;
+      if (!ignore) setCounts((previous) => ({
+        ...previous,
+        [id]: [
+          { value: String(assets.total), label: "Assets" },
+          { value: String(second), label: membership.workspace.type === "personal" ? "Expiring soon" : "Departments" },
+        ],
+      }));
+    }
+    for (const membership of memberships) void loadCounts(membership).catch(() => {});
+    return () => { ignore = true; };
+  }, [memberships]);
 
   // Load pending invites once, after the first render. If that fails the page
   // still works; the user just doesn't see invites until they reload.
@@ -165,7 +198,10 @@ export default function WorkspaceSelector({ isNewUser = false }: { isNewUser?: b
         const workspace = membership.workspace;
         const template = WORKSPACES.find((item) => item.id === workspace.type)!;
         return { ...template, id: workspace.id, kind: workspace.type,
-          title: workspace.name, stats: [] };
+          title: workspace.name, stats: counts[workspace.id] ?? [
+            { value: "—", label: "Assets" },
+            { value: "—", label: workspace.type === "personal" ? "Expiring soon" : "Departments" },
+          ] };
       })
     : (showOrganization ? WORKSPACES : WORKSPACES.filter((item) => item.id === "personal"))
         .map((item) => ({ ...item, kind: item.id }));

@@ -72,18 +72,25 @@ those with mock data rather than waiting for the endpoint to exist.
 Shared types live in [`src/types/index.ts`](src/types/index.ts) and must stay
 in sync with the backend's Pydantic schemas. Change both in the same PR.
 
-### Cognito and workspace handoff
+### Cognito and workspaces
 
-The sign-in feature (FE-04) must call `setAuthTokenProvider` in
-`src/lib/api.ts` with a provider for the current **Cognito ID token** before
-loading `/workspace`. When `NEXT_PUBLIC_COGNITO_CLIENT_ID` is set, that page
-loads `GET /me` and lists the real memberships. Choosing one stores its UUID
-in the `workspace_id` cookie; `api.ts` sends it as `X-Workspace-Id` on later
-browser requests. The backend checks membership on every scoped request.
+Set both `NEXT_PUBLIC_COGNITO_USER_POOL_ID` and `NEXT_PUBLIC_COGNITO_CLIENT_ID`
+in `frontend/.env.local` for a local Cognito run, and run the API with
+`AUTH_BACKEND=cognito`. Sign-in, sign-up, email confirmation, password reset,
+and sign-out use Cognito through `features/auth/cognito.ts`. It registers the
+current ID token with `setAuthTokenProvider` in `src/lib/api.ts`; the library
+refreshes an expired token while the session remains valid.
 
-The signed-in layout still uses FE-05 placeholders for other profile details;
-FE-05 should read the selected UUID and `GET /me` when replacing them. With no
-Cognito client configured, the existing local design demo remains available.
+`/workspace` loads `GET /me` and shows the account's memberships. It loads
+asset and department counts with each workspace's UUID. Choosing a workspace
+saves its UUID in the `workspace_id` cookie; API requests send it as
+`X-Workspace-Id`. The signed-in layout validates that selection against
+`GET /me` and uses the real user and workspace details. The API verifies
+membership on every scoped request.
+
+Local design demos work when both Cognito IDs are omitted in development.
+Production builds require both IDs. Google and Microsoft buttons remain
+visible but disabled because those identity providers are not configured.
 
 ## Mapping to Figma / Jira
 
