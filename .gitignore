@@ -57,3 +57,6 @@ terraform.tfvars
 
 # Robot Framework test output
 tests/robot/results/
+
+# Postman / Newman reports
+tests/postman/results/
