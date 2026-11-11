@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AddAssetIcon, ChevronDownIcon } from "@/components/NavIcons";
 
 import DashboardContent from "@/features/dashboard/DashboardContent";
+import WelcomeHeading from "@/features/dashboard/WelcomeHeading";
 import { getCurrentWorkspace } from "@/features/workspace/currentWorkspace";
 
 export const metadata: Metadata = {
@@ -16,8 +17,9 @@ export const metadata: Metadata = {
  * The mobile workspace card shows the workspace chosen on /workspace, the same
  * one as the nav panel. The numbers come from GET /dashboard/summary and /dashboard/expiring.
  *
- * TODO: the name in "Welcome back" is a Figma placeholder; read it from the
- * session once auth exists (FE-04). The desktop "This Month" dropdown in D04 is left out on
+ * "Welcome back" shows the signed-in user's first name (WelcomeHeading).
+ *
+ * The desktop "This Month" dropdown in D04 is left out on
  * purpose: the API has no date range yet, so it would change nothing. Add it
  * when /dashboard/summary accepts a period.
  *
@@ -31,9 +33,7 @@ export default async function DashboardPage() {
   return (
     <main className="flex flex-1 flex-col gap-3 px-5 pt-4 pb-6 md:gap-5 md:px-8 md:pt-6 md:pb-8">
       <div className="flex flex-col gap-1 md:gap-1.5">
-        <h1 className="text-[22px] font-bold tracking-[-0.44px] text-brand md:text-[30px] md:tracking-[-0.6px]">
-          Welcome back, Chaiyapat
-        </h1>
+        <WelcomeHeading />
         <p className="text-[13px] tracking-[-0.26px] text-muted md:text-[15px] md:tracking-[-0.3px]">
           Here&apos;s what&apos;s happening with your warranties.
         </p>
