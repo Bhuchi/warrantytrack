@@ -95,3 +95,28 @@ export interface CreateAssetRequest {
   assigned_to_user_id?: string | null;
   warranty: WarrantyInput;
 }
+
+/**
+ * PATCH /assets/{id}. Any subset of the POST fields: a field left out stays
+ * as it is, a field sent as null is cleared. `warranty` replaces the whole
+ * warranty and the backend works out the new end date.
+ *
+ * Not accepted: assigned_to_user_id (POST /assets/{id}/assign) and
+ * document_ids. Required fields cannot be cleared; the backend answers 422.
+ */
+export type UpdateAssetRequest = Partial<
+  Pick<
+    CreateAssetRequest,
+    | "name"
+    | "serial_number"
+    | "purchase_date"
+    | "price"
+    | "invoice_number"
+    | "category_name"
+    | "vendor_name"
+    | "location_id"
+    | "location_name"
+    | "storage_note"
+    | "warranty"
+  >
+>;
