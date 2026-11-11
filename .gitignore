@@ -54,3 +54,6 @@ terraform.tfvars
 *.auto.tfvars
 !terraform.tfvars.example
 !*.tfvars.example
+
+# Robot Framework test output
+tests/robot/results/

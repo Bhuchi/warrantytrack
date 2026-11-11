@@ -41,7 +41,6 @@ from app.models.catalog import Category, Vendor
 REQUIRED_ON_CREATE = [
     "name",
     "serial_number",
-    "condition",
     "purchase_date",
     "price",
     "invoice_number",
@@ -53,7 +52,6 @@ REQUIRED_ON_CREATE = [
 REQUIRED_ON_UPDATE = [
     "name",
     "serial_number",
-    "condition",
     "purchase_date",
     "price",
     "invoice_number",
@@ -97,6 +95,22 @@ def test_a_complete_submission_is_accepted(api: TestClient) -> None:
     assert created["vendor"]["name"] == "Power Buy"
     assert created["invoice_number"] == "INV-2025-001"
     assert created["warranty"]["provider"] == "Dell"
+
+
+def test_condition_is_optional(api: TestClient) -> None:
+    """Issue #34: the final -118 text no longer asks for it.
+
+    Removing "condition" from REQUIRED_ON_CREATE only stops checking it; this
+    is what fails if someone makes it required again.
+    """
+    payload = body()
+    del payload["condition"]
+
+    response = api.post("/assets", json=payload)
+
+    assert response.status_code == 201
+    detail = api.get(f"/assets/{response.json()['id']}").json()
+    assert detail["condition"] is None
 
 
 @pytest.mark.parametrize("field", REQUIRED_ON_CREATE)
@@ -248,7 +262,7 @@ def test_a_rejected_patch_changes_nothing(
 
 
 @pytest.mark.parametrize(
-    "field", ["storage_note", "department_id", "location_id", "image_key"]
+    "field", ["condition", "storage_note", "department_id", "location_id", "image_key"]
 )
 def test_patch_can_still_clear_an_optional_field(
     api: TestClient, field: str

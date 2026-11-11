@@ -13,8 +13,8 @@ import {
  * pages). Kept apart from workspaces.ts because `cookies()` only works on the
  * server, and workspaces.ts is also used in the browser.
  *
- * An organization created on /workspace (CLOUDAPPG5-132) replaces the
- * placeholder's name and initials.
+ * A selected workspace name from /workspace replaces the placeholder's
+ * label and initials until FE-05 loads the whole server-side profile.
  *
  * TODO (FE-05, CLOUDAPPG5-123): return the real workspace from GET /me.
  */
@@ -24,7 +24,7 @@ export async function getCurrentWorkspace() {
   const placeholder = WORKSPACE_PLACEHOLDERS[kind];
 
   const createdName = cookieStore.get(WORKSPACE_NAME_COOKIE)?.value;
-  if (kind === "organization" && createdName) {
+  if (createdName) {
     const name = decodeURIComponent(createdName);
     return {
       kind,

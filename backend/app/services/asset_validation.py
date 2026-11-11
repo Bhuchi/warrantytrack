@@ -77,10 +77,11 @@ class AssetValidationError(Exception):
 #:
 #: Until now `PATCH {"name": null}` set the column to NULL, the flush raised an
 #: IntegrityError and the caller got a 500 — neither clear nor per-field.
+#:
+#: `condition` is not here: it is optional since issue #34, so clearing it is fine.
 _REQUIRED_SCALARS = (
     "name",
     "serial_number",
-    "condition",
     "purchase_date",
     "price",
     "invoice_number",

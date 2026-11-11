@@ -126,8 +126,6 @@ export default function NavPanel({
           </button>
         </div>
 
-        {/* Switches workspace by going back to the selection screen. A dropdown
-            here can replace this once real workspaces come from GET /me. */}
         <Link
           href="/workspace"
           onClick={onClose}

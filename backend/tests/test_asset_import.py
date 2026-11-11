@@ -142,7 +142,6 @@ def test_the_warranty_columns_become_a_warranty(api: TestClient) -> None:
     [
         "name",
         "serial_number",
-        "condition",
         "purchase_date",
         "price",
         "invoice_number",
@@ -160,6 +159,21 @@ def test_a_missing_required_value_names_its_column(
     assert any(
         error_row == 2 and field == column for error_row, field, _ in errors_for(response)
     )
+
+
+def test_a_blank_condition_is_accepted(api: TestClient) -> None:
+    """Condition is optional since issue #34, so an empty cell is not an error."""
+    response = post(api, csv_bytes([row(condition="")]))
+
+    assert response.json() == {"total_rows": 1, "valid": 1, "errors": []}
+
+
+def test_a_misspelled_condition_is_still_rejected(api: TestClient) -> None:
+    """Optional is not "anything goes": a value must still be a real condition."""
+    response = post(api, csv_bytes([row(condition="gud")]))
+
+    assert response.json()["valid"] == 0
+    assert any(field == "condition" for _, field, _ in errors_for(response))
 
 
 @pytest.mark.parametrize("value", ["   ", "\t"])
@@ -312,7 +326,9 @@ def test_a_missing_required_column_is_a_file_level_error(api: TestClient) -> Non
 
 def test_an_optional_column_may_be_left_out_entirely(api: TestClient) -> None:
     """A user who tracks no departments should not need an empty column."""
-    header = [name for name in HEADER if name not in {"department", "location"}]
+    header = [
+        name for name in HEADER if name not in {"department", "location", "condition"}
+    ]
 
     assert post(api, csv_bytes([row()], header=header)).json()["valid"] == 1
 

@@ -214,7 +214,8 @@ def test_a_warranty_provider_is_required(api: TestClient) -> None:
 
 
 @pytest.mark.parametrize(
-    "missing", ["name", "serial_number", "condition", "purchase_date", "price"]
+    # Not condition: optional since issue #34 (test_condition_is_optional).
+    "missing", ["name", "serial_number", "purchase_date", "price"]
 )
 def test_required_fields_are_rejected_when_missing(
     api: TestClient, missing: str

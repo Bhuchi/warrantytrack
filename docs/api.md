@@ -65,6 +65,14 @@ target group.
 { "status": "ok", "service": "warrantytrack-api", "version": "0.1.0" }
 ```
 
+### Auth and workspace foundation
+
+`GET /me` returns the signed-in user and every current workspace membership.
+It creates the user's personal workspace on first successful Cognito sign-in.
+`POST /workspaces` creates an organization and makes the caller its owner.
+Both use the request and response shapes below. Role checks on scoped routes
+read `memberships` on every request. The member invite endpoints remain planned.
+
 ---
 
 ## Planned
@@ -96,7 +104,7 @@ inline:
   "errors": {
     "serial_number": "required",
     "purchase_date": "must be a valid date (YYYY-MM-DD)",
-    "condition": "required"
+    "price": "required"
   }
 }
 ```
@@ -105,8 +113,8 @@ inline:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/me` | Current user + every workspace they belong to |
-| `POST` | `/workspaces` | Create an organization workspace |
+| `GET` | `/me` | **Implemented** — current user + every workspace they belong to |
+| `POST` | `/workspaces` | **Implemented** — create an organization workspace |
 | `GET` | `/workspaces/{id}/members` | List members (admin only) |
 | `POST` | `/workspaces/{id}/members` | Invite a member (admin only) |
 
@@ -187,9 +195,9 @@ tenants, `assigned_to_user_id` separates people inside one.
 
 ```jsonc
 // POST /assets   (request)
-// required: name, serial_number, condition, purchase_date, price, vendor,
-//           category, invoice_number, warranty (with a provider)
-// optional: location (site), department_id, storage_note, *_image_key,
+// required: name, serial_number, purchase_date, price, vendor, category,
+//           invoice_number, warranty (with a provider)
+// optional: condition, location (site), department_id, storage_note, *_image_key,
 //           document_ids, assigned_to_user_id
 {
   "name": "Dell Latitude 5540",
@@ -368,10 +376,10 @@ the same wording.
 `row` counts the header as row 1, so it is the line number in the user's own
 file. `field` is the **column name**.
 
-**Columns** — required: `name`, `serial_number`, `condition`, `purchase_date`,
+**Columns** — required: `name`, `serial_number`, `purchase_date`,
 `price`, `invoice_number`, `vendor`, `category`, `warranty_provider`,
 `warranty_start_date`, `warranty_duration_months`. Optional, and may be left
-out entirely: `currency`, `department`, `location`, `storage_note`.
+out entirely: `condition`, `currency`, `department`, `location`, `storage_note`.
 
 Vendor, category and location are given **by name**; a name not yet in the
 workspace's list is added to it, exactly as `POST /assets` does.

@@ -1,4 +1,6 @@
 import type { MembershipRole, Workspace } from "@/types";
+import { api } from "@/lib/api";
+import { COGNITO_CLIENT_ID } from "@/lib/config";
 
 /** POST /workspaces response: the new workspace and your role in it (always owner). */
 export type CreatedWorkspace = Workspace & { role: MembershipRole };
@@ -16,6 +18,9 @@ export type CreatedWorkspace = Workspace & { role: MembershipRole };
  */
 export async function createWorkspace(name: string): Promise<CreatedWorkspace> {
   const request = { name, type: "organization" as const };
+  if (COGNITO_CLIENT_ID) {
+    return api.post<CreatedWorkspace>("/workspaces", request);
+  }
 
   if (process.env.NODE_ENV !== "production") {
     console.info("[mock] POST /workspaces", request);

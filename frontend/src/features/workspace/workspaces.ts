@@ -8,6 +8,7 @@ export const WORKSPACE_COOKIE = "workspace";
 
 /** Name of the cookie holding an organization created on /workspace (CLOUDAPPG5-132). */
 export const WORKSPACE_NAME_COOKIE = "workspace_name";
+export const WORKSPACE_ID_COOKIE = "workspace_id";
 
 /** Reads the cookie's value; anything unexpected (or no cookie) means organization, as before. */
 export function toWorkspaceKind(value: string | undefined): WorkspaceKind {
@@ -20,8 +21,8 @@ export function toWorkspaceKind(value: string | undefined): WorkspaceKind {
  * Values from Figma M10: personal 3455:536, organization 3392:2. Avatar
  * initials are the first letters of the first and last name (CA), not Figma's EM.
  *
- * TODO (FE-05, CLOUDAPPG5-123): replace with the real workspace from
- * GET /me once /workspaces exists (CLOUDAPPG5-92).
+ * FE-05 will replace the remaining signed-in page placeholders with the
+ * current workspace from GET /me.
  */
 export const WORKSPACE_PLACEHOLDERS: Record<
   WorkspaceKind,
@@ -53,16 +54,21 @@ export function initialsOf(name: string): string {
  * Remembers the chosen workspace for a year. Runs in the browser (it uses
  * `document`), so call it from a click handler, not from a server component.
  *
- * `name` is only passed for an organization just created on /workspace. Any
- * other choice clears it, so the placeholder organization shows again.
- *
- * TODO (CLOUDAPPG5-132): drop the name cookie once GET /me returns real
- * workspaces.
+ * `name` gives server-rendered navigation the selected workspace's label.
+ * `id` is sent to the API on scoped requests; the backend checks membership.
  */
-export function rememberWorkspace(kind: WorkspaceKind, name?: string): void {
+export function rememberWorkspace(kind: WorkspaceKind, name?: string, id?: string): void {
   const options = "path=/; max-age=31536000; samesite=lax";
   document.cookie = `${WORKSPACE_COOKIE}=${kind}; ${options}`;
   document.cookie = name
     ? `${WORKSPACE_NAME_COOKIE}=${encodeURIComponent(name)}; ${options}`
     : `${WORKSPACE_NAME_COOKIE}=; path=/; max-age=0`;
+  document.cookie = id
+    ? `${WORKSPACE_ID_COOKIE}=${encodeURIComponent(id)}; ${options}`
+    : `${WORKSPACE_ID_COOKIE}=; path=/; max-age=0`;
+}
+
+export function selectedWorkspaceId(): string | null {
+  return document.cookie.split("; ").find((value) => value.startsWith(`${WORKSPACE_ID_COOKIE}=`))
+    ?.slice(WORKSPACE_ID_COOKIE.length + 1) ?? null;
 }

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api.routes import assets, catalog, documents, health, notifications
+from app.api.routes import assets, catalog, documents, health, notifications, workspaces
 from app.core.config import settings
 
 app = FastAPI(
@@ -23,6 +23,7 @@ app.add_middleware(
 # each path is defined in exactly one place; the route files use "" for the
 # collection root.
 app.include_router(health.router)
+app.include_router(workspaces.router)
 app.include_router(notifications.router, prefix="/notifications")
 # The four catalog lists the asset pickers are built from. One router each, so
 # every path is still defined here and nowhere else.

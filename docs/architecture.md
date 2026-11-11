@@ -53,7 +53,9 @@ So, on every request:
 
 1. Verify the JWT signature against Cognito's JWKS.
 2. Take `sub` from the token — **and nothing else**.
-3. Look up `users` by `cognito_sub`; create the row on first sign-in.
+3. Look up `users` by `cognito_sub`; on first sign-in, fetch email/name from
+   Cognito AdminGetUser using that verified subject, then create the user and
+   personal workspace.
 4. Look up `memberships` for the requested `X-Workspace-Id`.
 5. No membership → **404**. Not 403 — see `docs/api.md`.
 

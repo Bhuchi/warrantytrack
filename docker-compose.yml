@@ -42,6 +42,11 @@ services:
       # This deliberately overrides whatever is in backend/.env, which is
       # written for running the API directly on your machine.
       DATABASE_URL: postgresql://warranty:warranty@db:5432/warrantytrack
+      # Every request acts as the seeded dev user, so the app and Postman work
+      # with no Cognito account. Run `docker compose exec backend python -m
+      # scripts.seed_dev` once to create that user. To try real sign-in
+      # locally: `AUTH_BACKEND=cognito docker compose up`.
+      AUTH_BACKEND: ${AUTH_BACKEND:-dev}
     ports:
       - "8000:8000"
     volumes:
