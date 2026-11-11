@@ -112,6 +112,19 @@ resource "aws_iam_role_policy" "task" {
         Resource = "*"
       },
       {
+        # Claude on Bedrock reads receipts (OCR_BACKEND=bedrock). Resource "*"
+        # because a global inference profile fans out to foundation-model ARNs
+        # in several regions; tighten once the model ID is final.
+        Effect   = "Allow"
+        Action   = ["bedrock:InvokeModel"]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["cognito-idp:AdminGetUser"]
+        Resource = aws_cognito_user_pool.main.arn
+      },
+      {
         Effect   = "Allow"
         Action   = ["ses:SendEmail"]
         Resource = "*"

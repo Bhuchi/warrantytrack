@@ -1,12 +1,11 @@
-"""Insert a dev workspace/user + a few notifications so Leg B endpoints return
-data while auth is still stubbed.
+"""Insert sample workspace/user/notification rows for local development.
 
 Run against the running stack (idempotent — safe to run more than once):
 
     docker compose exec backend python -m scripts.seed_dev
 
-Uses the fixed IDs from app.api.deps, so the stubbed `get_current_*` sees
-exactly these rows.
+The fixed IDs are test/sample data. Real requests still need a Cognito token
+whose subject matches a local user, so these rows are not signed-in by default.
 """
 
 from __future__ import annotations

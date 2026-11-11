@@ -121,11 +121,9 @@ class AssetCreate(BaseModel):
     generated for valid committed assets", so the optional-warranty UI is what
     has to change, not this.
 
-    `condition` is required too, which that document postpones — it shipped
-    first and the frontend collects it.
-
-    Optional: department, location (the site), the storage note and photos,
-    and attached documents.
+    Optional: condition, department, location (the site), the storage note and
+    photos, and attached documents. Condition was required until issue #34:
+    the final -118 text no longer asks for it and the document postpones it.
 
     **Category, vendor and location accept either an id or a name.** The form
     and OCR produce "Power Buy", not a UUID, and there is no picker in the UI
@@ -136,7 +134,7 @@ class AssetCreate(BaseModel):
 
     name: AssetName
     serial_number: SerialNumber
-    condition: AssetCondition
+    condition: AssetCondition | None = None
     purchase_date: date
     price: Price
     currency: str = Field(default="THB", min_length=3, max_length=3)
@@ -334,7 +332,8 @@ class AssetDetail(BaseModel):
     id: uuid.UUID
     name: str
     serial_number: str
-    condition: AssetCondition
+    # None when the asset was saved without one.
+    condition: AssetCondition | None
     purchase_date: date
     price: Decimal | None
     currency: str

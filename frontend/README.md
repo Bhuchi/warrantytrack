@@ -72,6 +72,19 @@ those with mock data rather than waiting for the endpoint to exist.
 Shared types live in [`src/types/index.ts`](src/types/index.ts) and must stay
 in sync with the backend's Pydantic schemas. Change both in the same PR.
 
+### Cognito and workspace handoff
+
+The sign-in feature (FE-04) must call `setAuthTokenProvider` in
+`src/lib/api.ts` with a provider for the current **Cognito ID token** before
+loading `/workspace`. When `NEXT_PUBLIC_COGNITO_CLIENT_ID` is set, that page
+loads `GET /me` and lists the real memberships. Choosing one stores its UUID
+in the `workspace_id` cookie; `api.ts` sends it as `X-Workspace-Id` on later
+browser requests. The backend checks membership on every scoped request.
+
+The signed-in layout still uses FE-05 placeholders for other profile details;
+FE-05 should read the selected UUID and `GET /me` when replacing them. With no
+Cognito client configured, the existing local design demo remains available.
+
 ## Mapping to Figma / Jira
 
 **Design file:** [WarrantyTrack on Figma](https://www.figma.com/design/Rf4eIrfmvy9QUwTp5hlKvL/WarrantyTrack)

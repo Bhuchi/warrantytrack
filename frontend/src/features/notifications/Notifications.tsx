@@ -2,157 +2,90 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-type NotificationCategory = "Warranties" | "Assets" | "System";
+import type { NotificationItem, NotificationType } from "@/types/notifications";
+
+import { getNotifications, markAllNotificationsRead } from "./notificationsApi";
+
+type NotificationCategory = "Warranties" | "Assets";
 type NotificationFilter = "All" | NotificationCategory;
-type NotificationGroup = "TODAY" | "YESTERDAY";
+type NotificationGroup = "TODAY" | "YESTERDAY" | "EARLIER";
 
-interface NotificationItem {
-  id: string;
-  title: string;
-  message: string;
-  time: string;
-  group: NotificationGroup;
-  category: NotificationCategory;
-  icon: string;
-  iconBackground: string;
-  isRead: boolean;
-}
-
-const initialNotifications: NotificationItem[] = [
-  {
-    id: "warranty-expiring-monitor",
-    title: "Warranty Expiring Soon",
-    message: 'Dell Monitor 24" expires in 30 days.',
-    time: "10:00",
-    group: "TODAY",
+/** How each kind of notification looks. The backend only sends the `type`. */
+const TYPE_DISPLAY: Record<
+  NotificationType,
+  { heading: string; category: NotificationCategory; icon: string; iconBackground: string }
+> = {
+  warranty_expiring: {
+    heading: "Warranty Expiring Soon",
     category: "Warranties",
     icon: "/icons/notifications-expiring.svg",
     iconBackground: "bg-amber-100",
-    isRead: false,
   },
-  {
-    id: "warranty-expired-printer",
-    title: "Warranty Expired",
-    message: '"HP Color LaserJet" expired on 10 Jan 2026.',
-    time: "09:30",
-    group: "TODAY",
+  warranty_expired: {
+    heading: "Warranty Expired",
     category: "Warranties",
     icon: "/icons/notifications-expired.svg",
     iconBackground: "bg-red-100",
-    isRead: false,
   },
-  {
-    id: "ocr-invoice-complete",
-    title: "OCR Completed",
-    message: "Processing finished for Invoice_INV-2024-0519.pdf.",
-    time: "09:15",
-    group: "TODAY",
-    category: "System",
-    icon: "/icons/notifications-ocr.svg",
-    iconBackground: "bg-brand-subtle",
-    isRead: false,
-  },
-  {
-    id: "asset-saved-camera",
-    title: "Asset Saved",
-    message: '"Canon EOS R50" was added to your assets.',
-    time: "16:45",
-    group: "YESTERDAY",
+  asset_assigned: {
+    heading: "Asset Assigned",
     category: "Assets",
     icon: "/icons/notifications-saved.svg",
     iconBackground: "bg-green-100",
-    isRead: true,
   },
-  {
-    id: "new-login-location",
-    title: "New Login Location",
-    message: "IP address 172.64.3.5 (SG).",
-    time: "14:10",
-    group: "YESTERDAY",
-    category: "System",
-    icon: "/icons/notifications-login.svg",
-    iconBackground: "bg-brand-subtle",
-    isRead: true,
-  },
-];
+};
 
-const filters: NotificationFilter[] = ["All", "Warranties", "Assets", "System"];
-const groups: NotificationGroup[] = ["TODAY", "YESTERDAY"];
+const filters: NotificationFilter[] = ["All", "Warranties", "Assets"];
+const groups: NotificationGroup[] = ["TODAY", "YESTERDAY", "EARLIER"];
 
-function NotificationsHeader() {
-  return (
-    <header className="flex h-[60px] items-center justify-between border-b border-border bg-surface px-4 md:h-20 md:px-8 lg:px-12">
-      <div className="flex items-center gap-3">
-        <Link
-          href="/workspace"
-          aria-label="Go to workspace"
-          className="flex size-9 items-center justify-center rounded-lg"
-        >
-          <Image
-            src="/icons/notifications-menu.svg"
-            alt=""
-            width={22}
-            height={22}
-          />
-        </Link>
-        <Link href="/" className="flex items-center gap-3">
-          <Image
-            src="/icons/notifications-logo.svg"
-            alt=""
-            width={36}
-            height={36}
-          />
-          <span className="text-[17px] font-bold text-brand md:text-[22px]">
-            WarrantyTrack
-          </span>
-        </Link>
-      </div>
+/** Which heading a notification goes under, by the user's own calendar day. */
+function groupOf(iso: string): NotificationGroup {
+  const day = new Date(iso).toDateString();
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
 
-      <div className="flex items-center gap-2.5">
-        <Image
-          src="/icons/notifications-bell.svg"
-          alt="Notifications"
-          width={36}
-          height={36}
-        />
-        <span className="flex size-9 items-center justify-center rounded-full bg-brand-subtle text-xs font-bold text-brand">
-          CA
-        </span>
-      </div>
-    </header>
-  );
+  if (day === today.toDateString()) return "TODAY";
+  if (day === yesterday.toDateString()) return "YESTERDAY";
+  return "EARLIER";
 }
 
-function NotificationRow({
-  item,
-  onMarkRead,
-}: {
-  item: NotificationItem;
-  onMarkRead: (id: string) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onMarkRead(item.id)}
-      aria-label={`${item.title}. ${item.isRead ? "Read" : "Unread"}. ${item.message}`}
-      className="flex w-full items-start gap-3 py-3 text-left focus-visible:rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-    >
+/** "10:00" for today and yesterday, "3 Nov" for anything older. */
+function timeLabel(iso: string, group: NotificationGroup): string {
+  const options: Intl.DateTimeFormatOptions =
+    group === "EARLIER"
+      ? { day: "numeric", month: "short" }
+      : { hour: "2-digit", minute: "2-digit", hour12: false };
+  return new Intl.DateTimeFormat("en-GB", options).format(new Date(iso));
+}
+
+function NotificationRow({ item }: { item: NotificationItem }) {
+  const display = TYPE_DISPLAY[item.type];
+  const group = groupOf(item.created_at);
+  const className =
+    "flex w-full items-start gap-3 py-3 text-left focus-visible:rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
+
+  const content = (
+    <>
       <span
-        className={`flex size-[38px] shrink-0 items-center justify-center rounded-[10px] ${item.iconBackground}`}
+        className={`flex size-[38px] shrink-0 items-center justify-center rounded-[10px] ${display.iconBackground}`}
       >
-        <Image src={item.icon} alt="" width={18} height={18} />
+        <Image src={display.icon} alt="" width={18} height={18} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex min-w-0 items-center gap-2">
           <span className="min-w-0 flex-1 text-[13px] font-semibold tracking-[-0.26px] text-foreground">
-            {item.title}
+            {display.heading}
           </span>
-          <time className="shrink-0 text-[10px] tracking-[-0.2px] text-muted-light">
-            {item.time}
+          <time
+            dateTime={item.created_at}
+            className="shrink-0 text-[10px] tracking-[-0.2px] text-muted-light"
+          >
+            {timeLabel(item.created_at, group)}
           </time>
-          {!item.isRead ? (
+          {!item.read ? (
             <Image
               src="/icons/notifications-unread.svg"
               alt="Unread"
@@ -163,19 +96,29 @@ function NotificationRow({
           ) : null}
         </span>
         <span className="text-[12px] leading-[18px] tracking-[-0.24px] text-muted">
-          {item.message}
+          {item.title}
         </span>
       </span>
-    </button>
+    </>
+  );
+
+  // The asset is gone if asset_id is null, so there is nothing to open.
+  if (item.asset_id === null) {
+    return <div className={className}>{content}</div>;
+  }
+  return (
+    <Link href={`/assets/${item.asset_id}`} className={className}>
+      {content}
+    </Link>
   );
 }
 
 function NotificationList({
   items,
-  onMarkRead,
+  emptyMessage,
 }: {
   items: NotificationItem[];
-  onMarkRead: (id: string) => void;
+  emptyMessage: string;
 }) {
   return (
     <section
@@ -183,7 +126,7 @@ function NotificationList({
       className="flex w-full flex-col rounded-[14px] border border-border bg-surface px-4 pb-3 pt-1"
     >
       {groups.map((group) => {
-        const groupItems = items.filter((item) => item.group === group);
+        const groupItems = items.filter((item) => groupOf(item.created_at) === group);
         if (groupItems.length === 0) return null;
 
         return (
@@ -193,7 +136,7 @@ function NotificationList({
             </h2>
             {groupItems.map((item, index) => (
               <div key={item.id}>
-                <NotificationRow item={item} onMarkRead={onMarkRead} />
+                <NotificationRow item={item} />
                 {index < groupItems.length - 1 ? (
                   <div className="h-px w-full bg-border" />
                 ) : null}
@@ -203,43 +146,73 @@ function NotificationList({
         );
       })}
       {items.length === 0 ? (
-        <p className="py-10 text-center text-sm text-muted">
-          No notifications in this category.
-        </p>
+        <p className="py-10 text-center text-sm text-muted">{emptyMessage}</p>
       ) : null}
     </section>
   );
 }
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState(initialNotifications);
+  // null = still loading. The list comes from GET /notifications.
+  const [notifications, setNotifications] = useState<NotificationItem[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [marking, setMarking] = useState(false);
   const [selectedFilter, setSelectedFilter] =
     useState<NotificationFilter>("All");
   const [statusMessage, setStatusMessage] = useState("");
+  const [markError, setMarkError] = useState<string | null>(null);
 
-  const unreadCount = notifications.filter((item) => !item.isRead).length;
+  useEffect(() => {
+    let ignore = false;
+    getNotifications()
+      .then((response) => {
+        if (!ignore) setNotifications(response.items);
+      })
+      .catch(() => {
+        if (!ignore) setFailed(true);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const items = useMemo(() => notifications ?? [], [notifications]);
+  // Counted from the list, so marking items read updates it with no extra state.
+  const unreadCount = items.filter((item) => !item.read).length;
   const filteredNotifications = useMemo(
     () =>
-      notifications.filter(
-        (item) => selectedFilter === "All" || item.category === selectedFilter,
+      items.filter(
+        (item) =>
+          selectedFilter === "All" ||
+          TYPE_DISPLAY[item.type].category === selectedFilter,
       ),
-    [notifications, selectedFilter],
+    [items, selectedFilter],
   );
 
-  function markRead(id: string) {
-    setNotifications((current) =>
-      current.map((item) => (item.id === id ? { ...item, isRead: true } : item)),
-    );
+  async function markAllRead() {
+    setMarking(true);
+    setMarkError(null);
+    try {
+      await markAllNotificationsRead();
+      // Only after the server agrees: a 204 has no body, so update our own copy.
+      setNotifications((current) =>
+        current ? current.map((item) => ({ ...item, read: true })) : current,
+      );
+      setStatusMessage("All notifications marked as read.");
+    } catch {
+      setMarkError("Couldn't mark notifications as read. Please try again.");
+    } finally {
+      setMarking(false);
+    }
   }
 
-  function markAllRead() {
-    setNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
-    setStatusMessage("All notifications marked as read.");
-  }
+  let emptyMessage = "No notifications in this category.";
+  if (failed) emptyMessage = "Couldn't load notifications. Please refresh the page.";
+  else if (notifications === null) emptyMessage = "Loading notifications…";
+  else if (items.length === 0) emptyMessage = "No notifications yet.";
 
   return (
     <div className="min-h-screen bg-canvas">
-      <NotificationsHeader />
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-5 pb-8 pt-4 md:gap-5 md:px-8 md:pt-8 lg:px-12">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-1">
@@ -247,13 +220,13 @@ export default function Notifications() {
               Notifications
             </h1>
             <p className="text-xs tracking-[-0.24px] text-muted">
-              {unreadCount} unread
+              {notifications === null ? "…" : `${unreadCount} unread`}
             </p>
           </div>
           <button
             type="button"
             onClick={markAllRead}
-            disabled={unreadCount === 0}
+            disabled={unreadCount === 0 || marking}
             className="flex shrink-0 items-center gap-[7px] rounded-md py-2 text-[13px] font-semibold tracking-[-0.26px] text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-default disabled:opacity-50"
           >
             <Image
@@ -262,9 +235,18 @@ export default function Notifications() {
               width={15}
               height={15}
             />
-            Mark all read
+            {marking ? "Marking…" : "Mark all read"}
           </button>
         </div>
+
+        {markError ? (
+          <p
+            role="alert"
+            className="rounded-[10px] bg-red-50 px-4 py-3 text-[13px] text-red-700"
+          >
+            {markError}
+          </p>
+        ) : null}
 
         <div
           role="group"
@@ -286,7 +268,7 @@ export default function Notifications() {
                   <span
                     className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${selected ? "bg-white/20 text-white" : "bg-canvas text-muted"}`}
                   >
-                    {notifications.length}
+                    {items.length}
                   </span>
                 ) : null}
               </button>
@@ -294,10 +276,10 @@ export default function Notifications() {
           })}
         </div>
 
-        <NotificationList items={filteredNotifications} onMarkRead={markRead} />
+        <NotificationList items={filteredNotifications} emptyMessage={emptyMessage} />
 
-        <button
-          type="button"
+        <Link
+          href="/assets/new"
           className="flex h-[54px] w-full items-center justify-center gap-2.5 rounded-[10px] bg-brand text-base font-bold tracking-[-0.32px] text-brand-foreground md:w-fit md:min-w-56 md:px-8"
         >
           <Image
@@ -307,7 +289,7 @@ export default function Notifications() {
             height={17}
           />
           Add Asset
-        </button>
+        </Link>
         <p aria-live="polite" className="sr-only">
           {statusMessage}
         </p>

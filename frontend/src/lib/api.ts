@@ -44,7 +44,7 @@ type TokenProvider = () => string | null | Promise<string | null>;
 let tokenProvider: TokenProvider = () => null;
 
 /**
- * Register how the client obtains the bearer token (Cognito id/access token).
+ * Register how the client obtains the Cognito ID token.
  * Call this once from the auth feature so `lib/api` stays auth-agnostic.
  */
 export function setAuthTokenProvider(provider: TokenProvider): void {
@@ -96,10 +96,13 @@ async function request<T>(
 
   const isFormData =
     typeof FormData !== "undefined" && body instanceof FormData;
+  // A File/Blob is sent as-is (e.g. the dev receipt upload); the caller sets
+  // its Content-Type. Only plain objects are JSON-encoded.
+  const isBlob = typeof Blob !== "undefined" && body instanceof Blob;
 
   const requestHeaders = new Headers(headers);
   requestHeaders.set("Accept", "application/json");
-  if (body !== undefined && !isFormData && !requestHeaders.has("Content-Type")) {
+  if (body !== undefined && !isFormData && !isBlob && !requestHeaders.has("Content-Type")) {
     // FormData must set its own Content-Type so the multipart boundary is correct.
     requestHeaders.set("Content-Type", "application/json");
   }
@@ -108,13 +111,24 @@ async function request<T>(
   if (token && !requestHeaders.has("Authorization")) {
     requestHeaders.set("Authorization", `Bearer ${token}`);
   }
+  if (!requestHeaders.has("X-Workspace-Id") && typeof document !== "undefined") {
+    const workspaceId = document.cookie
+      .split("; ")
+      .find((cookie) => cookie.startsWith("workspace_id="))
+      ?.slice("workspace_id=".length);
+    if (workspaceId) requestHeaders.set("X-Workspace-Id", workspaceId);
+  }
 
   const response = await fetch(buildUrl(path, query), {
     ...init,
     method,
     headers: requestHeaders,
     body:
-      body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
+      body === undefined
+        ? undefined
+        : isFormData || isBlob
+          ? (body as BodyInit)
+          : JSON.stringify(body),
   });
 
   if (!response.ok) {

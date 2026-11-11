@@ -23,11 +23,13 @@ const STATUS_TABS: { value: StatusFilter; label: string }[] = [
   { value: "expired", label: "Expired" },
 ];
 
-/** Desktop dropdown (D05 3354:116): the tabs plus "No warranty". */
+/**
+ * Desktop dropdown (D05 3354:116): the same choices as the tabs. No "No
+ * warranty": every asset must have a warranty now (issue #34).
+ */
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All statuses" },
   ...STATUS_TABS.slice(1),
-  { value: "unknown", label: "No warranty" },
 ];
 
 /** Figma has five device icons; other categories fall back to the monitor, as the Accessory row does in D05. */
@@ -64,8 +66,11 @@ export default function AssetsList() {
   const [page, setPage] = useState(1);
   // The last answer, tagged with the filters it was for.
   const [loaded, setLoaded] = useState<{ key: string; data: AssetListResponse } | null>(null);
+  // The filters whose request failed, e.g. the API was not running.
+  const [failedKey, setFailedKey] = useState<string | null>(null);
 
   const key = `${search}|${status}|${page}`;
+  const failed = failedKey === key;
   const loading = loaded?.key !== key;
   const data = loaded?.data ?? null;
 
@@ -77,9 +82,13 @@ export default function AssetsList() {
       q: search.trim() || undefined,
       status: status === "all" ? undefined : status,
       page,
-    }).then((result) => {
-      if (!ignore) setLoaded({ key, data: result });
-    });
+    })
+      .then((result) => {
+        if (!ignore) setLoaded({ key, data: result });
+      })
+      .catch(() => {
+        if (!ignore) setFailedKey(key);
+      });
     return () => {
       ignore = true;
     };
@@ -155,7 +164,12 @@ export default function AssetsList() {
         </label>
       </div>
 
-      {!data ? (
+      {failed ? (
+        <Card className="flex flex-col items-center gap-1 px-4 py-10 text-center">
+          <p className="text-[14px] font-semibold text-foreground">Couldn&apos;t load assets.</p>
+          <p className="text-[13px] text-muted">Check your connection, then refresh the page.</p>
+        </Card>
+      ) : !data ? (
         <p className="py-10 text-center text-[13px] text-muted">Loading assets…</p>
       ) : data.items.length === 0 ? (
         <Card className="flex flex-col items-center gap-3 px-4 py-10 text-center">

@@ -15,7 +15,7 @@ docker compose exec backend alembic upgrade head
 # Run the tests
 docker compose exec backend pytest
 
-# Dev data: a workspace, a user and a few notifications
+# Optional sample rows (not a login bypass)
 docker compose exec backend python -m scripts.seed_dev
 
 # The daily warranty-expiry scan, by hand (--today to try another date)
@@ -89,6 +89,16 @@ Every tenant-scoped table carries `workspace_id NOT NULL`. Every request runs
 inside one workspace, and the caller's role comes from the `memberships`
 table — **never** from the Cognito token. A record in a workspace the caller
 doesn't belong to returns **404, not 403**.
+
+Set `COGNITO_USER_POOL_ID` and `COGNITO_CLIENT_ID` in `backend/.env`. Send a
+Cognito **ID token** as `Authorization: Bearer <token>` and select a workspace
+with `X-Workspace-Id: <uuid>` on scoped requests. `GET /me` needs only the ID
+token; it creates the user and personal workspace on first sign-in and lists
+every current membership. `POST /workspaces` creates an organization owned by
+that user. The backend reads the first profile from Cognito AdminGetUser, so
+the task role needs `cognito-idp:AdminGetUser` on this user pool.
+In Learner Lab mode (`create_iam_roles = false`), confirm the supplied LabRole
+grants that action; Terraform cannot change its externally managed policy.
 
 Read [docs/architecture.md](../docs/architecture.md) before writing your first
 endpoint. It explains why.

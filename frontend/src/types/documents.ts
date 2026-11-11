@@ -41,5 +41,5 @@ export interface OcrDocument {
   error: string | null;
 }
 
-/** Physical condition, required when saving an asset (POST /assets, CLOUDAPPG5-118). */
+/** Physical condition. Optional when saving an asset since issue #34. */
 export type AssetCondition = "new" | "good" | "fair" | "damaged";

@@ -41,14 +41,27 @@ class Settings(BaseSettings):
     # matters while the project budget is 4,000 THB for the semester. Flip each
     # to the real backend once the account exists:
     #
-    #   STORAGE_BACKEND=s3  OCR_BACKEND=textract  EMAIL_BACKEND=ses
+    #   STORAGE_BACKEND=s3  OCR_BACKEND=textract|bedrock  EMAIL_BACKEND=ses
     #
     # `local` storage keeps uploads on the API container's disk, `fake` OCR
     # returns canned fields, and `log` email writes the message to the log.
     # None of the three is allowed in production — see the check below.
     storage_backend: Literal["s3", "local"] = "local"
-    ocr_backend: Literal["textract", "fake"] = "fake"
+    ocr_backend: Literal["textract", "bedrock", "fake"] = "fake"
+
+    # Claude on Amazon Bedrock reads the receipt image (OCR_BACKEND=bedrock).
+    # Copy the model ID (or inference profile ID) from the Bedrock console; it
+    # must be enabled for the account. Region defaults to AWS_REGION.
+    bedrock_model_id: str | None = None
+    bedrock_region: str | None = None
+
     email_backend: Literal["ses", "log"] = "log"
+
+    # `dev` skips Cognito and treats every request as the seeded dev user
+    # (scripts/seed_dev.py) in the dev workspace, so the app and Postman work
+    # locally with no AWS account. Default stays `cognito`: the bypass is only
+    # on where docker-compose.yml turns it on, and never in production.
+    auth_backend: Literal["cognito", "dev"] = "cognito"
 
     # How long a presigned S3 URL stays valid. Short on purpose: the bucket is
     # private and a leaked URL is a leaked object until it expires.
@@ -64,8 +77,9 @@ class Settings(BaseSettings):
         Each of them is a quiet wrong answer rather than an error: `local`
         storage would accept uploads onto a container's disk and lose them on
         the next deploy, `fake` OCR would invent an invoice, and `log` email
-        would silently not warn anyone that their warranty is expiring. Failing
-        at startup is the only safe behaviour.
+        would silently not warn anyone that their warranty is expiring, and
+        `dev` auth would let anyone act as the dev user. Failing at startup is
+        the only safe behaviour.
         """
         if self.environment != "production":
             return
@@ -74,13 +88,14 @@ class Settings(BaseSettings):
             "STORAGE_BACKEND": self.storage_backend == "local",
             "OCR_BACKEND": self.ocr_backend == "fake",
             "EMAIL_BACKEND": self.email_backend == "log",
+            "AUTH_BACKEND": self.auth_backend == "dev",
         }
         active = [name for name, is_development in development_backends.items() if is_development]
         if active:
             raise RuntimeError(
                 "Development backends are active in production: "
                 + ", ".join(sorted(active))
-                + ". Set them to s3 / textract / ses."
+                + ". Set them to s3 / textract or bedrock / ses / cognito."
             )
         if not self.s3_bucket_name:
             raise RuntimeError("S3_BUCKET_NAME is required in production.")

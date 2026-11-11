@@ -126,9 +126,11 @@ export default function NavPanel({
           </button>
         </div>
 
-        <button
-          type="button"
-          className="flex w-full items-center gap-2.5 rounded-[10px] border border-border bg-canvas px-3 py-[11px] text-left"
+        <Link
+          href="/workspace"
+          onClick={onClose}
+          aria-label={`${workspace.name}, ${workspace.kind}. Switch workspace`}
+          className="flex w-full items-center gap-2.5 rounded-[10px] border border-border bg-canvas px-3 py-[11px] text-left hover:border-brand"
         >
           <span className="flex size-[30px] shrink-0 items-center justify-center rounded-lg bg-brand text-[11px] font-bold text-brand-foreground">
             {workspace.initials}
@@ -142,7 +144,7 @@ export default function NavPanel({
             </span>
           </span>
           <ChevronDownIcon className="size-4 shrink-0 text-muted-light" />
-        </button>
+        </Link>
 
         <nav className="flex flex-col gap-1.5">
           <p className="text-[10px] font-bold tracking-[0.6px] text-muted-light">
