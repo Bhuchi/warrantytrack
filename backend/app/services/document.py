@@ -29,7 +29,7 @@ from app.core.config import settings
 from app.models.document import Document, DocumentKind, DocumentStatus
 from app.schemas.asset import AssetCreate
 from app.services import asset as asset_service
-from app.services import ocr, storage
+from app.services import ocr, storage, warranty_lookup
 from app.services.asset import DuplicateSerialNumber, UnknownDocument
 from app.services.asset_validation import AssetValidationError
 
@@ -162,6 +162,9 @@ def submit(db: Session, document: Document) -> Document:
         document.error = str(exc)
         db.flush()
         return document
+
+    # Receipts that print no warranty length get a web lookup. It never raises.
+    extracted = warranty_lookup.fill_missing_warranties(extracted)
 
     document.extracted_json = extracted
     document.status = DocumentStatus.extracted

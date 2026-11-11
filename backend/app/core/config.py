@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     bedrock_model_id: str | None = None
     bedrock_region: str | None = None
 
+    # When a receipt prints no warranty length, look the product up on the web
+    # and let Bedrock read the results (services/warranty_lookup.py). Off by
+    # default: it needs a Tavily API key and Bedrock, and costs a search per
+    # item. Only the product and shop name are sent to the search provider.
+    warranty_search_provider: Literal["none", "tavily"] = "none"
+    tavily_api_key: str | None = None
+
     email_backend: Literal["ses", "log"] = "log"
 
     # `dev` skips Cognito and treats every request as the seeded dev user

@@ -530,7 +530,8 @@ for an asset assigned to them. Anything else is `404`, never `403`.
     "line_items": [                    // one invoice can hold several assets
       { "name": "Dell Latitude 5540", "serial_number": "ABC123", "price": "32900.00",
         "warranty_months": 36,       // null when the receipt prints no warranty length
-        "category": "Laptop" }       // suggested; null when unsure
+        "category": "Laptop",        // suggested; null when unsure
+        "warranty_source": null }    // {url, evidence} when warranty_months was looked up on the web
     ]
   },
   "error": null

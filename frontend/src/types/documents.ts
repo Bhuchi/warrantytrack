@@ -17,6 +17,11 @@ export interface ExtractedLineItem {
   price: string;
   /** Warranty length printed on the receipt, in months. Null when none is printed. */
   warranty_months?: number | null;
+  /**
+   * Set only when `warranty_months` was looked up on the web because the
+   * receipt printed none. Absent when the length came from the receipt itself.
+   */
+  warranty_source?: { url: string; evidence: string | null } | null;
   /** Suggested category name, e.g. "Laptop". Null when OCR is unsure. */
   category?: string | null;
 }
