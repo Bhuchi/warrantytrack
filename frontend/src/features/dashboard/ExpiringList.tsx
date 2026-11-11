@@ -99,8 +99,8 @@ export default function ExpiringList({ items, total }: ExpiringListProps) {
                     {item.name}
                   </Link>
                 </td>
-                <td className="truncate py-3.5 pr-4">{item.vendor}</td>
-                <td className="truncate py-3.5 pr-4">{item.department}</td>
+                <td className="truncate py-3.5 pr-4">{item.vendor ?? "—"}</td>
+                <td className="truncate py-3.5 pr-4">{item.department ?? "—"}</td>
                 <td className="py-3.5 pr-4">{formatDate(item.end_date)}</td>
                 <td className="py-3.5">
                   <StatusBadge status={item.status} />
