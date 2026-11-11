@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.services import ocr
-from app.services.ocr import OcrError, _clean_product_name, _json_from_reply, _parse_months, parse_model_json
+from app.services.ocr import OcrError, _clean_category, _clean_invoice_number, _clean_product_name, _json_from_reply, _parse_months, parse_model_json
 
 
 def test_clean_answer_is_normalised():
@@ -20,7 +20,8 @@ def test_clean_answer_is_normalised():
     assert out["total_amount"] == "32900.00"
     assert out["currency"] == "THB"
     assert out["line_items"] == [
-        {"name": "Laptop", "serial_number": "ABC123", "price": "32900.00", "warranty_months": 36}
+        {"name": "Laptop", "serial_number": "ABC123", "price": "32900.00", "warranty_months": 36,
+         "category": None}
     ]
 
 
@@ -107,3 +108,34 @@ def test_line_item_name_is_cleaned_but_months_are_kept():
     out = parse_model_json({"line_items": [{"name": "CPU AMD AM5 RYZEN 7500F 3-Y *P25", "warranty_months": 36}]})
     assert out["line_items"][0]["name"] == "CPU AMD AM5 RYZEN 7500F"
     assert out["line_items"][0]["warranty_months"] == 36
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("INV-2025-001", "INV-2025-001"),
+        ("Invoice No: IV6812-0457", "IV6812-0457"),
+        ("  Tax Invoice #  0012345  ", "0012345"),
+        ("เลขที่ 66/0457", "เลขที่ 66/0457"),  # a Thai label is left for the model to strip
+        ("x" * 41, None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_invoice_number_is_tidied(raw, expected):
+    assert _clean_invoice_number(raw) == expected
+
+
+def test_category_is_trimmed_and_capped():
+    assert _clean_category("  Computer   Component ") == "Computer Component"
+    assert len(_clean_category("x" * 100)) == 60
+    assert _clean_category(None) is None
+
+
+def test_invoice_number_and_category_reach_the_result():
+    out = parse_model_json({
+        "invoice_number": "Invoice No. A-100",
+        "line_items": [{"name": "CPU AMD Ryzen 5 7500F", "category": "Computer Component"}],
+    })
+    assert out["invoice_number"] == "A-100"
+    assert out["line_items"][0]["category"] == "Computer Component"

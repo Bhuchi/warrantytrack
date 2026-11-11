@@ -232,6 +232,36 @@ def _clean_product_name(name: str | None) -> str | None:
     return cleaned or name
 
 
+def _clean_invoice_number(value: str | None) -> str | None:
+    """The invoice number as one tidy token string, or None.
+
+    Drops a leading label the model may have copied ("Invoice No: INV-1"),
+    collapses whitespace, and refuses anything implausibly long, which is a
+    sentence or a barcode run rather than a number.
+    """
+    value = (value or "").strip()
+    if not value:
+        return None
+    # Only whole words, and only when a separator follows, so "INV-2025-001"
+    # and "Invoice-7" are left alone.
+    cleaned = re.sub(
+        r"^(?:tax\s+)?(?:invoice|receipt)(?:\s*(?:no\.?|number|#))?(?=[\s:#.]|$)\s*[:#.]*\s*",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" :#.")
+    return cleaned if 0 < len(cleaned) <= 40 else None
+
+
+def _clean_category(value: str | None) -> str | None:
+    """A short category label, or None. Length-capped like the catalog's name column."""
+    if not value:
+        return None
+    cleaned = re.sub(r"\s+", " ", value).strip()
+    return cleaned[:60] if cleaned else None
+
+
 def _parse_months(value: Any) -> int | None:
     """A warranty length in whole months, or None.
 
@@ -278,6 +308,7 @@ def parse_model_json(data: dict[str, Any]) -> dict[str, Any]:
                 "serial_number": serial,
                 "price": price,
                 "warranty_months": _parse_months(item.get("warranty_months")),
+                "category": _clean_category(text(item.get("category"))),
             })
 
     total_text = text(data.get("total_amount"))
@@ -285,6 +316,7 @@ def parse_model_json(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "vendor_name": text(data.get("vendor_name")),
         "purchase_date": _parse_ocr_date(text(data.get("purchase_date")) or ""),
+        "invoice_number": _clean_invoice_number(text(data.get("invoice_number"))),
         "total_amount": _parse_amount(total_text),
         "currency": currency.upper() if currency else _sniff_currency(total_text),
         "line_items": items,
@@ -300,11 +332,13 @@ Return ONLY one JSON object, no prose and no markdown, with exactly these keys:
 {
   "vendor_name": string | null,
   "purchase_date": "YYYY-MM-DD" | null,
+  "invoice_number": string | null,
   "total_amount": string | null,
   "currency": string | null,
   "line_items": [
     {"name": string | null, "price": string | null,
-     "serial_number": string | null, "warranty_months": integer | null}
+     "serial_number": string | null, "warranty_months": integer | null,
+     "category": string | null}
   ]
 }
 
@@ -315,6 +349,11 @@ Rules:
   1 March 2025). Thai receipts may use Buddhist Era years such as 2568 - convert
   to Gregorian by subtracting 543. Ignore dates that belong to an address, a tax
   ID, a document number or a due date.
+- invoice_number: the receipt / tax invoice number printed on the document,
+  usually beside a label such as "Invoice No.", "Receipt No.", "Tax Invoice",
+  "เลขที่ใบกำกับภาษี" or "เลขที่". Return only the number, without the label.
+  It is NOT the 13-digit tax ID, a phone number, an order or queue number, a
+  member number, or a barcode.
 - total_amount: the final amount paid, as a plain decimal string without
   thousands separators, e.g. "37570.00".
 - currency: ISO code. THB for ฿ or บาท.
@@ -327,6 +366,11 @@ Rules:
   shop codes such as "*P25", quantities, item numbers, SKUs and barcodes.
 - serial_number: ONLY when printed with an explicit label such as S/N, SN or
   Serial. Product codes, SKUs, barcodes and item numbers are NOT serial numbers.
+- category: what kind of product the item is. Choose ONE of: Laptop, Desktop,
+  Computer Component, Monitor, Phone, Tablet, Printer, Camera, Network
+  Equipment, Accessory, Appliance, Furniture, Other. Use Computer Component for
+  parts such as CPU, GPU, RAM, SSD, motherboard or a power supply, and Other
+  when none fits. Never invent a new label.
 - warranty_months: the warranty length in months if it is printed for that
   item ("3-Y" or "3 YEAR" is 36, "ประกัน 1 ปี" is 12). null if not printed,
   and null for lifetime warranties."""
@@ -435,6 +479,7 @@ def _fake_extraction(filename: str | None) -> dict[str, Any]:
     return {
         "vendor_name": "Power Buy",
         "purchase_date": None,
+        "invoice_number": "INV-2025-001",
         "total_amount": "32900.00",
         "currency": "THB",
         "line_items": [
@@ -443,8 +488,15 @@ def _fake_extraction(filename: str | None) -> dict[str, Any]:
                 "serial_number": "ABC123",
                 "price": "32900.00",
                 "warranty_months": 36,
+                "category": "Laptop",
             },
-            {"name": "Laptop sleeve", "serial_number": None, "price": "890.00", "warranty_months": None},
+            {
+                "name": "Laptop sleeve",
+                "serial_number": None,
+                "price": "890.00",
+                "warranty_months": None,
+                "category": "Accessory",
+            },
         ],
         "_source": f"fake OCR backend, file {filename or 'unknown'}",
     }

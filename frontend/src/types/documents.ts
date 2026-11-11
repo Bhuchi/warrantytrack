@@ -17,6 +17,8 @@ export interface ExtractedLineItem {
   price: string;
   /** Warranty length printed on the receipt, in months. Null when none is printed. */
   warranty_months?: number | null;
+  /** Suggested category name, e.g. "Laptop". Null when OCR is unsure. */
+  category?: string | null;
 }
 
 /**
@@ -28,6 +30,8 @@ export interface ExtractedReceipt {
   vendor_name: string | null;
   /** "YYYY-MM-DD". */
   purchase_date: string | null;
+  /** Printed invoice or receipt number. Null when none was found. */
+  invoice_number?: string | null;
   total_amount: string | null;
   currency: string | null;
   line_items: ExtractedLineItem[];

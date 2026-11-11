@@ -44,7 +44,7 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
   // What OCR filled in, to decide where the "OCR" badges go.
   const ocr = scan?.status === "extracted" ? draftFromScan(scan) : null;
   const fromOcr = (key: keyof AssetDraft) => Boolean(ocr?.[key]);
-  const ocrCount = ocr ? ["name", "vendor_name", "purchase_date", "price", "warranty_duration_months"].filter((key) => fromOcr(key as keyof AssetDraft)).length : 0;
+  const ocrCount = ocr ? ["name", "vendor_name", "purchase_date", "price", "invoice_number", "category_name", "warranty_duration_months"].filter((key) => fromOcr(key as keyof AssetDraft)).length : 0;
   const endLabel = warrantyEndLabel(draft);
   // A receipt can print a length the list does not offer (18 months), so the
   // chosen value always gets an option instead of silently showing "Choose".
@@ -100,7 +100,7 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
                 onChange={(event) => onChange({ name: event.target.value })}
               />
             </Field>
-            <Field id="invoice-number" label="Invoice Number" required>
+            <Field id="invoice-number" label="Invoice Number" required fromOcr={fromOcr("invoice_number")}>
               <input
                 id="invoice-number"
                 className={inputClasses}
@@ -117,7 +117,7 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
                 onChange={(event) => onChange({ price: event.target.value })}
               />
             </Field>
-            <Field id="category" label="Category" required>
+            <Field id="category" label="Category" required fromOcr={fromOcr("category_name")}>
               <input
                 id="category"
                 className={inputClasses}

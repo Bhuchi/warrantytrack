@@ -55,7 +55,6 @@ export const EMPTY_DRAFT: AssetDraft = {
 /**
  * A draft pre-filled from what OCR read. Uses the first line item only:
  * receipts listing several assets are a later improvement.
- * The contract has no invoice number in `extracted`, so that stays empty.
  */
 export function draftFromScan(scan: OcrDocument): AssetDraft {
   const receipt = scan.extracted;
@@ -65,6 +64,8 @@ export function draftFromScan(scan: OcrDocument): AssetDraft {
     ...EMPTY_DRAFT,
     document_id: scan.id,
     name: item?.name ?? "",
+    invoice_number: receipt?.invoice_number ?? "",
+    category_name: item?.category ?? "",
     vendor_name: receipt?.vendor_name ?? "",
     purchase_date: receipt?.purchase_date ?? "",
     price: item?.price ?? receipt?.total_amount ?? "",
