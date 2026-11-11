@@ -44,7 +44,7 @@ export default function WorkspaceCard({
 }: WorkspaceCardProps) {
   return (
     <div
-      className={`flex flex-col gap-4 rounded-2xl bg-surface p-5 md:flex-1 md:gap-[22px] md:px-8 md:pt-8 md:pb-7 ${
+      className={`flex flex-col gap-4 rounded-2xl bg-surface p-5 md:min-w-[260px] md:max-w-[420px] md:flex-1 md:gap-[22px] md:px-8 md:pt-8 md:pb-7 ${
         selected
           ? "border-2 border-brand md:shadow-panel-selected"
           : "border border-border md:shadow-panel"

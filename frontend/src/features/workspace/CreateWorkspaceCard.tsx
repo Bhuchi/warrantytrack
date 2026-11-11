@@ -18,7 +18,7 @@ export default function CreateWorkspaceCard({ onCreate }: CreateWorkspaceCardPro
     <button
       type="button"
       onClick={onCreate}
-      className="flex flex-col gap-4 rounded-2xl border-[1.5px] border-dashed border-brand bg-surface p-5 text-left md:flex-1 md:gap-[22px] md:self-stretch md:px-8 md:pt-8 md:pb-7"
+      className="flex flex-col gap-4 rounded-2xl border-[1.5px] border-dashed border-brand bg-surface p-5 text-left md:min-w-[260px] md:max-w-[420px] md:flex-1 md:gap-[22px] md:self-stretch md:px-8 md:pt-8 md:pb-7"
     >
       <span className="flex w-full items-center gap-3.5 md:flex-wrap md:gap-y-[22px]">
         <span className="flex size-[50px] shrink-0 items-center justify-center rounded-[13px] bg-brand-subtle text-brand md:size-14 md:rounded-[14px]">

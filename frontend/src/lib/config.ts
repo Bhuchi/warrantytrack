@@ -20,6 +20,9 @@ export const API_BASE_URL = stripTrailingSlash(
 /** Amazon Cognito app client ID. Empty until auth is wired up. */
 export const COGNITO_CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID ?? "";
 
+/** AWS region of the Cognito user pool. Same default as the backend's `aws_region`. */
+export const COGNITO_REGION = process.env.NEXT_PUBLIC_COGNITO_REGION || "ap-southeast-1";
+
 if (!process.env.NEXT_PUBLIC_API_URL && process.env.NODE_ENV !== "production") {
   console.warn(
     `NEXT_PUBLIC_API_URL is not set — falling back to ${DEFAULT_API_URL}. ` +
