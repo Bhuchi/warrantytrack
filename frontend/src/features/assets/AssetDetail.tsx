@@ -270,18 +270,16 @@ function StoragePanel({ asset }: { asset: Asset }) {
   );
 }
 
-function QuickActions() {
+function QuickActions({ assetId }: { assetId: string }) {
   return (
     <div className="flex w-full flex-col gap-3">
-      <button
-        type="button"
-        aria-disabled="true"
-        title="Asset editing will be connected in a later task"
+      <Link
+        href={`/assets/${encodeURIComponent(assetId)}/edit`}
         className="flex h-[54px] w-full items-center justify-center gap-2.5 rounded-[10px] bg-brand text-base font-bold tracking-[-0.32px] text-brand-foreground"
       >
         <Image src="/icons/asset-edit.svg" alt="" width={17} height={17} />
         Edit Asset
-      </button>
+      </Link>
       <Link
         href="/assets/new"
         className="flex h-[54px] w-full items-center justify-center gap-2.5 rounded-[10px] bg-brand text-base font-bold tracking-[-0.32px] text-brand-foreground"
@@ -378,7 +376,7 @@ export default function AssetDetail({ assetId }: { assetId: string }) {
                 )}
               </Panel>
               <StoragePanel asset={asset} />
-              <QuickActions />
+              <QuickActions assetId={asset.id} />
             </div>
           </div>
         )}
