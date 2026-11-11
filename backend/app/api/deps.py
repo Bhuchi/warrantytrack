@@ -32,6 +32,10 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> uuid.UUID:
     """Resolve a verified Cognito subject to a local user and personal tenant."""
+    if settings.auth_backend == "dev":
+        # Local only (AUTH_BACKEND=dev, refused in production by config.py):
+        # every request is the user that scripts/seed_dev.py creates.
+        return DEV_USER_ID
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Authentication required")
     try:
@@ -79,6 +83,10 @@ def get_current_workspace(
     db: Session = Depends(get_db),
 ) -> uuid.UUID:
     """Reject a missing or foreign workspace before a scoped route runs."""
+    if workspace_id is None and settings.auth_backend == "dev":
+        # The frontend only sends X-Workspace-Id after a Cognito sign-in, so
+        # locally fall back to the seeded workspace. Membership is still checked.
+        workspace_id = DEV_WORKSPACE_ID
     if workspace_id is None:
         raise HTTPException(status_code=400, detail="X-Workspace-Id is required")
     membership = db.scalar(select(Membership).where(
