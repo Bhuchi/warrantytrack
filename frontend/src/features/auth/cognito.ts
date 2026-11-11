@@ -42,7 +42,7 @@ const FRIENDLY_MESSAGES: Record<string, string> = {
   InvalidPasswordException:
     "Password needs at least 8 characters, with upper and lower case letters, a number and a symbol.",
   CodeMismatchException: "That code is not right. Check the email and try again.",
-  ExpiredCodeException: "That code has expired. Sign up again to get a new one.",
+  ExpiredCodeException: "That code has expired. Press Send a new code.",
   TooManyRequestsException: "Too many attempts. Wait a minute and try again.",
   LimitExceededException: "Too many attempts. Wait a minute and try again.",
 };
@@ -130,4 +130,9 @@ export async function signUp(email: string, password: string, name: string): Pro
 /** Confirms the account with the code from the email. After this, signIn works. */
 export async function confirmSignUp(email: string, code: string): Promise<void> {
   await callCognito("ConfirmSignUp", { Username: email, ConfirmationCode: code });
+}
+
+/** Emails a fresh code, for an account that was created but never confirmed. */
+export async function resendConfirmationCode(email: string): Promise<void> {
+  await callCognito("ResendConfirmationCode", { Username: email });
 }

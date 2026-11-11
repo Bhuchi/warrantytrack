@@ -3,33 +3,72 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
 
 import Button from "@/components/Button";
 import TextField from "@/components/TextField";
+import { COGNITO_CLIENT_ID } from "@/lib/config";
+
+import { CognitoError, resendConfirmationCode, signIn } from "./cognito";
+import ConfirmCodeForm from "./ConfirmCodeForm";
+import { saveSession } from "./session";
 
 /**
- * Sign-in form fields — Figma D02 (node 3337:42 onward).
+ * Sign-in form fields — Figma D02 (node 3337:42 onward). CLOUDAPPG5-122.
  *
- * For now Sign In only moves on to workspace selection: nothing is checked or
- * sent, so the demo flows without typing URLs. preventDefault stops the
- * browser's default submit, which would reload /login with the email and
- * password in the address bar.
+ * Signs in with Cognito, keeps the tokens (session.ts), then moves on to
+ * workspace selection. An account that was never confirmed gets a fresh code
+ * and the code step (ConfirmCodeForm) instead of a dead end.
  *
- * TODO (FE-04, CLOUDAPPG5-122): replace with the real Cognito sign-in. Hold the
- * field values in state and call a function in features/auth/ that talks to
- * lib/api; never fetch from this component.
+ * Without NEXT_PUBLIC_COGNITO_CLIENT_ID it skips Cognito and goes straight
+ * on, so the local demo still works with no AWS account.
+ *
+ * preventDefault stops the browser's own submit, which would reload /login
+ * with the email and password in the address bar.
  */
 export default function SignInForm() {
   const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  // Set when Cognito says the account exists but its email was never confirmed.
+  const [needsCode, setNeedsCode] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!COGNITO_CLIENT_ID) {
+      router.push("/workspace");
+      return;
+    }
+
+    setError(null);
+    setSubmitting(true);
+    try {
+      const tokens = await signIn(email.trim(), password);
+      saveSession(tokens, email.trim());
+      router.push("/workspace");
+    } catch (caught) {
+      if (caught instanceof CognitoError && caught.code === "UserNotConfirmedException") {
+        // Signed up earlier but never typed the code: send a fresh one and ask for it.
+        await resendConfirmationCode(email.trim()).catch(() => {});
+        setNeedsCode(true);
+        setSubmitting(false);
+        return;
+      }
+      setError(
+        caught instanceof CognitoError ? caught.message : "Something went wrong. Please try again.",
+      );
+      setSubmitting(false);
+    }
+  }
+
+  if (needsCode) {
+    return <ConfirmCodeForm email={email.trim()} password={password} onBack={() => setNeedsCode(false)} />;
+  }
 
   return (
-    <form
-      className="flex w-full flex-col gap-[22px]"
-      onSubmit={(event) => {
-        event.preventDefault();
-        router.push("/workspace");
-      }}
-    >
+    <form className="flex w-full flex-col gap-[22px]" onSubmit={handleSubmit}>
       <TextField
         id="email"
         name="email"
@@ -38,6 +77,9 @@ export default function SignInForm() {
         autoComplete="email"
         placeholder="you@example.com"
         iconSrc="/icons/mail.svg"
+        required
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
       />
 
       <TextField
@@ -48,6 +90,9 @@ export default function SignInForm() {
         autoComplete="current-password"
         placeholder="••••••••••"
         iconSrc="/icons/lock.svg"
+        required
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
       />
 
       <div className="flex items-center justify-between">
@@ -82,7 +127,15 @@ export default function SignInForm() {
         </Link>
       </div>
 
-      <Button type="submit">Sign In</Button>
+      {error && (
+        <p role="alert" className="rounded-[10px] bg-red-50 px-4 py-3 text-[13px] text-red-700">
+          {error}
+        </p>
+      )}
+
+      <Button type="submit" disabled={submitting}>
+        {submitting ? "Signing in…" : "Sign In"}
+      </Button>
     </form>
   );
 }

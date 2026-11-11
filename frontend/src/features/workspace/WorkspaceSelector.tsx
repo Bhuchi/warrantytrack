@@ -205,7 +205,7 @@ export default function WorkspaceSelector({ isNewUser = false }: { isNewUser?: b
         </div>
       )}
 
-      <div className="flex w-full flex-col gap-5 md:flex-row md:items-start md:gap-8">
+      <div className="flex w-full flex-col gap-5 md:flex-row md:flex-wrap md:items-start md:justify-center md:gap-8">
         {workspaces.map((workspace) => (
           <WorkspaceCard
             key={workspace.id}
