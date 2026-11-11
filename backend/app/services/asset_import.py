@@ -76,10 +76,10 @@ COLUMNS = (
 
 #: Columns a file must contain. The optional ones may be left out entirely —
 #: a user who tracks no departments should not need an empty column for them.
+#: `condition` is optional too since issue #34, so it is read when present only.
 REQUIRED_COLUMNS = (
     "name",
     "serial_number",
-    "condition",
     "purchase_date",
     "price",
     "invoice_number",
