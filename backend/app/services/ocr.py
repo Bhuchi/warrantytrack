@@ -14,7 +14,7 @@ Two backends, chosen by `OCR_BACKEND`:
 
 * `textract` — Amazon Textract AnalyzeExpense.
 * `bedrock` — a Claude model on Amazon Bedrock reads the image and returns
-  JSON. Handles Thai and photos well; images only (no PDF) for now. Scored in
+  JSON. Handles Thai and photos well; images and PDFs. Scored in
   scripts/ocr_compare.
 * `fake` — canned fields, so the OCR Review screen (D07) can be built and
   demoed with no AWS account and no per-page charge.
@@ -214,6 +214,26 @@ def _parse_ocr_date(text: str) -> str | None:
     return None
 
 
+def _parse_months(value: Any) -> int | None:
+    """A warranty length in whole months, or None.
+
+    The model is told to answer in months, but a bad answer ("3 years", 0,
+    999, true) must become an empty Duration field rather than a wrong one the
+    user accepts without looking. 120 months (10 years) is a generous ceiling.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        value = value.strip()
+        if not value.isdigit():
+            return None
+    try:
+        months = int(value)
+    except (TypeError, ValueError):
+        return None
+    return months if 1 <= months <= 120 else None
+
+
 def parse_model_json(data: dict[str, Any]) -> dict[str, Any]:
     """A model's JSON -> the `extracted` shape, re-validating every value.
 
@@ -234,7 +254,12 @@ def parse_model_json(data: dict[str, Any]) -> dict[str, Any]:
         name, serial = text(item.get("name")), text(item.get("serial_number"))
         price = _parse_amount(text(item.get("price")))
         if any((name, serial, price)):
-            items.append({"name": name, "serial_number": serial, "price": price})
+            items.append({
+                "name": name,
+                "serial_number": serial,
+                "price": price,
+                "warranty_months": _parse_months(item.get("warranty_months")),
+            })
 
     total_text = text(data.get("total_amount"))
     currency = text(data.get("currency"))
@@ -333,12 +358,21 @@ def _bedrock_extract(s3_key: str, filename: str | None, content_type: str | None
         raise OcrError("OCR_BACKEND=bedrock but BEDROCK_MODEL_ID is not set.")
 
     data = storage.read_bytes(s3_key)
-    if (
+    is_pdf = (
         data[:4] == b"%PDF"
         or content_type == "application/pdf"
         or (filename or "").lower().endswith(".pdf")
-    ):
-        raise OcrError("The Bedrock backend reads images only; upload a JPG or PNG.")
+    )
+    if is_pdf:
+        # Converse reads a PDF natively (text and page images), so there is
+        # nothing to render here. The name is fixed on purpose: the API only
+        # allows a narrow character set and a user's filename can hold
+        # anything, including prompt text.
+        attachment = {"document": {"format": "pdf", "name": "receipt", "source": {"bytes": data}}}
+        request_text = "Extract the receipt in this document."
+    else:
+        attachment = {"image": {"format": "jpeg", "source": {"bytes": _prepare_image(data)}}}
+        request_text = "Extract the receipt in this image."
 
     try:
         response = _bedrock().converse(
@@ -347,8 +381,8 @@ def _bedrock_extract(s3_key: str, filename: str | None, content_type: str | None
             messages=[{
                 "role": "user",
                 "content": [
-                    {"image": {"format": "jpeg", "source": {"bytes": _prepare_image(data)}}},
-                    {"text": "Extract the receipt in this image."},
+                    attachment,
+                    {"text": request_text},
                 ],
             }],
             # No temperature: some current models reject it as deprecated.
@@ -385,8 +419,9 @@ def _fake_extraction(filename: str | None) -> dict[str, Any]:
                 "name": "Dell Latitude 5540",
                 "serial_number": "ABC123",
                 "price": "32900.00",
+                "warranty_months": 36,
             },
-            {"name": "Laptop sleeve", "serial_number": None, "price": "890.00"},
+            {"name": "Laptop sleeve", "serial_number": None, "price": "890.00", "warranty_months": None},
         ],
         "_source": f"fake OCR backend, file {filename or 'unknown'}",
     }

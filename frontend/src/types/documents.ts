@@ -15,6 +15,8 @@ export interface ExtractedLineItem {
   serial_number: string | null;
   /** Decimal as a string, e.g. "32900.00", so no precision is lost. */
   price: string;
+  /** Warranty length printed on the receipt, in months. Null when none is printed. */
+  warranty_months?: number | null;
 }
 
 /**

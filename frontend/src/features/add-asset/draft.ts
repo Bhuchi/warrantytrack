@@ -75,6 +75,8 @@ export function draftFromScan(scan: OcrDocument): AssetDraft {
     warranty_provider: receipt?.vendor_name ?? "",
     warranty_start_date: receipt?.purchase_date ?? "",
     serial_number: item?.serial_number ?? "",
+    // The warranty length printed on the receipt, if OCR found one.
+    warranty_duration_months: item?.warranty_months ? String(item.warranty_months) : "",
   };
 }
 

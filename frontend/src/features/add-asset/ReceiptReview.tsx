@@ -44,8 +44,15 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
   // What OCR filled in, to decide where the "OCR" badges go.
   const ocr = scan?.status === "extracted" ? draftFromScan(scan) : null;
   const fromOcr = (key: keyof AssetDraft) => Boolean(ocr?.[key]);
-  const ocrCount = ocr ? ["name", "vendor_name", "purchase_date", "price"].filter((key) => fromOcr(key as keyof AssetDraft)).length : 0;
+  const ocrCount = ocr ? ["name", "vendor_name", "purchase_date", "price", "warranty_duration_months"].filter((key) => fromOcr(key as keyof AssetDraft)).length : 0;
   const endLabel = warrantyEndLabel(draft);
+  // A receipt can print a length the list does not offer (18 months), so the
+  // chosen value always gets an option instead of silently showing "Choose".
+  const chosen = draft.warranty_duration_months;
+  const durations =
+    chosen && !DURATIONS.some((d) => d.value === chosen)
+      ? [...DURATIONS, { value: chosen, label: `${chosen} months` }].sort((a, b) => Number(a.value) - Number(b.value))
+      : DURATIONS;
 
   return (
     <div className="flex flex-col gap-3 md:gap-4">
@@ -165,7 +172,7 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
               onChange={(event) => onChange({ warranty_start_date: event.target.value })}
             />
           </Field>
-          <Field id="warranty-duration" label="Duration" required>
+          <Field id="warranty-duration" label="Duration" required fromOcr={fromOcr("warranty_duration_months")}>
             <select
               id="warranty-duration"
               className={inputClasses}
@@ -173,7 +180,7 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
               onChange={(event) => onChange({ warranty_duration_months: event.target.value })}
             >
               <option value="">Choose a duration</option>
-              {DURATIONS.map((duration) => (
+              {durations.map((duration) => (
                 <option key={duration.value} value={duration.value}>
                   {duration.label}
                 </option>
