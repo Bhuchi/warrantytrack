@@ -349,11 +349,14 @@ Rules:
   1 March 2025). Thai receipts may use Buddhist Era years such as 2568 - convert
   to Gregorian by subtracting 543. Ignore dates that belong to an address, a tax
   ID, a document number or a due date.
-- invoice_number: the receipt / tax invoice number printed on the document,
-  usually beside a label such as "Invoice No.", "Receipt No.", "Tax Invoice",
-  "เลขที่ใบกำกับภาษี" or "เลขที่". Return only the number, without the label.
-  It is NOT the 13-digit tax ID, a phone number, an order or queue number, a
-  member number, or a barcode.
+- invoice_number: the number that identifies this document. Prefer an invoice /
+  receipt / tax invoice number, printed beside a label such as "Invoice No.",
+  "Receipt No.", "Tax Invoice", "เลขที่ใบกำกับภาษี", "เลขที่ใบเสร็จ" or "เลขที่".
+  If the document has none, because it is itself an online order or purchase
+  order (ใบสั่งซื้อสินค้า, "Order No."), use its own order number
+  ("เลขที่ใบสั่งซื้อ"). Return only the number, without the label. It is NEVER
+  the 13-digit tax ID, a phone number, a bank account number, a product or item
+  code, a queue or member number, or a barcode value that belongs to a product.
 - total_amount: the final amount paid, as a plain decimal string without
   thousands separators, e.g. "37570.00".
 - currency: ISO code. THB for ฿ or บาท.
