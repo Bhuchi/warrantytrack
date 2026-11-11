@@ -128,7 +128,7 @@ export default function ReceiptUpload({ method, file, status, error, onFile }: R
               ? `${error ?? "We couldn't read this receipt."} Enter the details yourself.`
               : status === "done"
                 ? "Receipt read. Check the details on the next screen."
-                : "AWS Textract is extracting your data…"}
+                : "Reading your receipt, this takes a few seconds…"}
           </p>
         </div>
       )}
