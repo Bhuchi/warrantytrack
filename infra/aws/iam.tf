@@ -52,7 +52,8 @@ resource "aws_iam_role_policy" "execution_secrets" {
         Resource = compact([
           aws_ssm_parameter.database_url.arn,
           aws_ssm_parameter.secret_key.arn,
-          one(aws_ssm_parameter.db_password[*].arn)
+          one(aws_ssm_parameter.db_password[*].arn),
+          one(aws_ssm_parameter.tavily_api_key[*].arn)
         ])
       },
       {
