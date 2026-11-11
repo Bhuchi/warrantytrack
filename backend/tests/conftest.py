@@ -5,11 +5,24 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_current_workspace
+from app.core.config import settings
 from app.db.session import engine, get_db
 from app.main import app
 from app.models.membership import Membership, MembershipRole
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceType
+
+
+@pytest.fixture(autouse=True)
+def real_auth_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every test starts with real Cognito auth, whatever the environment says.
+
+    docker-compose.yml sets AUTH_BACKEND=dev so the app runs locally without
+    Cognito. Tests run inside that container would otherwise inherit the
+    bypass and pass requests that should get a 401. A test that is about the
+    bypass switches it on itself (see test_dev_auth_backend.py).
+    """
+    monkeypatch.setattr(settings, "auth_backend", "cognito")
 
 
 @pytest.fixture
