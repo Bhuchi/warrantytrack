@@ -214,6 +214,24 @@ def _parse_ocr_date(text: str) -> str | None:
     return None
 
 
+# Warranty length ("3-Y", "2 YEAR", "1 ปี") and "*P25"-style promo or shop codes
+# that receipts print inside the product line. They belong to other fields (or
+# to nothing), not to the product name.
+_NAME_NOISE = re.compile(
+    r"(?<![\w])\d{1,2}\s?-?\s?(?:Y|YR|YRS|YEAR|YEARS|ปี)(?![\w])"
+    r"|(?<!\w)\*\w+",
+    re.IGNORECASE,
+)
+
+
+def _clean_product_name(name: str | None) -> str | None:
+    """The product name without warranty or promo markers; the original if that would leave nothing."""
+    if not name:
+        return name
+    cleaned = re.sub(r"\s{2,}", " ", _NAME_NOISE.sub(" ", name)).strip(" -,;/")
+    return cleaned or name
+
+
 def _parse_months(value: Any) -> int | None:
     """A warranty length in whole months, or None.
 
@@ -251,7 +269,8 @@ def parse_model_json(data: dict[str, Any]) -> dict[str, Any]:
     for item in data.get("line_items") or []:
         if not isinstance(item, dict):
             continue
-        name, serial = text(item.get("name")), text(item.get("serial_number"))
+        name = _clean_product_name(text(item.get("name")))
+        serial = text(item.get("serial_number"))
         price = _parse_amount(text(item.get("price")))
         if any((name, serial, price)):
             items.append({
@@ -300,8 +319,12 @@ Rules:
   thousands separators, e.g. "37570.00".
 - currency: ISO code. THB for ฿ or บาท.
 - vendor_name: the shop's name as printed in the logo or header.
-- line_items: one entry per purchased product, as printed. price is that line's
-  total amount as a decimal string.
+- line_items: one entry per purchased product. price is that line's total
+  amount as a decimal string.
+- name: ONLY the product's own name, brand and model, e.g. "CPU AMD AM5 RYZEN
+  7500F". Leave out everything else printed on that line: the warranty length
+  ("3-Y", "1 YEAR", "ประกัน 1 ปี" - that goes in warranty_months), promo or
+  shop codes such as "*P25", quantities, item numbers, SKUs and barcodes.
 - serial_number: ONLY when printed with an explicit label such as S/N, SN or
   Serial. Product codes, SKUs, barcodes and item numbers are NOT serial numbers.
 - warranty_months: the warranty length in months if it is printed for that

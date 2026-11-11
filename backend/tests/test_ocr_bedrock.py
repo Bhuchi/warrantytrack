@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.services import ocr
-from app.services.ocr import OcrError, _json_from_reply, _parse_months, parse_model_json
+from app.services.ocr import OcrError, _clean_product_name, _json_from_reply, _parse_months, parse_model_json
 
 
 def test_clean_answer_is_normalised():
@@ -82,3 +82,28 @@ def test_json_fence_is_stripped():
 def test_prose_is_an_error():
     with pytest.raises(OcrError):
         _json_from_reply("Sorry, I cannot read this.")
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("CPU AMD AM5 RYZEN 7500F 3-Y *P25", "CPU AMD AM5 RYZEN 7500F"),
+        ("SSD Samsung 980 1TB 5 YEAR", "SSD Samsung 980 1TB"),
+        ("Monitor Dell 27 inch 3Y", "Monitor Dell 27 inch"),
+        ("เมาส์ Logitech MX 1 ปี", "เมาส์ Logitech MX"),
+        # Sizes, models and plain numbers are not warranty text.
+        ("Dell Monitor 27\" U2723QE", 'Dell Monitor 27" U2723QE'),
+        ("MacBook Pro 14-inch (M3)", "MacBook Pro 14-inch (M3)"),
+        ("Galaxy S24 Ultra 256GB", "Galaxy S24 Ultra 256GB"),
+        ("3-Y", "3-Y"),  # never leave the name empty
+        (None, None),
+    ],
+)
+def test_product_name_drops_warranty_and_promo_text(raw, expected):
+    assert _clean_product_name(raw) == expected
+
+
+def test_line_item_name_is_cleaned_but_months_are_kept():
+    out = parse_model_json({"line_items": [{"name": "CPU AMD AM5 RYZEN 7500F 3-Y *P25", "warranty_months": 36}]})
+    assert out["line_items"][0]["name"] == "CPU AMD AM5 RYZEN 7500F"
+    assert out["line_items"][0]["warranty_months"] == 36
