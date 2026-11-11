@@ -97,3 +97,44 @@ def test_create_organization_owner_and_reject_invalid_type(api, db, user):
     assert any(item["workspace"]["id"] == body["id"] for item in api.get("/me").json()["memberships"])
     assert api.post("/workspaces", json={"name": "  ", "type": "organization"}).status_code == 422
     assert api.post("/workspaces", json={"name": "No", "type": "personal"}).status_code == 422
+
+
+def test_switching_workspaces_uses_each_membership_role(db, user, workspace, membership, monkeypatch):
+    """One identity may own one workspace and be an employee in another."""
+    personal = Workspace(name="Personal", type=WorkspaceType.personal)
+    employee_org = Workspace(name="Employee Org", type=WorkspaceType.organization)
+    db.add_all([personal, employee_org])
+    db.flush()
+    db.add_all([
+        Membership(user_id=user.id, workspace_id=personal.id, role=MembershipRole.owner),
+        Membership(user_id=user.id, workspace_id=employee_org.id, role=MembershipRole.employee),
+    ])
+    db.flush()
+
+    monkeypatch.setattr(deps, "verify_id_token", lambda _: {"sub": user.cognito_sub})
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        client = TestClient(app)
+        auth = {"Authorization": "Bearer signed-token"}
+        listed = client.get("/me", headers=auth)
+        assert listed.status_code == 200
+        assert {
+            item["workspace"]["id"]: item["role"]
+            for item in listed.json()["memberships"]
+        } == {
+            str(workspace.id): "owner",
+            str(personal.id): "owner",
+            str(employee_org.id): "employee",
+        }
+
+        owner_headers = {**auth, "X-Workspace-Id": str(workspace.id)}
+        employee_headers = {**auth, "X-Workspace-Id": str(employee_org.id)}
+        personal_headers = {**auth, "X-Workspace-Id": str(personal.id)}
+        assert client.post("/categories", json={"name": "Laptop"}, headers=owner_headers).status_code == 201
+        assert client.post("/categories", json={"name": "Forbidden"}, headers=employee_headers).status_code == 403
+        assert client.post("/categories", json={"name": "Phone"}, headers=personal_headers).status_code == 201
+        assert [item["name"] for item in client.get("/categories", headers=owner_headers).json()["items"]] == ["Laptop"]
+        assert client.get("/categories", headers=employee_headers).json()["items"] == []
+        assert [item["name"] for item in client.get("/categories", headers=personal_headers).json()["items"]] == ["Phone"]
+    finally:
+        app.dependency_overrides.clear()
