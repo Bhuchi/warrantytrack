@@ -41,13 +41,20 @@ class Settings(BaseSettings):
     # matters while the project budget is 4,000 THB for the semester. Flip each
     # to the real backend once the account exists:
     #
-    #   STORAGE_BACKEND=s3  OCR_BACKEND=textract  EMAIL_BACKEND=ses
+    #   STORAGE_BACKEND=s3  OCR_BACKEND=textract|bedrock  EMAIL_BACKEND=ses
     #
     # `local` storage keeps uploads on the API container's disk, `fake` OCR
     # returns canned fields, and `log` email writes the message to the log.
     # None of the three is allowed in production — see the check below.
     storage_backend: Literal["s3", "local"] = "local"
-    ocr_backend: Literal["textract", "fake"] = "fake"
+    ocr_backend: Literal["textract", "bedrock", "fake"] = "fake"
+
+    # Claude on Amazon Bedrock reads the receipt image (OCR_BACKEND=bedrock).
+    # Copy the model ID (or inference profile ID) from the Bedrock console; it
+    # must be enabled for the account. Region defaults to AWS_REGION.
+    bedrock_model_id: str | None = None
+    bedrock_region: str | None = None
+
     email_backend: Literal["ses", "log"] = "log"
 
     # `dev` skips Cognito and treats every request as the seeded dev user
@@ -88,7 +95,7 @@ class Settings(BaseSettings):
             raise RuntimeError(
                 "Development backends are active in production: "
                 + ", ".join(sorted(active))
-                + ". Set them to s3 / textract / ses / cognito."
+                + ". Set them to s3 / textract or bedrock / ses / cognito."
             )
         if not self.s3_bucket_name:
             raise RuntimeError("S3_BUCKET_NAME is required in production.")

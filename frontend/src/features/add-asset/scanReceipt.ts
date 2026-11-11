@@ -1,4 +1,5 @@
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/config";
 import type { OcrDocument } from "@/types/documents";
 
 /** A Promise that resolves after `ms` milliseconds. Also used by scanSerial.ts. */
@@ -6,18 +7,15 @@ export function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** POST /documents/presign response. */
 interface PresignResponse {
   document_id: string;
   upload_url: string;
   s3_key: string;
 }
 
-/** How often to ask whether OCR is done, and when to stop asking. */
 const POLL_EVERY_MS = 2000;
-const GIVE_UP_AFTER_MS = 60_000;
+const GIVE_UP_AFTER_MS = 90_000;
 
-/** A "failed" result the wizard shows on its OCR-failed screen. */
 function failed(id: string, error: string): OcrDocument {
   return { id, status: "failed", extracted: null, error };
 }
@@ -26,48 +24,57 @@ function failed(id: string, error: string): OcrDocument {
  * Sends a receipt to OCR and waits for the result. The one place the Add
  * Asset flow talks to OCR (docs/api.md "Documents and OCR"):
  *
- *   1. POST /documents/presign     → document_id and upload_url
- *   2. PUT the file to upload_url  (S3 when deployed; the API's dev-only
- *      upload route locally)
- *   3. POST /documents/{id}/submit → starts OCR
- *   4. GET /documents/{id} every 2 s until it is "extracted" or "failed"
+ *   1. POST /documents/presign  -> { document_id, upload_url }
+ *   2. PUT the file to upload_url
+ *   3. POST /documents/{id}/submit
+ *   4. GET /documents/{id} until status leaves pending/processing
  *
- * Never throws: any problem comes back as status "failed" with a message,
- * which the wizard turns into the OCR-failed screen with manual entry.
+ * Never throws: any failure comes back as a `failed` document, which the
+ * wizard already shows with the manual-entry fallback.
  */
 export async function scanReceipt(file: File): Promise<OcrDocument> {
-  let id = "";
-
+  let documentId = "";
   try {
-    const presign = await api.post<PresignResponse>("/documents/presign", {
+    const contentType = file.type || "application/octet-stream";
+
+    const reserved = await api.post<PresignResponse>("/documents/presign", {
       filename: file.name,
-      content_type: file.type || null,
+      content_type: contentType,
     });
-    id = presign.document_id;
+    documentId = reserved.document_id;
 
-    // Plain fetch, not lib/api: upload_url may be S3, which must not get our
-    // JSON or Authorization headers. The Content-Type has to match what was
-    // sent to presign, or S3 rejects the signature.
-    const upload = await fetch(presign.upload_url, {
-      method: "PUT",
-      body: file,
-      headers: file.type ? { "Content-Type": file.type } : undefined,
-    });
-    if (!upload.ok) return failed(id, "We couldn't upload this file. Please try again.");
-
-    let document = await api.post<OcrDocument>(`/documents/${encodeURIComponent(id)}/submit`);
-
-    const giveUpAt = Date.now() + GIVE_UP_AFTER_MS;
-    while (document.status === "pending" || document.status === "processing") {
-      if (Date.now() > giveUpAt) {
-        return failed(id, "Reading the receipt took too long. Enter the details yourself.");
-      }
-      await wait(POLL_EVERY_MS);
-      document = await api.get<OcrDocument>(`/documents/${encodeURIComponent(id)}`);
+    // Two different destinations. The local dev route is our own API and
+    // needs the bearer token, so it goes through lib/api. A presigned S3 URL
+    // must NOT get our Authorization header (S3 would reject the signature),
+    // so it is a plain fetch.
+    if (reserved.upload_url.startsWith(API_BASE_URL)) {
+      await api.put(reserved.upload_url, file, {
+        headers: { "Content-Type": contentType },
+      });
+    } else {
+      const upload = await fetch(reserved.upload_url, {
+        method: "PUT",
+        headers: { "Content-Type": contentType },
+        body: file,
+      });
+      if (!upload.ok) return failed(documentId, "The upload did not finish. Please try again.");
     }
 
+    let document = await api.post<OcrDocument>(`/documents/${encodeURIComponent(documentId)}/submit`);
+
+    const startedAt = Date.now();
+    while (document.status === "pending" || document.status === "processing") {
+      if (Date.now() - startedAt > GIVE_UP_AFTER_MS) {
+        return failed(documentId, "Reading the receipt took too long.");
+      }
+      await wait(POLL_EVERY_MS);
+      document = await api.get<OcrDocument>(`/documents/${encodeURIComponent(documentId)}`);
+    }
     return document;
-  } catch {
-    return failed(id, "We couldn't reach the server. Check your connection and try again.");
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 409) {
+      return failed(documentId, "The receipt was not uploaded. Please try again.");
+    }
+    return failed(documentId, "We couldn't read this receipt.");
   }
 }
