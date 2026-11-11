@@ -14,7 +14,7 @@ about it.
 from __future__ import annotations
 
 import uuid
-from datetime import date, timedelta
+from datetime import date
 
 from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import Session, contains_eager, joinedload
@@ -55,7 +55,9 @@ def _status_condition(status: WarrantyStatus, today: date) -> ColumnElement[bool
     outer-join rather than inner-join — an inner join would drop exactly the
     rows this status is about.
     """
-    soon = today + timedelta(days=warranty_service.EXPIRING_SOON_DAYS)
+    # soon_cutoff() owns this boundary, so the asset filter, the dashboard
+    # counts and compute_status() cannot drift apart.
+    soon = warranty_service.soon_cutoff(today)
 
     if status is WarrantyStatus.unknown:
         return Warranty.id.is_(None)

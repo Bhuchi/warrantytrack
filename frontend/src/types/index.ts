@@ -78,8 +78,10 @@ export interface DashboardSummary {
 export interface ExpiringAsset {
   asset_id: string;
   name: string;
-  vendor: string;
-  department: string;
+  /** Null when the asset has no vendor recorded — it is optional on an asset. */
+  vendor: string | null;
+  /** Null when the asset is in no department. */
+  department: string | null;
   /** Warranty end date, "YYYY-MM-DD". */
   end_date: string;
   status: WarrantyStatus;
