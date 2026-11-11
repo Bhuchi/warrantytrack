@@ -44,8 +44,20 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
   // What OCR filled in, to decide where the "OCR" badges go.
   const ocr = scan?.status === "extracted" ? draftFromScan(scan) : null;
   const fromOcr = (key: keyof AssetDraft) => Boolean(ocr?.[key]);
-  const ocrCount = ocr ? ["name", "vendor_name", "purchase_date", "price"].filter((key) => fromOcr(key as keyof AssetDraft)).length : 0;
+  const ocrCount = ocr ? ["name", "vendor_name", "purchase_date", "price", "invoice_number", "category_name", "warranty_duration_months"].filter((key) => fromOcr(key as keyof AssetDraft)).length : 0;
   const endLabel = warrantyEndLabel(draft);
+  // The warranty length was not on the receipt: it was found on the web. Say
+  // so, and link the page, until the user changes the value.
+  const webSource = scan?.status === "extracted" ? scan.extracted?.line_items[0]?.warranty_source : null;
+  const webSourceUrl = webSource && /^https:\/\//.test(webSource.url) ? webSource.url : null;
+  const durationFromWeb = Boolean(webSourceUrl) && ocr?.warranty_duration_months === draft.warranty_duration_months;
+  // A receipt can print a length the list does not offer (18 months), so the
+  // chosen value always gets an option instead of silently showing "Choose".
+  const chosen = draft.warranty_duration_months;
+  const durations =
+    chosen && !DURATIONS.some((d) => d.value === chosen)
+      ? [...DURATIONS, { value: chosen, label: `${chosen} months` }].sort((a, b) => Number(a.value) - Number(b.value))
+      : DURATIONS;
 
   return (
     <div className="flex flex-col gap-3 md:gap-4">
@@ -93,7 +105,7 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
                 onChange={(event) => onChange({ name: event.target.value })}
               />
             </Field>
-            <Field id="invoice-number" label="Invoice Number" required>
+            <Field id="invoice-number" label="Invoice Number" required fromOcr={fromOcr("invoice_number")}>
               <input
                 id="invoice-number"
                 className={inputClasses}
@@ -110,7 +122,7 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
                 onChange={(event) => onChange({ price: event.target.value })}
               />
             </Field>
-            <Field id="category" label="Category" required>
+            <Field id="category" label="Category" required fromOcr={fromOcr("category_name")}>
               <input
                 id="category"
                 className={inputClasses}
@@ -165,7 +177,7 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
               onChange={(event) => onChange({ warranty_start_date: event.target.value })}
             />
           </Field>
-          <Field id="warranty-duration" label="Duration" required>
+          <Field id="warranty-duration" label="Duration" required fromOcr={fromOcr("warranty_duration_months")}>
             <select
               id="warranty-duration"
               className={inputClasses}
@@ -173,12 +185,26 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
               onChange={(event) => onChange({ warranty_duration_months: event.target.value })}
             >
               <option value="">Choose a duration</option>
-              {DURATIONS.map((duration) => (
+              {durations.map((duration) => (
                 <option key={duration.value} value={duration.value}>
                   {duration.label}
                 </option>
               ))}
             </select>
+            {durationFromWeb && webSourceUrl && (
+              <p className="text-[12px] tracking-[-0.24px] text-muted">
+                Not printed on the receipt. Found online, so please check it:{" "}
+                <a
+                  href={webSourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-brand underline"
+                >
+                  {new URL(webSourceUrl).hostname}
+                </a>
+                {webSource?.evidence ? ` \u2014 \u201c${webSource.evidence}\u201d` : ""}
+              </p>
+            )}
           </Field>
           <div className="flex flex-col gap-[7px]">
             <p className="text-[12px] font-semibold tracking-[-0.24px] text-muted">Expiry Date (auto-calculated)</p>

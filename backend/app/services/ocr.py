@@ -14,7 +14,7 @@ Two backends, chosen by `OCR_BACKEND`:
 
 * `textract` — Amazon Textract AnalyzeExpense.
 * `bedrock` — a Claude model on Amazon Bedrock reads the image and returns
-  JSON. Handles Thai and photos well; images only (no PDF) for now. Scored in
+  JSON. Handles Thai and photos well; images and PDFs. Scored in
   scripts/ocr_compare.
 * `fake` — canned fields, so the OCR Review screen (D07) can be built and
   demoed with no AWS account and no per-page charge.
@@ -214,6 +214,74 @@ def _parse_ocr_date(text: str) -> str | None:
     return None
 
 
+# Warranty length ("3-Y", "2 YEAR", "1 ปี") and "*P25"-style promo or shop codes
+# that receipts print inside the product line. They belong to other fields (or
+# to nothing), not to the product name.
+_NAME_NOISE = re.compile(
+    r"(?<![\w])\d{1,2}\s?-?\s?(?:Y|YR|YRS|YEAR|YEARS|ปี)(?![\w])"
+    r"|(?<!\w)\*\w+",
+    re.IGNORECASE,
+)
+
+
+def _clean_product_name(name: str | None) -> str | None:
+    """The product name without warranty or promo markers; the original if that would leave nothing."""
+    if not name:
+        return name
+    cleaned = re.sub(r"\s{2,}", " ", _NAME_NOISE.sub(" ", name)).strip(" -,;/")
+    return cleaned or name
+
+
+def _clean_invoice_number(value: str | None) -> str | None:
+    """The invoice number as one tidy token string, or None.
+
+    Drops a leading label the model may have copied ("Invoice No: INV-1"),
+    collapses whitespace, and refuses anything implausibly long, which is a
+    sentence or a barcode run rather than a number.
+    """
+    value = (value or "").strip()
+    if not value:
+        return None
+    # Only whole words, and only when a separator follows, so "INV-2025-001"
+    # and "Invoice-7" are left alone.
+    cleaned = re.sub(
+        r"^(?:tax\s+)?(?:invoice|receipt)(?:\s*(?:no\.?|number|#))?(?=[\s:#.]|$)\s*[:#.]*\s*",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" :#.")
+    return cleaned if 0 < len(cleaned) <= 40 else None
+
+
+def _clean_category(value: str | None) -> str | None:
+    """A short category label, or None. Length-capped like the catalog's name column."""
+    if not value:
+        return None
+    cleaned = re.sub(r"\s+", " ", value).strip()
+    return cleaned[:60] if cleaned else None
+
+
+def _parse_months(value: Any) -> int | None:
+    """A warranty length in whole months, or None.
+
+    The model is told to answer in months, but a bad answer ("3 years", 0,
+    999, true) must become an empty Duration field rather than a wrong one the
+    user accepts without looking. 120 months (10 years) is a generous ceiling.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        value = value.strip()
+        if not value.isdigit():
+            return None
+    try:
+        months = int(value)
+    except (TypeError, ValueError):
+        return None
+    return months if 1 <= months <= 120 else None
+
+
 def parse_model_json(data: dict[str, Any]) -> dict[str, Any]:
     """A model's JSON -> the `extracted` shape, re-validating every value.
 
@@ -231,16 +299,24 @@ def parse_model_json(data: dict[str, Any]) -> dict[str, Any]:
     for item in data.get("line_items") or []:
         if not isinstance(item, dict):
             continue
-        name, serial = text(item.get("name")), text(item.get("serial_number"))
+        name = _clean_product_name(text(item.get("name")))
+        serial = text(item.get("serial_number"))
         price = _parse_amount(text(item.get("price")))
         if any((name, serial, price)):
-            items.append({"name": name, "serial_number": serial, "price": price})
+            items.append({
+                "name": name,
+                "serial_number": serial,
+                "price": price,
+                "warranty_months": _parse_months(item.get("warranty_months")),
+                "category": _clean_category(text(item.get("category"))),
+            })
 
     total_text = text(data.get("total_amount"))
     currency = text(data.get("currency"))
     return {
         "vendor_name": text(data.get("vendor_name")),
         "purchase_date": _parse_ocr_date(text(data.get("purchase_date")) or ""),
+        "invoice_number": _clean_invoice_number(text(data.get("invoice_number"))),
         "total_amount": _parse_amount(total_text),
         "currency": currency.upper() if currency else _sniff_currency(total_text),
         "line_items": items,
@@ -256,11 +332,13 @@ Return ONLY one JSON object, no prose and no markdown, with exactly these keys:
 {
   "vendor_name": string | null,
   "purchase_date": "YYYY-MM-DD" | null,
+  "invoice_number": string | null,
   "total_amount": string | null,
   "currency": string | null,
   "line_items": [
     {"name": string | null, "price": string | null,
-     "serial_number": string | null, "warranty_months": integer | null}
+     "serial_number": string | null, "warranty_months": integer | null,
+     "category": string | null}
   ]
 }
 
@@ -271,14 +349,31 @@ Rules:
   1 March 2025). Thai receipts may use Buddhist Era years such as 2568 - convert
   to Gregorian by subtracting 543. Ignore dates that belong to an address, a tax
   ID, a document number or a due date.
+- invoice_number: the number that identifies this document. Prefer an invoice /
+  receipt / tax invoice number, printed beside a label such as "Invoice No.",
+  "Receipt No.", "Tax Invoice", "เลขที่ใบกำกับภาษี", "เลขที่ใบเสร็จ" or "เลขที่".
+  If the document has none, because it is itself an online order or purchase
+  order (ใบสั่งซื้อสินค้า, "Order No."), use its own order number
+  ("เลขที่ใบสั่งซื้อ"). Return only the number, without the label. It is NEVER
+  the 13-digit tax ID, a phone number, a bank account number, a product or item
+  code, a queue or member number, or a barcode value that belongs to a product.
 - total_amount: the final amount paid, as a plain decimal string without
   thousands separators, e.g. "37570.00".
 - currency: ISO code. THB for ฿ or บาท.
 - vendor_name: the shop's name as printed in the logo or header.
-- line_items: one entry per purchased product, as printed. price is that line's
-  total amount as a decimal string.
+- line_items: one entry per purchased product. price is that line's total
+  amount as a decimal string.
+- name: ONLY the product's own name, brand and model, e.g. "CPU AMD AM5 RYZEN
+  7500F". Leave out everything else printed on that line: the warranty length
+  ("3-Y", "1 YEAR", "ประกัน 1 ปี" - that goes in warranty_months), promo or
+  shop codes such as "*P25", quantities, item numbers, SKUs and barcodes.
 - serial_number: ONLY when printed with an explicit label such as S/N, SN or
   Serial. Product codes, SKUs, barcodes and item numbers are NOT serial numbers.
+- category: what kind of product the item is. Choose ONE of: Laptop, Desktop,
+  Computer Component, Monitor, Phone, Tablet, Printer, Camera, Network
+  Equipment, Accessory, Appliance, Furniture, Other. Use Computer Component for
+  parts such as CPU, GPU, RAM, SSD, motherboard or a power supply, and Other
+  when none fits. Never invent a new label.
 - warranty_months: the warranty length in months if it is printed for that
   item ("3-Y" or "3 YEAR" is 36, "ประกัน 1 ปี" is 12). null if not printed,
   and null for lifetime warranties."""
@@ -333,12 +428,21 @@ def _bedrock_extract(s3_key: str, filename: str | None, content_type: str | None
         raise OcrError("OCR_BACKEND=bedrock but BEDROCK_MODEL_ID is not set.")
 
     data = storage.read_bytes(s3_key)
-    if (
+    is_pdf = (
         data[:4] == b"%PDF"
         or content_type == "application/pdf"
         or (filename or "").lower().endswith(".pdf")
-    ):
-        raise OcrError("The Bedrock backend reads images only; upload a JPG or PNG.")
+    )
+    if is_pdf:
+        # Converse reads a PDF natively (text and page images), so there is
+        # nothing to render here. The name is fixed on purpose: the API only
+        # allows a narrow character set and a user's filename can hold
+        # anything, including prompt text.
+        attachment = {"document": {"format": "pdf", "name": "receipt", "source": {"bytes": data}}}
+        request_text = "Extract the receipt in this document."
+    else:
+        attachment = {"image": {"format": "jpeg", "source": {"bytes": _prepare_image(data)}}}
+        request_text = "Extract the receipt in this image."
 
     try:
         response = _bedrock().converse(
@@ -347,8 +451,8 @@ def _bedrock_extract(s3_key: str, filename: str | None, content_type: str | None
             messages=[{
                 "role": "user",
                 "content": [
-                    {"image": {"format": "jpeg", "source": {"bytes": _prepare_image(data)}}},
-                    {"text": "Extract the receipt in this image."},
+                    attachment,
+                    {"text": request_text},
                 ],
             }],
             # No temperature: some current models reject it as deprecated.
@@ -378,6 +482,7 @@ def _fake_extraction(filename: str | None) -> dict[str, Any]:
     return {
         "vendor_name": "Power Buy",
         "purchase_date": None,
+        "invoice_number": "INV-2025-001",
         "total_amount": "32900.00",
         "currency": "THB",
         "line_items": [
@@ -385,8 +490,16 @@ def _fake_extraction(filename: str | None) -> dict[str, Any]:
                 "name": "Dell Latitude 5540",
                 "serial_number": "ABC123",
                 "price": "32900.00",
+                "warranty_months": 36,
+                "category": "Laptop",
             },
-            {"name": "Laptop sleeve", "serial_number": None, "price": "890.00"},
+            {
+                "name": "Laptop sleeve",
+                "serial_number": None,
+                "price": "890.00",
+                "warranty_months": None,
+                "category": "Accessory",
+            },
         ],
         "_source": f"fake OCR backend, file {filename or 'unknown'}",
     }

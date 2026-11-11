@@ -525,15 +525,29 @@ for an asset assigned to them. Anything else is `404`, never `403`.
   "extracted": {
     "vendor_name": "Power Buy",
     "purchase_date": "2025-03-01",
+    "invoice_number": "INV-2025-001",  // null when none is printed
     "total_amount": "32900.00",
     "currency": "THB",
     "line_items": [                    // one invoice can hold several assets
-      { "name": "Dell Latitude 5540", "serial_number": "ABC123", "price": "32900.00" }
+      { "name": "Dell Latitude 5540", "serial_number": "ABC123", "price": "32900.00",
+        "warranty_months": 36,       // null when the receipt prints no warranty length
+        "category": "Laptop",        // suggested; null when unsure
+        "warranty_source": null }    // {url, evidence} when warranty_months was looked up on the web
     ]
   },
   "error": null
 }
 ```
+
+`line_items[].warranty_months` is the warranty length printed on the receipt
+for that item, as a whole number of months from 1 to 120 ("3-Y" is 36, "ประกัน
+1 ปี" is 12). It is `null` when nothing is printed or the warranty is for life,
+and the Add Asset screen uses it to pre-select Duration. `invoice_number` and
+`line_items[].category` pre-fill Invoice Number and Category the same way;
+the category is one label from a short fixed list in the OCR prompt (Laptop,
+Monitor, Computer Component, …) so the catalog does not fill with variants. Only the `bedrock`
+OCR backend fills it; `textract` leaves it `null`. The uploaded file may be an
+image or, with the `bedrock` backend, a PDF.
 
 Every field in `extracted` is optional, including `purchase_date`: a receipt
 photographed at an angle gives some of them up, and the review screen is built
