@@ -11,7 +11,7 @@ Kick-off Report; this file covers the decisions that shape the code.
 ```
 Browser ──▶ ALB ──▶ ECS Fargate ──┬──▶ RDS PostgreSQL   (assets, warranties, users)
                                   ├──▶ S3               (receipts, invoices)
-                                  ├──▶ Textract         (OCR extraction)
+                                  ├──▶ Bedrock          (OCR: Claude Haiku 5.5)
                                   └──▶ SES              (expiry emails)
             Cognito ── sign-in ───┘
 ```
