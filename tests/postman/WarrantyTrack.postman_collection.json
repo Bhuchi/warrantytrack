@@ -1,0 +1,1037 @@
+{
+  "info": {
+    "_postman_id": "c07bd083-a617-5d1d-bb27-f6e3ac984300",
+    "name": "WarrantyTrack API",
+    "description": "Every REST endpoint in docs/api.md, with tests (CLOUDAPPG5-101). Run the folders in order: later requests use ids saved by earlier ones.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Runs before every request. Adds the Cognito token and the workspace, so no",
+          "// request has to remember them. Locally (AUTH_BACKEND=dev) both may be empty.",
+          "const token = pm.variables.get('token');",
+          "const workspace = pm.variables.get('workspaceId');",
+          "const skipAuth = pm.request.headers.has('X-Skip-Auth');",
+          "pm.request.headers.remove('X-Skip-Auth');",
+          "if (token && !skipAuth) {",
+          "  pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+          "}",
+          "// A request that sets its own X-Workspace-Id (the security test) keeps it.",
+          "if (workspace && !skipAuth && !pm.request.headers.has('X-Workspace-Id')) {",
+          "  pm.request.headers.upsert({ key: 'X-Workspace-Id', value: workspace });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "workspaceId",
+      "value": ""
+    },
+    {
+      "key": "serial",
+      "value": ""
+    },
+    {
+      "key": "categoryId",
+      "value": ""
+    },
+    {
+      "key": "assetId",
+      "value": ""
+    },
+    {
+      "key": "ocrAssetId",
+      "value": ""
+    },
+    {
+      "key": "documentId",
+      "value": ""
+    },
+    {
+      "key": "uploadUrl",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Health",
+      "description": "",
+      "item": [
+        {
+          "name": "API is up",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('reports ok', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Account and workspaces",
+      "description": "",
+      "item": [
+        {
+          "name": "Current user and memberships",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('has the user', () => pm.expect(body.user.id).to.be.a('string'));",
+                  "pm.test('belongs to a personal workspace', () => {",
+                  "  const personal = body.memberships.find((m) => m.workspace.type === 'personal');",
+                  "  pm.expect(personal, 'personal membership').to.exist;",
+                  "  // Every later request acts in this workspace unless one was set already.",
+                  "  if (!pm.variables.get('workspaceId')) {",
+                  "    pm.collectionVariables.set('workspaceId', personal.workspace.id);",
+                  "  }",
+                  "});",
+                  "// A serial number no earlier run has used.",
+                  "pm.collectionVariables.set('serial', 'PM-' + Date.now());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create an organization workspace",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/workspaces",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Test Org {{$timestamp}}\",\n  \"type\": \"organization\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('caller is the owner', () => pm.expect(pm.response.json().role).to.eql('owner'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Catalog",
+      "description": "",
+      "item": [
+        {
+          "name": "List categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/categories"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('items is a list', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List vendors",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/vendors"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List departments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/departments"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List locations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/locations"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create a category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/categories",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Category {{serial}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('categoryId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a duplicate category name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/categories",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"postman category {{serial}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict, even in a different case', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rename the category",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/categories/{{categoryId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Renamed {{serial}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('name changed', () => pm.expect(pm.response.json().name).to.include('Postman Renamed'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete the category",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/categories/{{categoryId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Assets",
+      "description": "",
+      "item": [
+        {
+          "name": "Create an asset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/assets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Test Laptop\",\n  \"serial_number\": \"{{serial}}\",\n  \"condition\": \"new\",\n  \"purchase_date\": \"2026-11-01\",\n  \"price\": \"32900.00\",\n  \"currency\": \"THB\",\n  \"invoice_number\": \"PM-INV-001\",\n  \"vendor_name\": \"Power Buy\",\n  \"category_name\": \"Laptop\",\n  \"storage_note\": \"Box on the top shelf\",\n  \"warranty\": {\n    \"provider\": \"Dell\",\n    \"start_date\": \"2026-11-01\",\n    \"duration_months\": 24\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const asset = pm.response.json();",
+                  "pm.collectionVariables.set('assetId', asset.id);",
+                  "pm.test('serial number saved', () => pm.expect(asset.serial_number).to.eql(pm.variables.get('serial')));",
+                  "pm.test('warranty end date calculated (2 years)', () => pm.expect(asset.warranty.end_date).to.eql('2028-11-01'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject missing required fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/assets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Incomplete\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422 Unprocessable', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a duplicate serial number",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/assets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Test Laptop\",\n  \"serial_number\": \"{{serial}}\",\n  \"condition\": \"new\",\n  \"purchase_date\": \"2026-11-01\",\n  \"price\": \"32900.00\",\n  \"currency\": \"THB\",\n  \"invoice_number\": \"PM-INV-001\",\n  \"vendor_name\": \"Power Buy\",\n  \"category_name\": \"Laptop\",\n  \"storage_note\": \"Box on the top shelf\",\n  \"warranty\": {\n    \"provider\": \"Dell\",\n    \"start_date\": \"2026-11-01\",\n    \"duration_months\": 24\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search by serial number",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/assets?q={{serial}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('finds exactly the new asset', () => {",
+                  "  const items = pm.response.json().items;",
+                  "  pm.expect(items.map((a) => a.id)).to.include(pm.variables.get('assetId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter by warranty status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/assets?status=active"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('every result is active', () => {",
+                  "  pm.response.json().items.forEach((a) => pm.expect(a.warranty_status).to.eql('active'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Asset details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/assets/{{assetId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('warranty status is active', () => pm.expect(pm.response.json().warranty.status).to.eql('active'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Edit the storage note",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/assets/{{assetId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"storage_note\": \"Moved to the cabinet\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('note updated', () => pm.expect(pm.response.json().storage_note).to.eql('Moved to the cabinet'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refuse assigning in a personal workspace",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/assets/{{assetId}}/assign",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assigned_to_user_id\": \"00000000-0000-0000-0000-000000000099\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422: a personal workspace has no one to assign to', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown asset id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/assets/00000000-0000-0000-0000-000000000099"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Bulk import",
+      "description": "",
+      "item": [
+        {
+          "name": "Dry run a CSV with one bad row",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/csv"
+              }
+            ],
+            "url": "{{baseUrl}}/assets/import?mode=validate",
+            "body": {
+              "mode": "raw",
+              "raw": "name,serial_number,purchase_date,price,invoice_number,vendor,category,warranty_provider,warranty_start_date,warranty_duration_months\nImport Monitor,IMP-{{serial}},2026-10-01,5990,INV-IMP-1,JIB,Monitor,Dell,2026-10-01,12\nBroken Row,,not-a-date,5990,INV-IMP-2,JIB,Monitor,Dell,2026-10-01,12\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('reads both rows', () => pm.expect(body.total_rows).to.eql(2));",
+                  "pm.test('one row is valid', () => pm.expect(body.valid).to.eql(1));",
+                  "pm.test('the bad row is reported as row 3', () => pm.expect(body.errors.map((e) => e.row)).to.include(3));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Receipts and OCR",
+      "description": "",
+      "item": [
+        {
+          "name": "Get an upload URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/documents/presign",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"filename\": \"sample-receipt.png\",\n  \"content_type\": \"image/png\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('documentId', body.document_id);",
+                  "pm.collectionVariables.set('uploadUrl', body.upload_url);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload the receipt file",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "image/png"
+              },
+              {
+                "key": "X-Skip-Auth",
+                "value": "1"
+              }
+            ],
+            "url": "{{uploadUrl}}",
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": "../robot/files/sample-receipt.png"
+              }
+            },
+            "description": "Goes to S3 on AWS (no token: the URL is already signed) or to the dev-upload route locally."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('upload accepted (200 from S3, 204 locally)', () => pm.expect(pm.response.code).to.be.oneOf([200, 204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start reading the receipt",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/documents/{{documentId}}/submit"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 Accepted', () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read the extracted details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/documents/{{documentId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const doc = pm.response.json();",
+                  "pm.test('extraction finished', () => pm.expect(doc.status).to.eql('extracted'));",
+                  "pm.test('found at least one line item', () => pm.expect(doc.extracted.line_items.length).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm the receipt into an asset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/documents/{{documentId}}/confirm",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assets\": [\n    {\n      \"name\": \"Postman OCR Laptop\",\n      \"serial_number\": \"OCR-{{serial}}\",\n      \"condition\": \"new\",\n      \"purchase_date\": \"2026-11-01\",\n      \"price\": \"32900.00\",\n      \"currency\": \"THB\",\n      \"invoice_number\": \"PM-INV-001\",\n      \"vendor_name\": \"Power Buy\",\n      \"category_name\": \"Laptop\",\n      \"storage_note\": \"Box on the top shelf\",\n      \"warranty\": {\n        \"provider\": \"Dell\",\n        \"start_date\": \"2026-11-01\",\n        \"duration_months\": 24\n      }\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('created one asset', () => pm.expect(pm.response.json().created_asset_ids).to.have.length(1));",
+                  "pm.collectionVariables.set('ocrAssetId', pm.response.json().created_asset_ids[0]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refuse confirming twice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/documents/{{documentId}}/confirm",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assets\": [\n    {\n      \"name\": \"Postman Test Laptop\",\n      \"serial_number\": \"OCR2-{{serial}}\",\n      \"condition\": \"new\",\n      \"purchase_date\": \"2026-11-01\",\n      \"price\": \"32900.00\",\n      \"currency\": \"THB\",\n      \"invoice_number\": \"PM-INV-001\",\n      \"vendor_name\": \"Power Buy\",\n      \"category_name\": \"Laptop\",\n      \"storage_note\": \"Box on the top shelf\",\n      \"warranty\": {\n        \"provider\": \"Dell\",\n        \"start_date\": \"2026-11-01\",\n        \"duration_months\": 24\n      }\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict: a double tap cannot create the assets twice', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Notifications",
+      "description": "",
+      "item": [
+        {
+          "name": "List notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/notifications"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('has an unread count and a list', () => {",
+                  "  pm.expect(body.unread).to.be.a('number');",
+                  "  pm.expect(body.items).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark all as read",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/notifications/mark-all-read"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unread count is now zero",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/notifications"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('unread is 0', () => pm.expect(pm.response.json().unread).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Security",
+      "description": "",
+      "item": [
+        {
+          "name": "Reject a request without a token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Skip-Auth",
+                "value": "1"
+              }
+            ],
+            "url": "{{baseUrl}}/assets"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Locally AUTH_BACKEND=dev lets everyone in, so this only means something on AWS.",
+                  "if (pm.variables.get('token')) {",
+                  "  pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "} else {",
+                  "  pm.test.skip('401 Unauthorized (needs a real token: run against AWS)', () => {});",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hide another workspace's data",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Workspace-Id",
+                "value": "00000000-0000-0000-0000-000000000099"
+              }
+            ],
+            "url": "{{baseUrl}}/assets"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404, not 403: it must not even confirm the workspace exists', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. Clean up",
+      "description": "",
+      "item": [
+        {
+          "name": "Delete the test asset",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/assets/{{assetId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete the OCR test asset",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/assets/{{ocrAssetId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deleted asset is gone",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/assets/{{assetId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
