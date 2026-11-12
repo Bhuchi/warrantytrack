@@ -30,7 +30,7 @@ export default function TextField({
         <Image src={iconSrc} alt="" width={20} height={20} />
         <input
           id={id}
-          className={`min-w-0 flex-1 text-[15px] tracking-[-0.3px] outline-none placeholder:text-muted ${className ?? ""}`}
+          className={`min-w-0 flex-1 self-stretch text-[15px] tracking-[-0.3px] outline-none placeholder:text-muted ${className ?? ""}`}
           {...inputProps}
         />
       </div>

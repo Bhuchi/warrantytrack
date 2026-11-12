@@ -121,7 +121,7 @@ export default function SignInForm() {
 
         <Link
           href="/forgot-password"
-          className="text-[14px] font-semibold tracking-[-0.28px] text-brand"
+          className="-my-1.5 py-1.5 text-[14px] font-semibold tracking-[-0.28px] text-brand"
         >
           Forgot password?
         </Link>

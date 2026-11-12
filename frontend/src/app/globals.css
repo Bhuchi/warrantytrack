@@ -9,18 +9,18 @@
   --canvas: #f5f7fc;
   --surface: #ffffff;
   --foreground: #0f172a;
-  --muted: #64748b;
+  --muted: #556274;
   /* Lighter grey for secondary labels and icons. */
-  --muted-light: #94a3b8;
+  --muted-light: #606f84;
   --border: #e2e8f0;
 
   /* Warranty status badges, M05 Assets List (3382:382 / 3382:407 / 3382:432).
      Each status has a strong colour for the text and a soft one behind it. */
-  --status-active: #16a34a;
+  --status-active: #15803d;
   --status-active-soft: #dcfce7;
   --status-expiring: #b45309;
   --status-expiring-soft: #fef3c7;
-  --status-expired: #dc2626;
+  --status-expired: #b91c1c;
   --status-expired-soft: #fee2e2;
   /* No warranty: purple from the Dashboard status bar (3382:250). Figma has no
      badge for it, so the soft tint follows the same pattern as the three above. */

@@ -163,7 +163,7 @@ export default function SettingsNotifications() {
                     width={7}
                     height={7}
                   />
-                  <span className="text-[11px] font-semibold text-green-600">
+                  <span className="text-[11px] font-semibold text-status-active">
                     Connected
                   </span>
                 </div>
