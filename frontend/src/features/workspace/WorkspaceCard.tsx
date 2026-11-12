@@ -19,6 +19,8 @@ interface WorkspaceCardProps {
   href: string;
   selected: boolean;
   onSelect: () => void;
+  /** Runs when the desktop "Continue" is clicked, before moving on. */
+  onContinue?: () => void;
 }
 
 /**
@@ -38,10 +40,11 @@ export default function WorkspaceCard({
   href,
   selected,
   onSelect,
+  onContinue,
 }: WorkspaceCardProps) {
   return (
     <div
-      className={`flex flex-col gap-4 rounded-2xl bg-surface p-5 md:flex-1 md:gap-[22px] md:px-8 md:pt-8 md:pb-7 ${
+      className={`flex flex-col gap-4 rounded-2xl bg-surface p-5 md:min-w-[260px] md:max-w-[420px] md:flex-1 md:gap-[22px] md:px-8 md:pt-8 md:pb-7 ${
         selected
           ? "border-2 border-brand md:shadow-panel-selected"
           : "border border-border md:shadow-panel"
@@ -113,16 +116,25 @@ export default function WorkspaceCard({
         </div>
       </button>
 
-      <Link
-        href={href}
-        className={`hidden h-[50px] w-full items-center justify-center rounded-lg text-[16px] font-bold tracking-[-0.32px] md:flex ${
-          selected
-            ? "bg-brand text-brand-foreground"
-            : "border border-border text-brand"
-        }`}
-      >
-        Continue
-      </Link>
+      {/* Desktop Continue. Only the selected card's one works, so you cannot
+          continue into a workspace that is not the one highlighted. */}
+      {selected ? (
+        <Link
+          href={href}
+          onClick={onContinue}
+          className="hidden h-[50px] w-full items-center justify-center rounded-lg bg-brand text-[16px] font-bold tracking-[-0.32px] text-brand-foreground md:flex"
+        >
+          Continue
+        </Link>
+      ) : (
+        <button
+          type="button"
+          disabled
+          className="hidden h-[50px] w-full cursor-not-allowed items-center justify-center rounded-lg border border-border text-[16px] font-bold tracking-[-0.32px] text-brand opacity-50 md:flex"
+        >
+          Continue
+        </button>
+      )}
     </div>
   );
 }

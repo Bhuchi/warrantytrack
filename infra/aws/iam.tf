@@ -52,7 +52,8 @@ resource "aws_iam_role_policy" "execution_secrets" {
         Resource = compact([
           aws_ssm_parameter.database_url.arn,
           aws_ssm_parameter.secret_key.arn,
-          one(aws_ssm_parameter.db_password[*].arn)
+          one(aws_ssm_parameter.db_password[*].arn),
+          one(aws_ssm_parameter.tavily_api_key[*].arn)
         ])
       },
       {
@@ -110,6 +111,19 @@ resource "aws_iam_role_policy" "task" {
           "textract:DetectDocumentText"
         ]
         Resource = "*"
+      },
+      {
+        # Claude on Bedrock reads receipts (OCR_BACKEND=bedrock). Resource "*"
+        # because a global inference profile fans out to foundation-model ARNs
+        # in several regions; tighten once the model ID is final.
+        Effect   = "Allow"
+        Action   = ["bedrock:InvokeModel"]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["cognito-idp:AdminGetUser"]
+        Resource = aws_cognito_user_pool.main.arn
       },
       {
         Effect   = "Allow"

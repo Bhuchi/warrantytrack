@@ -23,24 +23,50 @@ interface ModalProps {
 export default function Modal({ open, onClose, title, children, actions }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  // Same pattern as NavPanel: while open, move focus into the dialog, stop the
-  // page behind from scrolling, and listen for Escape. The returned function
-  // undoes all three when the modal closes.
+  // On open: remember what had focus (usually the button that opened us), move
+  // focus into the dialog and stop the page behind from scrolling. The cleanup
+  // runs however the modal closes, and gives focus back to that element.
+  // Only `open` is a dependency, so this cannot re-run while the modal is open.
   useEffect(() => {
     if (!open) return;
 
+    const opener = document.activeElement as HTMLElement | null;
     dialogRef.current?.focus();
     document.body.style.overflow = "hidden";
 
+    return () => {
+      document.body.style.overflow = "";
+      opener?.focus();
+    };
+  }, [open]);
+
+  // While open: Escape closes, and Tab wraps around inside the dialog instead
+  // of moving to the hidden page behind it.
+  useEffect(() => {
+    if (!open) return;
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
+      if (event.key !== "Tab" || !dialogRef.current) return;
+
+      const items = dialogRef.current.querySelectorAll<HTMLElement>(
+        "a[href], button:not([disabled]), input:not([disabled]), select, textarea",
+      );
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && (active === first || active === dialogRef.current)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = "";
-    };
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
   if (!open) return null;

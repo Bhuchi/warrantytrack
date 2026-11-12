@@ -35,7 +35,7 @@ Each Dockerfile has two targets:
 - **ALB** distributes traffic across AZs.
 - **ECR** stores the Docker images ECS pulls.
 - **RDS PostgreSQL** for the database.
-- **S3** stores receipts/invoices; **Textract** extracts data.
+- **S3** stores receipts/invoices; **Bedrock** (Claude Haiku 5.5) extracts data.
 - **Cognito** for auth; **SES** for expiry emails; **CloudWatch** for logs.
 
 Region: `ap-southeast-1` (Singapore).

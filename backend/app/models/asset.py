@@ -79,8 +79,10 @@ class Asset(Base):
     # --- Required on manual entry (CLOUDAPPG5-118) ---
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     serial_number: Mapped[str] = mapped_column(String(120), nullable=False)
-    condition: Mapped[AssetCondition] = mapped_column(
-        SAEnum(AssetCondition, name="asset_condition"), nullable=False
+    # Optional since 0003 (issue #34): the final CLOUDAPPG5-118 text no longer
+    # asks for it and the ERD postpones it. Null means "not recorded".
+    condition: Mapped[AssetCondition | None] = mapped_column(
+        SAEnum(AssetCondition, name="asset_condition"), nullable=True
     )
     purchase_date: Mapped[date] = mapped_column(Date, nullable=False)
 

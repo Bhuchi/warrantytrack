@@ -1,31 +1,35 @@
 import type { ReactNode } from "react";
 
-import AppShell from "@/components/AppShell";
+import ToastProvider from "@/components/ToastProvider";
+import RequireSignIn from "@/features/auth/RequireSignIn";
+import { getCurrentWorkspace } from "@/features/workspace/currentWorkspace";
+import SignedInShell from "@/features/workspace/SignedInShell";
 
 /**
- * Wraps every signed-in screen with the navigation panel and mobile top bar.
+ * Wraps every signed-in screen with the navigation panel and mobile top bar,
+ * and the ToastProvider, so a toast survives moving between these pages.
  * Marketing pages live in (marketing) and auth pages in (auth); neither gets
  * this chrome.
  *
- * TODO: workspace, user and unread count are the Figma placeholders. Read them
- * from the session and the API once auth and /workspaces exist (FE-04, FE-05).
+ * The nav panel shows the workspace chosen on /workspace, read from the
+ * "workspace" cookie. Reading a cookie makes these pages render on every
+ * request instead of once at build time.
+ *
+ * RequireSignIn sends anyone who is not signed in to /login (CLOUDAPPG5-122).
+ *
+ * SignedInShell swaps the cookie-based placeholders for the real workspace,
+ * user and unread count from GET /me and GET /notifications (CLOUDAPPG5-123).
  */
-export default function AppLayout({ children }: { children: ReactNode }) {
+export default async function AppLayout({ children }: { children: ReactNode }) {
+  const { workspace, user, unreadCount } = await getCurrentWorkspace();
+
   return (
-    <AppShell
-      workspace={{
-        name: "SIIT Organization",
-        kind: "Organization workspace",
-        initials: "SI",
-      }}
-      user={{
-        name: "Chaiyapat A.",
-        department: "IT Department",
-        initials: "CA",
-      }}
-      unreadCount={3}
-    >
-      {children}
-    </AppShell>
+    <RequireSignIn>
+      <ToastProvider>
+        <SignedInShell placeholder={{ workspace, user, unreadCount }}>
+          {children}
+        </SignedInShell>
+      </ToastProvider>
+    </RequireSignIn>
   );
 }

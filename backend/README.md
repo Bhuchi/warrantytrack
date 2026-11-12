@@ -14,7 +14,26 @@ docker compose exec backend alembic upgrade head
 
 # Run the tests
 docker compose exec backend pytest
+
+# Optional sample rows (not a login bypass)
+docker compose exec backend python -m scripts.seed_dev
+
+# The daily warranty-expiry scan, by hand (--today to try another date)
+docker compose exec backend python -m scripts.scan_warranties
+docker compose exec backend python -m scripts.scan_warranties --today 2026-12-01
 ```
+
+### S3, Bedrock and SES without an AWS account
+
+`STORAGE_BACKEND`, `OCR_BACKEND` and `EMAIL_BACKEND` default to `local`,
+`fake` and `log`, so receipt upload, OCR and the expiry scan all work on
+`docker compose up` with nothing configured and nothing spent. On those
+defaults the browser PUTs its file to `/documents/{id}/dev-upload` instead of
+to S3, OCR returns canned fields, and email goes to the log.
+
+Set all three to `s3` / `bedrock` / `ses` (plus `S3_BUCKET_NAME`,
+`BEDROCK_MODEL_ID` for Claude Haiku 5.5, and `SES_SENDER_EMAIL`) once the account exists — see `backend/.env.example`. The
+app refuses to start in production on a development backend.
 
 To run it standalone (needs Python 3.11+ and a PostgreSQL you can reach):
 
@@ -70,6 +89,16 @@ Every tenant-scoped table carries `workspace_id NOT NULL`. Every request runs
 inside one workspace, and the caller's role comes from the `memberships`
 table — **never** from the Cognito token. A record in a workspace the caller
 doesn't belong to returns **404, not 403**.
+
+Set `COGNITO_USER_POOL_ID` and `COGNITO_CLIENT_ID` in `backend/.env`. Send a
+Cognito **ID token** as `Authorization: Bearer <token>` and select a workspace
+with `X-Workspace-Id: <uuid>` on scoped requests. `GET /me` needs only the ID
+token; it creates the user and personal workspace on first sign-in and lists
+every current membership. `POST /workspaces` creates an organization owned by
+that user. The backend reads the first profile from Cognito AdminGetUser, so
+the task role needs `cognito-idp:AdminGetUser` on this user pool.
+In Learner Lab mode (`create_iam_roles = false`), confirm the supplied LabRole
+grants that action; Terraform cannot change its externally managed policy.
 
 Read [docs/architecture.md](../docs/architecture.md) before writing your first
 endpoint. It explains why.

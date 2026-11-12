@@ -2,7 +2,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api.routes import health
+from app.api.routes import (
+    assets,
+    catalog,
+    dashboard,
+    documents,
+    health,
+    notifications,
+    workspaces,
+)
 from app.core.config import settings
 
 app = FastAPI(
@@ -19,8 +27,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# One include_router per resource. Give each feature router its own prefix so
+# each path is defined in exactly one place; the route files use "" for the
+# collection root.
 app.include_router(health.router)
-
-# Add your feature router here, one line per resource:
-#   from app.api.routes import assets
-#   app.include_router(assets.router, prefix="/assets")
+app.include_router(workspaces.router)
+app.include_router(notifications.router, prefix="/notifications")
+# The four catalog lists the asset pickers are built from. One router each, so
+# every path is still defined here and nowhere else.
+app.include_router(catalog.categories_router, prefix="/categories")
+app.include_router(catalog.vendors_router, prefix="/vendors")
+app.include_router(catalog.departments_router, prefix="/departments")
+app.include_router(catalog.locations_router, prefix="/locations")
+app.include_router(assets.router, prefix="/assets")
+# Receipt upload and OCR. Mounted after /assets because confirming a
+# document creates assets through the same service that router uses.
+app.include_router(documents.router, prefix="/documents")
+app.include_router(dashboard.router, prefix="/dashboard")

@@ -1,0 +1,13 @@
+# Receipts for OCR testing (CLOUDAPPG5-102).
+#
+# Real purchase receipts carry names, addresses and partial card numbers, so
+# they must not reach a shared repository. Drop your own samples in this folder
+# to run tests against them locally; git ignores everything here except the
+# sanitised ones listed below, which we commit deliberately.
+#
+# Adding a sample for everyone? Check it has no personal data, then add a
+# `!` line for it here in the same PR.
+
+*
+!.gitignore
+!jib-receipt.jpg

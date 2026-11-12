@@ -1,10 +1,9 @@
-import type { ReactNode } from "react";
-
 import Button from "@/components/Button";
 import Card from "@/components/Card";
 import type { AssetCondition, OcrDocument } from "@/types/documents";
 
 import { type AssetDraft, draftFromScan, isReceiptComplete, warrantyEndLabel } from "./draft";
+import Field, { inputClasses } from "./Field";
 
 interface ReceiptReviewProps {
   draft: AssetDraft;
@@ -30,54 +29,35 @@ const DURATIONS = [
   { value: "36", label: "3 years" },
 ];
 
-/** Shared look for every box: M07 field style (3382:636). */
-const inputClasses =
-  "h-12 w-full rounded-[9px] border border-border bg-surface px-3.5 text-[14px] font-medium tracking-[-0.28px] text-foreground outline-none focus:border-brand md:h-[46px]";
-
-interface FieldProps {
-  id: string;
-  label: string;
-  required?: boolean;
-  /** Shows the green "OCR" badge: this value was read from the receipt. */
-  fromOcr?: boolean;
-  /** Spans both columns of the desktop grid. */
-  wide?: boolean;
-  children: ReactNode;
-}
-
-/** A label (with optional "*" and "OCR" badge) above one input. */
-function Field({ id, label, required, fromOcr, wide, children }: FieldProps) {
-  return (
-    <div className={`flex flex-col gap-[7px] ${wide ? "md:col-span-2" : ""}`}>
-      <div className="flex items-center justify-between gap-2">
-        <label htmlFor={id} className="text-[12px] font-semibold tracking-[-0.24px] text-foreground">
-          {label}
-          {required && " *"}
-        </label>
-        {fromOcr && (
-          <span className="rounded-full bg-status-active-soft px-[9px] py-1 text-[10px] font-semibold tracking-[-0.2px] text-status-active">
-            OCR
-          </span>
-        )}
-      </div>
-      {children}
-    </div>
-  );
-}
-
 /**
  * Step 1's review: check and correct what OCR read, or type it all in for
  * manual entry. Mobile 3569:361, desktop 3570:451.
  *
- * TODO: Category, Department and Location (desktop frame) need lists from the
- * backend (/categories, /departments) that do not exist yet.
+ * Required fields follow issue #34: everything except Condition, including
+ * Category, Invoice Number and the whole warranty.
+ *
+ * Category is typed, like Vendor: POST /assets adds a new name to the list.
+ * TODO: Department and Location (desktop frame) need lists from the backend
+ * (/departments) that do not exist yet.
  */
 export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCancel }: ReceiptReviewProps) {
   // What OCR filled in, to decide where the "OCR" badges go.
   const ocr = scan?.status === "extracted" ? draftFromScan(scan) : null;
   const fromOcr = (key: keyof AssetDraft) => Boolean(ocr?.[key]);
-  const ocrCount = ocr ? ["name", "vendor_name", "purchase_date", "price"].filter((key) => fromOcr(key as keyof AssetDraft)).length : 0;
+  const ocrCount = ocr ? ["name", "vendor_name", "purchase_date", "price", "invoice_number", "category_name", "warranty_duration_months"].filter((key) => fromOcr(key as keyof AssetDraft)).length : 0;
   const endLabel = warrantyEndLabel(draft);
+  // The warranty length was not on the receipt: it was found on the web. Say
+  // so, and link the page, until the user changes the value.
+  const webSource = scan?.status === "extracted" ? scan.extracted?.line_items[0]?.warranty_source : null;
+  const webSourceUrl = webSource && /^https:\/\//.test(webSource.url) ? webSource.url : null;
+  const durationFromWeb = Boolean(webSourceUrl) && ocr?.warranty_duration_months === draft.warranty_duration_months;
+  // A receipt can print a length the list does not offer (18 months), so the
+  // chosen value always gets an option instead of silently showing "Choose".
+  const chosen = draft.warranty_duration_months;
+  const durations =
+    chosen && !DURATIONS.some((d) => d.value === chosen)
+      ? [...DURATIONS, { value: chosen, label: `${chosen} months` }].sort((a, b) => Number(a.value) - Number(b.value))
+      : DURATIONS;
 
   return (
     <div className="flex flex-col gap-3 md:gap-4">
@@ -125,7 +105,7 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
                 onChange={(event) => onChange({ name: event.target.value })}
               />
             </Field>
-            <Field id="invoice-number" label="Invoice Number">
+            <Field id="invoice-number" label="Invoice Number" required fromOcr={fromOcr("invoice_number")}>
               <input
                 id="invoice-number"
                 className={inputClasses}
@@ -142,7 +122,16 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
                 onChange={(event) => onChange({ price: event.target.value })}
               />
             </Field>
-            <Field id="condition" label="Condition" required wide>
+            <Field id="category" label="Category" required fromOcr={fromOcr("category_name")}>
+              <input
+                id="category"
+                className={inputClasses}
+                placeholder="e.g. Laptop"
+                value={draft.category_name}
+                onChange={(event) => onChange({ category_name: event.target.value })}
+              />
+            </Field>
+            <Field id="condition" label="Condition">
               <select
                 id="condition"
                 className={inputClasses}
@@ -166,11 +155,11 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
               Warranty Details
             </h2>
             <p className="text-[11px] tracking-[-0.22px] text-muted-light md:text-[12px]">
-              Optional. The expiry date is worked out for you.
+              Required. The expiry date is worked out for you.
             </p>
           </div>
 
-          <Field id="warranty-provider" label="Warranty Provider">
+          <Field id="warranty-provider" label="Warranty Provider" required>
             <input
               id="warranty-provider"
               className={inputClasses}
@@ -179,7 +168,7 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
               onChange={(event) => onChange({ warranty_provider: event.target.value })}
             />
           </Field>
-          <Field id="warranty-start" label="Start Date">
+          <Field id="warranty-start" label="Start Date" required>
             <input
               id="warranty-start"
               type="date"
@@ -188,20 +177,34 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
               onChange={(event) => onChange({ warranty_start_date: event.target.value })}
             />
           </Field>
-          <Field id="warranty-duration" label="Duration">
+          <Field id="warranty-duration" label="Duration" required fromOcr={fromOcr("warranty_duration_months")}>
             <select
               id="warranty-duration"
               className={inputClasses}
               value={draft.warranty_duration_months}
               onChange={(event) => onChange({ warranty_duration_months: event.target.value })}
             >
-              <option value="">No warranty</option>
-              {DURATIONS.map((duration) => (
+              <option value="">Choose a duration</option>
+              {durations.map((duration) => (
                 <option key={duration.value} value={duration.value}>
                   {duration.label}
                 </option>
               ))}
             </select>
+            {durationFromWeb && webSourceUrl && (
+              <p className="text-[12px] tracking-[-0.24px] text-muted">
+                Not printed on the receipt. Found online, so please check it:{" "}
+                <a
+                  href={webSourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-brand underline"
+                >
+                  {new URL(webSourceUrl).hostname}
+                </a>
+                {webSource?.evidence ? ` \u2014 \u201c${webSource.evidence}\u201d` : ""}
+              </p>
+            )}
           </Field>
           <div className="flex flex-col gap-[7px]">
             <p className="text-[12px] font-semibold tracking-[-0.24px] text-muted">Expiry Date (auto-calculated)</p>
