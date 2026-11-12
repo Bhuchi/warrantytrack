@@ -17,7 +17,7 @@ Step-by-step commands are in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 | **ECR** | Two repositories with scan-on-push and a 10-image lifecycle policy |
 | **RDS PostgreSQL** | Single-AZ, encrypted, private, 7-day backups. No final snapshot — see DEPLOYMENT.md teardown. |
 | **Cognito** | User pool and public browser client |
-| **SSM Parameter Store** | `DATABASE_URL` and `SECRET_KEY` as SecureStrings |
+| **SSM Parameter Store** | `DATABASE_URL` and `SECRET_KEY` as SecureStrings; `TAVILY_API_KEY` too when the warranty lookup is on |
 | **CloudWatch Logs** | `/ecs/<name>`, 14-day retention |
 | **IAM** | Scoped execution and task roles |
 | **AWS Budgets** | Monthly alert at 50%, 80% and forecast 100% |
@@ -94,6 +94,7 @@ security.tf        the three security groups
 identity.tf        Cognito user pool and client
 registry.tf        ECR repositories and lifecycle policies
 secrets.tf         generated DATABASE_URL and SECRET_KEY in SSM
+warranty_search.tf optional Tavily key parameter for the online warranty lookup
 database.tf        RDS PostgreSQL
 load_balancer.tf   ALB, target group, listeners
 ecs.tf             cluster, task definitions, service
