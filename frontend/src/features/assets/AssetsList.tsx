@@ -114,7 +114,7 @@ export default function AssetsList() {
     <div className="flex flex-col gap-3 md:gap-4">
       {/* Mobile: search then tabs. Desktop: one white bar with search and the Status dropdown. */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:rounded-[14px] md:border md:border-border md:bg-surface md:px-5 md:py-4">
-        <label className="flex h-[46px] items-center gap-2.5 rounded-[10px] border border-border bg-surface px-3.5 md:h-11 md:flex-1 md:rounded-lg md:bg-canvas">
+        <label className="flex h-[46px] items-center gap-2.5 rounded-[10px] border border-border bg-surface px-3.5 focus-within:border-brand md:h-11 md:flex-1 md:rounded-lg md:bg-canvas">
           <Image src="/icons/search.svg" alt="" width={17} height={17} className="shrink-0" />
           <span className="sr-only">Search assets</span>
           <input
@@ -145,7 +145,7 @@ export default function AssetsList() {
           })}
         </div>
 
-        <label className="hidden h-11 w-[178px] shrink-0 items-center gap-2.5 rounded-lg border border-border bg-surface pr-3 pl-3.5 md:flex">
+        <label className="hidden h-11 w-[178px] shrink-0 items-center gap-2.5 rounded-lg border border-border bg-surface pr-3 pl-3.5 focus-within:border-brand md:flex">
           <span className="flex min-w-0 flex-1 flex-col gap-px">
             <span className="text-[10px] tracking-[0.2px] text-muted-light">STATUS</span>
             <select
