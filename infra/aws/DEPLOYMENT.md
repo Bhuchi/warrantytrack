@@ -9,14 +9,18 @@ Every command runs from `infra/aws` unless stated otherwise.
 
 - Terraform >= 1.11, AWS CLI v2, Docker, `jq`
 - AWS credentials for the project account: `aws sts get-caller-identity`
-- The **document bucket name** from the S3/Textract workstream
-- A **verified SES sender**, or accept that mail will not send yet
+- A globally unique name for the S3 documents bucket this stack creates
+- An SES sender address you control; its verification email must be confirmed
+- A Bedrock model or inference profile ID enabled for this account when using OCR
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-Fill in `document_bucket_name`, `ses_sender_email` and `budget_alert_email`.
+Fill in `document_bucket_name`, `ses_sender_email`, `budget_alert_email`
+and `bedrock_model_id`. Set `scan_schedule_enabled = false` until the SES sender
+and any sandbox recipients are verified; then enable the schedule after the
+database migration and a successful manual email test.
 Never commit `terraform.tfvars`.
 
 ## Why the order matters

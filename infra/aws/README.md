@@ -21,14 +21,17 @@ Step-by-step commands are in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 | **CloudWatch Logs** | `/ecs/<name>`, 14-day retention |
 | **IAM** | Scoped execution and task roles |
 | **AWS Budgets** | Monthly alert at 50%, 80% and forecast 100% |
+| **S3** | Private receipts bucket, encryption, public access block, browser CORS, and upload cleanup |
+| **SES** | Sender identity and optional recipient identities; inbox owners must complete verification |
+| **EventBridge Scheduler** | Daily one-off Fargate warranty scan; disable it until email is ready |
+| **Bedrock integration** | OCR model configuration and task IAM permission; model access is configured in the AWS account |
 
 ## What this deliberately does not create
 
 | Not here | Owner |
 |---|---|
-| **S3 bucket and its CORS configuration** | S3/Textract workstream. This stack takes `document_bucket_name` as a variable and grants the task role access to it. |
-| **SES identity verification** | SES workstream. Verify the sender before any mail sends. |
-| **EventBridge Scheduler** for expiry emails | SES/scheduler workstream. The `job` task definition here is what a schedule should invoke. |
+| **SES identity verification** | Terraform creates identity requests, but the inbox owner must click the verification link. Sandbox recipients must also be verified. |
+| **Bedrock model access** | Select an available model or inference profile, enable access for the account, and set `bedrock_model_id`. |
 | **HTTPS / ACM certificate** | Needs a domain, and none has been chosen — see [`docs/REQUIRES_YOUR_INPUT.md`](../../docs/REQUIRES_YOUR_INPUT.md). Traffic is HTTP only, so use test accounts and no real personal data. |
 
 ## Two design decisions worth knowing
@@ -95,6 +98,10 @@ identity.tf        Cognito user pool and client
 registry.tf        ECR repositories and lifecycle policies
 secrets.tf         generated DATABASE_URL and SECRET_KEY in SSM
 warranty_search.tf optional Tavily key parameter for the online warranty lookup
+storage.tf         private S3 bucket, CORS, encryption, and lifecycle
+ses.tf             SES sender and optional recipient identities
+scheduler.tf       EventBridge Scheduler and its ECS invocation role
+bedrock.tf         OCR backend and Bedrock model inputs
 database.tf        RDS PostgreSQL
 load_balancer.tf   ALB, target group, listeners
 ecs.tf             cluster, task definitions, service

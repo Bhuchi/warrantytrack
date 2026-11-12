@@ -7,8 +7,7 @@ aws_region  = "ap-southeast-1"
 name        = "warrantytrack"
 environment = "production"
 
-# The document bucket is created by the S3/Textract workstream, not here.
-# Ask for the exact bucket name before the first apply.
+# This stack creates the private document bucket. Choose a globally unique name.
 document_bucket_name = "warrantytrack-documents-CHANGEME"
 
 # Must be verified in SES before any mail sends. SES also starts in sandbox

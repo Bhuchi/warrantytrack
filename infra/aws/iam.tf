@@ -1,7 +1,7 @@
 # Two roles when the account allows it:
 #   execution role — what ECS itself needs: pull from ECR, write logs, read the
 #                    SSM SecureStrings named in the task definition.
-#   task role      — what the application code needs: S3, Textract, SES.
+#   task role      — what the application code needs: S3, Bedrock, SES, Cognito.
 #
 # An AWS Academy Learner Lab denies IAM role creation and supplies LabRole
 # instead. Set create_iam_roles = false there; LabRole is used for both.
