@@ -7,6 +7,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { WarrantyStatus } from "@/types";
 import type { AssetDetail as Asset } from "@/types/assets";
 
+import DeleteAssetButton from "./DeleteAssetButton";
 import { getAsset } from "./getAsset";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -270,7 +271,8 @@ function StoragePanel({ asset }: { asset: Asset }) {
   );
 }
 
-function QuickActions({ assetId }: { assetId: string }) {
+/** Edit and Add for everyone; Delete only for owners and admins (DeleteAssetButton decides). */
+function QuickActions({ assetId, assetName }: { assetId: string; assetName: string }) {
   return (
     <div className="flex w-full flex-col gap-3">
       <Link
@@ -287,6 +289,7 @@ function QuickActions({ assetId }: { assetId: string }) {
         <Image src="/icons/asset-add.svg" alt="" width={17} height={17} />
         Add Asset
       </Link>
+      <DeleteAssetButton assetId={assetId} assetName={assetName} />
     </div>
   );
 }
@@ -326,7 +329,7 @@ export default function AssetDetail({ assetId }: { assetId: string }) {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <main className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-5 pb-8 pt-4 md:gap-4 md:px-8 md:pt-8 lg:px-12">
+      <main className="flex w-full flex-col gap-3 px-5 pb-8 pt-4 md:gap-4 md:px-8 md:pt-6">
         <Link
           href="/assets"
           className="-my-1.5 flex w-fit items-center gap-1.5 py-1.5 text-[13px] font-semibold tracking-[-0.26px] text-muted hover:text-brand"
@@ -376,7 +379,7 @@ export default function AssetDetail({ assetId }: { assetId: string }) {
                 )}
               </Panel>
               <StoragePanel asset={asset} />
-              <QuickActions assetId={asset.id} />
+              <QuickActions assetId={asset.id} assetName={asset.name} />
             </div>
           </div>
         )}

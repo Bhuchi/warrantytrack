@@ -1,9 +1,9 @@
 import type { ComponentPropsWithoutRef } from "react";
 
-type ButtonVariant = "primary" | "secondary";
+type ButtonVariant = "primary" | "secondary" | "danger";
 
 interface ButtonProps extends ComponentPropsWithoutRef<"button"> {
-  /** "primary" is the filled brand button; "secondary" is the quieter outline one. */
+  /** "primary" is the filled brand button; "secondary" is the quieter outline one; "danger" is red, for actions that cannot be undone. */
   variant?: ButtonVariant;
 }
 
@@ -15,6 +15,7 @@ const baseClasses =
 const variantClasses: Record<ButtonVariant, string> = {
   primary: "bg-brand text-brand-foreground",
   secondary: "border border-border bg-surface text-foreground",
+  danger: "bg-danger text-danger-foreground",
 };
 
 /** Full-width action button: Sign In, Confirm, Cancel and the like. */

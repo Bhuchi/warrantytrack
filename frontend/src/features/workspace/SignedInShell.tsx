@@ -11,6 +11,7 @@ import { COGNITO_CLIENT_ID } from "@/lib/config";
 import type { MeResponse, MembershipRole } from "@/types";
 import type { NotificationListResponse } from "@/types/notifications";
 
+import { WorkspaceRoleContext } from "./WorkspaceRole";
 import { initialsOf, selectedWorkspaceId } from "./workspaces";
 
 interface ShellData {
@@ -47,6 +48,8 @@ export default function SignedInShell({
 }) {
   const router = useRouter();
   const [data, setData] = useState<ShellData | null>(COGNITO_CLIENT_ID ? null : placeholder);
+  // The local demo user owns its workspace (backend seed), so without Cognito it is "owner".
+  const [role, setRole] = useState<MembershipRole | null>(COGNITO_CLIENT_ID ? null : "owner");
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
@@ -81,6 +84,7 @@ export default function SignedInShell({
 
       const { workspace, role } = membership;
       const userName = me.user.display_name || me.user.email;
+      setRole(role);
       setData({
         workspace: {
           name: workspace.name,
@@ -134,8 +138,10 @@ export default function SignedInShell({
   }
 
   return (
-    <AppShell workspace={data.workspace} user={data.user} unreadCount={data.unreadCount}>
-      {children}
-    </AppShell>
+    <WorkspaceRoleContext.Provider value={role}>
+      <AppShell workspace={data.workspace} user={data.user} unreadCount={data.unreadCount}>
+        {children}
+      </AppShell>
+    </WorkspaceRoleContext.Provider>
   );
 }
