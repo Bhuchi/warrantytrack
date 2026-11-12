@@ -19,8 +19,8 @@ export default function LoginPage() {
         subtitle="Sign in to keep every receipt, warranty and claim for your assets in one secure place."
       />
 
-      <div className="-mt-11 flex flex-1 justify-center md:mt-0 md:px-8 md:pt-[158px] md:pb-16">
-        <div className="flex h-fit w-full flex-col gap-[18px] rounded-t-[28px] bg-surface px-6 pt-6 pb-7 md:w-[480px] md:gap-[22px] md:rounded-2xl md:border md:border-border md:px-10 md:pt-10 md:pb-9 md:shadow-card">
+      <main className="-mt-11 flex flex-1 justify-center md:mt-0 md:px-8 md:pt-[158px] md:pb-16">
+        <div className="flex h-fit w-full flex-col gap-[18px] rounded-t-[28px] bg-surface px-6 pt-6 pb-7 md:w-full md:max-w-[480px] md:gap-[22px] md:rounded-2xl md:border md:border-border md:px-10 md:pt-10 md:pb-9 md:shadow-card">
           <div className="hidden flex-col gap-2 md:flex">
             <h2 className="text-[26px] font-bold tracking-[-0.52px] text-foreground">
               Sign in to your account
@@ -48,7 +48,7 @@ export default function LoginPage() {
             </p>
           </div>
         </div>
-      </div>
+      </main>
     </>
   );
 }

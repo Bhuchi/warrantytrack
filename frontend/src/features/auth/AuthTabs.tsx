@@ -14,7 +14,7 @@ interface AuthTabsProps {
 
 export default function AuthTabs({ active }: AuthTabsProps) {
   return (
-    <nav className="flex w-full">
+    <nav aria-label="Sign in or create account" className="flex w-full">
       {TABS.map((tab) => {
         const isActive = tab.id === active;
         return (

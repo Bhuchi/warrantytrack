@@ -1,0 +1,39 @@
+# Overrides for testing in an AWS Academy Learner Lab, before the real account
+# is available. Copy to terraform.tfvars.
+#
+# A Learner Lab denies several things a real account allows. These values work
+# around that; none of them belong in a real deployment.
+
+aws_region  = "us-east-1" # labs are often restricted to this region
+name        = "warrantytrack-lab"
+environment = "production"
+
+document_bucket_name = "warrantytrack-lab-CHANGEME-docs"
+ses_sender_email     = "CHANGEME@g.siit.tu.ac.th"
+budget_alert_email   = "CHANGEME@g.siit.tu.ac.th"
+
+# A lab denies iam:CreateRole and supplies LabRole instead. Confirm LabRole
+# trusts ecs-tasks.amazonaws.com before applying.
+create_iam_roles   = false
+existing_role_name = "LabRole"
+
+# A lab typically denies rds:CreateDBInstance outright. Verify with:
+#   aws iam simulate-principal-policy \
+#     --policy-source-arn arn:aws:iam::<account>:role/voclabs \
+#     --action-names rds:CreateDBInstance
+#
+# When denied, PostgreSQL runs as a container inside the ECS task. ALL DATA IS
+# LOST whenever the task restarts. Never set this true for a real deployment.
+use_container_database = true
+
+# Four containers share the task when the database runs in it: db, migrate,
+# api, web.
+task_cpu    = 512
+task_memory = 2048
+
+image_tag     = "bootstrap"
+desired_count = 0
+
+# A lab usually denies the budgets API. If apply fails with AccessDenied on
+# aws_budgets_budget, the lab's own credit counter is the only meter.
+budget_limit_usd = 50

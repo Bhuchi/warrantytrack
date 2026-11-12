@@ -9,10 +9,25 @@
   --canvas: #f5f7fc;
   --surface: #ffffff;
   --foreground: #0f172a;
-  --muted: #64748b;
+  --muted: #556274;
   /* Lighter grey for secondary labels and icons. */
-  --muted-light: #94a3b8;
+  --muted-light: #606f84;
   --border: #e2e8f0;
+
+  /* Warranty status badges, M05 Assets List (3382:382 / 3382:407 / 3382:432).
+     Each status has a strong colour for the text and a soft one behind it. */
+  --status-active: #15803d;
+  --status-active-soft: #dcfce7;
+  --status-expiring: #b45309;
+  --status-expiring-soft: #fef3c7;
+  --status-expired: #b91c1c;
+  --status-expired-soft: #fee2e2;
+  /* No warranty: purple from the Dashboard status bar (3382:250). Figma has no
+     badge for it, so the soft tint follows the same pattern as the three above. */
+  --status-none: #7c3aed;
+  --status-none-soft: #ede9fe;
+  /* Empty part of a progress bar: Dashboard status bars, Add Asset progress (3382:211). */
+  --track: #e8edf7;
 
   /* Brand blue — Figma Header (3313:1716) and Footer (3313:1662). */
   --brand: #001cb7;
@@ -21,6 +36,9 @@
   --brand-soft: #c4defd;
   /* Faintest brand tint, used for info panels on the auth screens (3337:80). */
   --brand-subtle: #eef2ff;
+  /* Alert red — notification badges and the unread dot (3396:7183). */
+  --danger: #dc2626;
+  --danger-foreground: #ffffff;
 }
 
 /* `@theme inline` is what turns a token into a Tailwind utility class:
@@ -33,16 +51,31 @@
   --color-muted: var(--muted);
   --color-muted-light: var(--muted-light);
   --color-border: var(--border);
+  --color-status-active: var(--status-active);
+  --color-status-active-soft: var(--status-active-soft);
+  --color-status-expiring: var(--status-expiring);
+  --color-status-expiring-soft: var(--status-expiring-soft);
+  --color-status-expired: var(--status-expired);
+  --color-status-expired-soft: var(--status-expired-soft);
+  --color-status-none: var(--status-none);
+  --color-status-none-soft: var(--status-none-soft);
+  --color-track: var(--track);
+  /* Floating toast (N02b 3488:289), stronger than the card shadow. */
+  --shadow-toast: 0 10px 28px 0 rgba(5, 13, 51, 0.2);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-soft: var(--brand-soft);
   --color-brand-subtle: var(--brand-subtle);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
 
   /* Card elevation used by the auth card (3337:31). */
   --shadow-card: 0 10px 30px 0 rgba(5, 15, 64, 0.08);
   /* Workspace cards (3344:20) — the stronger variant marks the selected card. */
   --shadow-panel: 0 8px 24px 0 rgba(5, 15, 64, 0.05);
   --shadow-panel-selected: 0 8px 24px 0 rgba(5, 15, 64, 0.12);
+  /* Navigation drawer, cast to the right of the panel (3396:7135). */
+  --shadow-drawer: 6px 0 24px 0 rgba(0, 0, 0, 0.18);
 
   /* --font-inter is provided by next/font in app/layout.tsx. */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;

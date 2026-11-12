@@ -23,7 +23,7 @@ interface BrandPanelProps {
 
 export default function BrandPanel({ title, subtitle }: BrandPanelProps) {
   return (
-    <aside className="flex flex-col justify-between bg-brand px-6 pt-7 pb-11 text-brand-foreground md:w-[560px] md:shrink-0 md:px-14 md:py-16">
+    <aside className="flex flex-col justify-between bg-brand px-6 pt-7 pb-16 text-brand-foreground md:w-[45%] md:shrink-0 md:px-8 md:py-16 lg:w-[560px] lg:px-14">
       <div className="flex flex-col gap-2.5 md:gap-10">
         <div className="flex items-center gap-2.5 md:gap-3.5">
           <Image

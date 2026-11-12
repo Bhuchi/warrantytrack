@@ -1,7 +1,7 @@
 # WarrantyTrack
 
 Cloud-based warranty management for individuals and organizations. Register
-products/assets, upload receipts (OCR-extracted via AWS Textract), track
+products/assets, upload receipts (read by Claude Haiku 5.5 on Amazon Bedrock), track
 warranty status, and get expiration notifications.
 
 **Course:** DES424 Cloud-based Application Development · Semester 1, 2026 · Group 5
@@ -27,7 +27,7 @@ Then find your slice in the [team table](#team-who-owns-what) and start on your 
 | Backend | FastAPI (Python) |
 | Database | PostgreSQL + SQLAlchemy + Alembic |
 | Auth | Amazon Cognito |
-| Storage / OCR | Amazon S3 + Amazon Textract |
+| Storage / OCR | Amazon S3 + Amazon Bedrock (Claude Haiku 5.5) |
 | Notifications | Amazon SES |
 | Hosting | Amazon ECS Fargate + ALB |
 | Containers | Docker |
@@ -91,7 +91,7 @@ docker compose down -v    # stop and wipe the database
 
 ### Adding AWS credentials later
 
-Only needed once we have an AWS account, for S3/Textract/Cognito/SES work:
+Only needed once we have an AWS account, for S3/Bedrock/Cognito/SES work:
 
 ```bash
 cp backend/.env.example backend/.env
@@ -108,17 +108,20 @@ See [frontend/README.md](frontend/README.md) and [backend/README.md](backend/REA
 
 ## Team — who owns what
 
-Work is split by **layer**: two people own the whole frontend, three own the
-backend and AWS. The Figma file is one design system across all 14 screens, so
-keeping the UI with a single pair stops the components drifting apart.
+Work is split broadly by **layer** — a frontend pair and a backend/AWS group. The
+backend is split into two API **legs** so two people build in parallel: Leg A
+(asset write-path) and Leg B (OCR, warranty, dashboard, notifications). The Figma
+file is one design system across all screens, so keeping the UI with a single
+pair stops the components drifting apart. The detail per person below matches
+what's assigned on the Jira board.
 
 | Name | Student ID | GitHub | Owns |
 |---|---|---|---|
-| Chaiyapat Anantarasuchart | 6622782223 | [@erthcyp](https://github.com/erthcyp) | UX/UI design + frontend |
-| Poonnawit Wongprateepwilai | 6622772455 | [@Aphelios514](https://github.com/Aphelios514) | Frontend |
-| Chaitawat Boonkitticharoen | 6622780342 | [@fongctw](https://github.com/fongctw) | Backend + AWS |
-| Sirawich Narakulsookpipat | 6622782298 | [@SirErthh](https://github.com/SirErthh) | Backend + AWS |
-| Bhuchi Kumprakob | 6622782215 | [@Bhuchi](https://github.com/Bhuchi) | Backend, infra, CI, deployment |
+| Chaiyapat Anantarasuchart | 6622782223 | [@erthcyp](https://github.com/erthcyp) | UX/UI design (Figma, all screens D01–D09 + N03), frontend screens D01–D07, shared UI library, nav/app shell, API wiring (auth + workspace), Postman + end-to-end/accessibility testing |
+| Poonnawit Wongprateepwilai | 6622772455 | [@Aphelios514](https://github.com/Aphelios514) | Frontend screens Asset Detail D08, Notifications D09, Settings, loading/empty/error states; requirements docs (functional + roles matrix); backend Pytest + OCR-accuracy testing |
+| Chaitawat Boonkitticharoen | 6622780342 | [@fongctw](https://github.com/fongctw) | Foundation: Cognito auth & RBAC, workspace switching; architecture diagram; non-functional requirements; all AWS deployment (VPC, ECS Fargate + ALB + ECR, RDS, IAM + CloudWatch, Docker→ECR, AWS account setup) |
+| Sirawich Narakulsookpipat | 6622782298 | [@SirErthh](https://github.com/SirErthh) | Backend **Leg A** — asset write-path: asset data model + CRUD (Asset, Category, Vendor, Department, Location), assignment, bulk import (CSV/Excel), asset-save validation |
+| Bhuchi Kumprakob | 6622782215 | [@Bhuchi](https://github.com/Bhuchi) | Backend **Leg B** — pipeline & signals: S3 + Bedrock OCR, multi-line invoices, warranty model + status, Dashboard API, Notifications API + scheduled scan + SES; plus repo/Jira setup, database schema/ERD |
 
 Frontend tickets, owners and dates are in
 [docs/frontend-plan.md](docs/frontend-plan.md).
@@ -136,17 +139,18 @@ shapes with mock data while the endpoint is still being written — don't wait.
 
 ---
 
-## Branching Strategy — GitHub Flow
+## Branching Strategy
 
-We use **GitHub Flow** (simple, one long-lived branch). See
+All work goes through `dev` before it reaches `main`. See
 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the full workflow. Short version:
 
-1. `main` is always deployable. **Never commit directly to `main`.**
-2. Branch off `main` for every piece of work:
+1. **Never commit directly to `dev` or `main`.** `main` only receives merges
+   from `dev`, when the team agrees `dev` is ready.
+2. Branch off `dev` for every piece of work:
    - `feat/<short-name>` — new feature (e.g. `feat/asset-list-page`)
    - `fix/<short-name>` — bug fix
    - `chore/<short-name>` — config, deps, docs
-3. Open a **Pull Request** into `main`. At least **1 teammate reviews** before merge.
+3. Open a **Pull Request** into `dev`. At least **1 teammate reviews** before merge.
 4. CI must pass (lint + types + migrations + tests) before merging.
 5. Squash-merge, then delete the branch.
 
@@ -159,7 +163,7 @@ Do this once, on something harmless, so the workflow isn't new to you when
 you're mid-feature.
 
 ```bash
-git checkout main && git pull origin main
+git checkout dev && git pull origin dev
 git checkout -b chore/add-my-name
 
 # Edit the team table above — add your GitHub username next to your name.
@@ -169,7 +173,7 @@ git commit -m "chore: add my GitHub username to the team table"
 git push -u origin chore/add-my-name
 ```
 
-Then on GitHub: open a PR into `main`, fill in the template, request a review
+Then on GitHub: open a PR into `dev`, fill in the template, request a review
 from someone, wait for CI to go green, and squash-merge it. Delete the branch.
 That's the whole loop.
 

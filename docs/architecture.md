@@ -11,7 +11,7 @@ Kick-off Report; this file covers the decisions that shape the code.
 ```
 Browser ──▶ ALB ──▶ ECS Fargate ──┬──▶ RDS PostgreSQL   (assets, warranties, users)
                                   ├──▶ S3               (receipts, invoices)
-                                  ├──▶ Textract         (OCR extraction)
+                                  ├──▶ Bedrock          (OCR: Claude Haiku 5.5)
                                   └──▶ SES              (expiry emails)
             Cognito ── sign-in ───┘
 ```
@@ -53,7 +53,9 @@ So, on every request:
 
 1. Verify the JWT signature against Cognito's JWKS.
 2. Take `sub` from the token — **and nothing else**.
-3. Look up `users` by `cognito_sub`; create the row on first sign-in.
+3. Look up `users` by `cognito_sub`; on first sign-in, fetch email/name from
+   Cognito AdminGetUser using that verified subject, then create the user and
+   personal workspace.
 4. Look up `memberships` for the requested `X-Workspace-Id`.
 5. No membership → **404**. Not 403 — see `docs/api.md`.
 
