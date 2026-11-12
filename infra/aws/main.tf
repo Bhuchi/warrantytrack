@@ -39,11 +39,17 @@ locals {
     { name = "BEDROCK_MODEL_ID", value = var.bedrock_model_id },
     { name = "BEDROCK_REGION", value = var.bedrock_region },
     { name = "EMAIL_BACKEND", value = "ses" },
-    { name = "CORS_ORIGINS", value = jsonencode([local.app_url]) }
+    { name = "CORS_ORIGINS", value = jsonencode([local.app_url]) },
+    { name = "WARRANTY_SEARCH_PROVIDER", value = var.warranty_search_provider }
   ]
 
-  api_secrets = [
-    { name = "DATABASE_URL", valueFrom = aws_ssm_parameter.database_url.arn },
-    { name = "SECRET_KEY", valueFrom = aws_ssm_parameter.secret_key.arn }
-  ]
+  api_secrets = concat(
+    [
+      { name = "DATABASE_URL", valueFrom = aws_ssm_parameter.database_url.arn },
+      { name = "SECRET_KEY", valueFrom = aws_ssm_parameter.secret_key.arn }
+    ],
+    local.warranty_search_enabled ? [
+      { name = "TAVILY_API_KEY", valueFrom = one(aws_ssm_parameter.tavily_api_key[*].arn) }
+    ] : []
+  )
 }
