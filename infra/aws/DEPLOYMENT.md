@@ -160,6 +160,31 @@ cd infra/aws && POOL=$(terraform output -raw cognito_user_pool_id) && aws cognit
 successfully and then gets 401s from every API call, with nothing in the logs
 to explain why.
 
+## Online warranty lookup (optional)
+
+When a receipt prints no warranty length, the API can search the web through
+Tavily and pre-fill Duration. It is off by default. To turn it on:
+
+1. Set `warranty_search_provider = "tavily"` in `terraform.tfvars` and apply.
+   This creates the SSM parameter `/<name>/<environment>/TAVILY_API_KEY` with a
+   placeholder and gives the task the key and `WARRANTY_SEARCH_PROVIDER`.
+2. Put the real key in the parameter. Terraform never sees it, so it stays out
+   of state, tfvars and git:
+
+```bash
+aws ssm put-parameter --name "/<name>/<environment>/TAVILY_API_KEY" --type SecureString --overwrite --value '<tavily key>'
+```
+
+3. Start tasks that read it. ECS loads secrets at task start:
+
+```bash
+cd infra/aws && aws ecs update-service --cluster "$(terraform output -raw ecs_cluster_name)" --service "$(terraform output -raw ecs_service_name)" --force-new-deployment
+```
+
+Only the shop and product name are sent to Tavily. If the key is wrong or
+missing, the lookup fails quietly and Duration is left empty; receipts still
+work.
+
 ## Redeploying
 
 Repeat phase 2 with a new `$TAG`, run the migration task, then apply with that
@@ -202,6 +227,7 @@ cd infra/aws && aws ecs describe-services --cluster "$(terraform output -raw ecs
 | Task cycles start → stop | Migration never ran, or app crash | Confirm the job task exited 0 |
 | `AccessDenied` on `aws_budgets_budget` | Learner Lab denies the budgets API | Use the lab's credit counter instead |
 | `rds:CreateDBInstance` denied | Learner Lab | `use_container_database = true` for testing only |
+| Duration never pre-filled from the web | Placeholder still in `TAVILY_API_KEY`, or tasks not restarted after `put-parameter` | Put the real key, then force a new deployment |
 | Plan wants to scale to 0 / revert the tag | `terraform.tfvars` out of sync | Set `image_tag` and `desired_count` |
 
 ## Teardown
