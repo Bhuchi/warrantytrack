@@ -31,8 +31,8 @@ export default function ExpiringList({ items, total }: ExpiringListProps) {
           <h2 className="text-[16px] font-bold tracking-[-0.32px] text-foreground">
             Expiring in 30 days
           </h2>
-          {/* Goes to the Assets List (FE-07, CLOUDAPPG5-85) once it exists. */}
-          <Link href="/assets" className="shrink-0 text-[12px] font-semibold tracking-[-0.24px] text-brand">
+          {/* Padding enlarges the tap area to 30px; the negative margin keeps the row height. */}
+          <Link href="/assets" className="-my-1.5 shrink-0 py-1.5 text-[12px] font-semibold tracking-[-0.24px] text-brand">
             View all
           </Link>
         </div>

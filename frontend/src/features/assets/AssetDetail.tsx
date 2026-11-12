@@ -329,7 +329,7 @@ export default function AssetDetail({ assetId }: { assetId: string }) {
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-5 pb-8 pt-4 md:gap-4 md:px-8 md:pt-8 lg:px-12">
         <Link
           href="/assets"
-          className="flex w-fit items-center gap-1.5 text-[13px] font-semibold tracking-[-0.26px] text-muted hover:text-brand"
+          className="-my-1.5 flex w-fit items-center gap-1.5 py-1.5 text-[13px] font-semibold tracking-[-0.26px] text-muted hover:text-brand"
         >
           <Image src="/icons/asset-back.svg" alt="" width={15} height={15} />
           Assets

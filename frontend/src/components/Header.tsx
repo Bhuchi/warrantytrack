@@ -24,7 +24,7 @@ export default function Header() {
         </span>
       </Link>
 
-      <nav className="flex items-center gap-6">
+      <nav aria-label="Main" className="flex items-center gap-6">
         <Link
           href="/login"
           className="flex h-[38px] items-center justify-center rounded-lg bg-white px-[18px] text-[14px] font-bold tracking-[-0.28px] text-brand md:h-[60px] md:px-10 md:text-[18px] md:tracking-[-0.36px]"

@@ -37,7 +37,7 @@ export default function Footer() {
             WarrantyTrack
           </span>
 
-          <nav className="hidden items-center gap-10 md:flex">
+          <nav aria-label="Legal" className="hidden items-center gap-10 md:flex">
             <Link href="/privacy" className="text-[16px] hover:opacity-80">
               Privacy Policy
             </Link>
@@ -69,14 +69,14 @@ export default function Footer() {
 
         <span className="block h-px w-full bg-white/30" />
 
-        <nav className="flex gap-5 pt-3.5 text-[12px] tracking-[-0.24px] opacity-80 md:gap-0 md:pt-[49px] md:pb-[34px] md:text-[16px] md:tracking-normal md:opacity-100">
-          <Link href="/privacy" className="hover:opacity-80 md:hidden">
+        <nav aria-label="Footer links" className="flex gap-5 pt-3.5 text-[12px] tracking-[-0.24px] opacity-80 md:gap-0 md:pt-[49px] md:pb-[34px] md:text-[16px] md:tracking-normal md:opacity-100">
+          <Link href="/privacy" className="-my-1.5 py-1.5 hover:opacity-80 md:hidden">
             Privacy Policy
           </Link>
-          <Link href="/terms" className="hover:opacity-80 md:hidden">
+          <Link href="/terms" className="-my-1.5 py-1.5 hover:opacity-80 md:hidden">
             Terms
           </Link>
-          <Link href="/contacts" className="hover:opacity-80">
+          <Link href="/contacts" className="-my-1.5 py-1.5 hover:opacity-80">
             Contacts
           </Link>
         </nav>

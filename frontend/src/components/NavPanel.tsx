@@ -12,7 +12,6 @@ import {
   ChevronDownIcon,
   CloseIcon,
   DashboardIcon,
-  DocumentsIcon,
   SettingsIcon,
   SignOutIcon,
 } from "@/components/NavIcons";
@@ -34,7 +33,6 @@ const MENU = [
   { href: "/assets", label: "Assets", Icon: AssetsIcon },
   { href: "/assets/new", label: "Add Asset", Icon: AddAssetIcon },
   { href: "/notifications", label: "Notifications", Icon: BellIcon },
-  { href: "/documents", label: "Documents", Icon: DocumentsIcon },
   { href: "/settings", label: "Settings", Icon: SettingsIcon },
 ] as const;
 
@@ -146,7 +144,7 @@ export default function NavPanel({
           <ChevronDownIcon className="size-4 shrink-0 text-muted-light" />
         </Link>
 
-        <nav className="flex flex-col gap-1.5">
+        <nav aria-label="Main menu" className="flex flex-col gap-1.5">
           <p className="text-[10px] font-bold tracking-[0.6px] text-muted-light">
             MENU
           </p>

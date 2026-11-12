@@ -171,7 +171,7 @@ export default function EditAssetForm({ assetId }: { assetId: string }) {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
       <Link
         href={detailHref}
-        className="flex w-fit items-center gap-1.5 text-[13px] font-semibold tracking-[-0.26px] text-muted hover:text-brand"
+        className="-my-1.5 flex w-fit items-center gap-1.5 py-1.5 text-[13px] font-semibold tracking-[-0.26px] text-muted hover:text-brand"
       >
         <Image src="/icons/asset-back.svg" alt="" width={15} height={15} />
         Asset Details

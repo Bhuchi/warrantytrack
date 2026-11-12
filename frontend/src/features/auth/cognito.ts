@@ -136,3 +136,26 @@ export async function confirmSignUp(email: string, code: string): Promise<void> 
 export async function resendConfirmationCode(email: string): Promise<void> {
   await callCognito("ResendConfirmationCode", { Username: email });
 }
+
+/**
+ * Starts a password reset: Cognito emails a code to the account's address.
+ *
+ * The pool has "prevent user existence errors" on, so this succeeds even for
+ * an email with no account. The screen must not claim the account exists.
+ */
+export async function forgotPassword(email: string): Promise<void> {
+  await callCognito("ForgotPassword", { Username: email });
+}
+
+/** Sets the new password, using the code from the reset email. After this, signIn works. */
+export async function confirmForgotPassword(
+  email: string,
+  code: string,
+  newPassword: string,
+): Promise<void> {
+  await callCognito("ConfirmForgotPassword", {
+    Username: email,
+    ConfirmationCode: code,
+    Password: newPassword,
+  });
+}

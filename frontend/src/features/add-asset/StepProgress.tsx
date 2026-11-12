@@ -14,16 +14,17 @@ interface StepProgressProps {
 }
 
 /**
- * Where the user is in Add Asset. Mobile: a card with a bar (M06 3569:187).
- * Desktop: three numbered circles joined by lines (D06 3570:539).
+ * Where the user is in Add Asset. Below 1024px: a card with a bar (M06 3569:187).
+ * From 1024px: three numbered circles joined by lines (D06 3570:539).
+ * The circles need about 560px, more than a tablet has beside the sidebar.
  */
 export default function StepProgress({ step }: StepProgressProps) {
   const percent = Math.round((step / STEPS.length) * 100);
 
   return (
     <>
-      {/* Mobile */}
-      <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-surface px-4 py-3.5 md:hidden">
+      {/* Phones and tablets */}
+      <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-surface px-4 py-3.5 lg:hidden">
         <div className="flex items-center justify-between gap-3">
           <p className="text-[13px] font-semibold tracking-[-0.26px] text-brand">
             Step {step} of {STEPS.length} · {STEPS[step - 1].short}
@@ -35,8 +36,8 @@ export default function StepProgress({ step }: StepProgressProps) {
         </div>
       </div>
 
-      {/* Desktop */}
-      <ol className="hidden items-center gap-2 rounded-[14px] border border-border bg-surface px-6 py-4 md:flex">
+      {/* Wide screens */}
+      <ol className="hidden items-center gap-2 rounded-[14px] border border-border bg-surface px-6 py-4 lg:flex">
         {STEPS.map((item, index) => {
           const number = index + 1;
           const done = number < step;
