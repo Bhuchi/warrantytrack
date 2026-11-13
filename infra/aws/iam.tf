@@ -101,18 +101,6 @@ resource "aws_iam_role_policy" "task" {
         Resource = "arn:aws:s3:::${var.document_bucket_name}/*"
       },
       {
-        # AnalyzeExpense for receipts; the Start/Get pair for multi-page PDFs,
-        # which must use the asynchronous API.
-        Effect = "Allow"
-        Action = [
-          "textract:AnalyzeExpense",
-          "textract:StartExpenseAnalysis",
-          "textract:GetExpenseAnalysis",
-          "textract:DetectDocumentText"
-        ]
-        Resource = "*"
-      },
-      {
         # Claude on Bedrock reads receipts (OCR_BACKEND=bedrock). Resource "*"
         # because a global inference profile fans out to foundation-model ARNs
         # in several regions; tighten once the model ID is final.

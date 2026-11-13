@@ -27,8 +27,8 @@ export interface ExtractedLineItem {
 }
 
 /**
- * What Textract read from the receipt. The contract only shows filled-in
- * values; the nulls are assumed for fields Textract could not find.
+ * What OCR read from the receipt. The contract only shows filled-in
+ * values; the nulls are assumed for fields OCR could not find.
  * Confirm with Bhuchi (CLOUDAPPG5-95).
  */
 export interface ExtractedReceipt {

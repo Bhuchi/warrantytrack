@@ -1,15 +1,5 @@
-# Receipt OCR backend (CLOUDAPPG5-95). Bedrock is the chosen reader after the
-# scripts/ocr_compare trial; Textract stays available as a fallback.
-
-variable "ocr_backend" {
-  description = "Which reader the API uses for receipts: bedrock or textract."
-  type        = string
-  default     = "bedrock"
-  validation {
-    condition     = contains(["bedrock", "textract"], var.ocr_backend)
-    error_message = "ocr_backend must be bedrock or textract."
-  }
-}
+# Receipt OCR (CLOUDAPPG5-95): a Claude model on Amazon Bedrock reads each
+# uploaded receipt. Chosen after the scripts/ocr_compare trial.
 
 variable "bedrock_model_id" {
   description = "Bedrock model ID or inference profile ID, copied from the Bedrock console. The model must be enabled for the account."

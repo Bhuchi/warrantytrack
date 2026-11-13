@@ -68,7 +68,7 @@ Employees get a second check: they may only touch assets where
 
 ## Decision 3 — OCR runs outside the request
 
-Textract takes seconds, and multi-page PDFs need the async API. Holding an
+Reading a receipt with Bedrock takes seconds. Holding an
 HTTP request open that long ties up a worker and risks load-balancer timeouts.
 
 The flow instead:
@@ -89,7 +89,7 @@ job states.
 
 **Known limitation:** extraction runs in-process, so a crash can strand a job
 in `processing`. We store `attempts` and `updated_at` so a stuck job can be
-retried. The production answer is S3 event → Lambda → Textract; that is the
+retried. The production answer is S3 event → Lambda → Bedrock; that is the
 documented next step, not something we build this semester.
 
 **The S3 bucket is private.** Uploads use presigned PUT, viewing uses

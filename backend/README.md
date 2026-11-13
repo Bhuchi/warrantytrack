@@ -58,7 +58,7 @@ backend/app/
 │                   e.g. asset.py, warranty.py, user.py, workspace.py
 ├── schemas/      → Pydantic request/response models (API input/output shapes).
 ├── services/     → Business logic. Routes stay thin; real work happens here.
-│                   e.g. ocr_service.py (Textract), warranty_service.py (status calc),
+│                   e.g. ocr.py (Bedrock), warranty_service.py (status calc),
 │                        notification_service.py (SES), import_service.py (bulk CSV)
 ├── db/           → DB session/engine setup and the declarative Base.
 └── utils/        → Small shared helpers.

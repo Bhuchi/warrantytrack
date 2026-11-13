@@ -15,7 +15,7 @@ export interface SerialScan {
  * name contains "fail" comes back with no serial, so that case can be tested.
  *
  * TODO: docs/api.md has no endpoint for this yet (it only reads serials off the
- * receipt). Asked Bhuchi to add one; Textract can read a sticker photo the same
+ * receipt). Asked Bhuchi to add one; Bedrock can read a sticker photo the same
  * way as a receipt. Swap this body for the real call when it exists.
  */
 export async function scanSerial(photo: File): Promise<SerialScan> {

@@ -97,7 +97,7 @@ class Document(Base):
         server_default=DocumentStatus.pending.value,
         nullable=False,
     )
-    # Raw Textract output, exactly as it came back. Kept after confirmation so
+    # What OCR read, exactly as it came back. Kept after confirmation so
     # the review screen (D07) can show what the user changed, and so we can
     # report OCR accuracy in the final presentation — see docs/api.md.
     extracted_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
@@ -108,8 +108,6 @@ class Document(Base):
     # These two columns are how a stuck job is found and retried.
     attempts: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Set when Textract's async API is used for multi-page PDFs.
-    textract_job_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

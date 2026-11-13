@@ -93,11 +93,10 @@ erDiagram
         string s3_key UK
         enum   kind "invoice | receipt | warranty_card | other"
         enum   status "pending|processing|extracted|confirmed|failed"
-        json   extracted_json "raw Textract output"
+        json   extracted_json "raw OCR output"
         json   confirmed_json "what the user approved"
         int    attempts
         string error
-        string textract_job_id
     }
     ASSET_DOCUMENTS {
         uuid asset_id PK_FK

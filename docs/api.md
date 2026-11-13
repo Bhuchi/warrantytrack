@@ -493,7 +493,7 @@ passes through the API. That route 404s on any other backend, and the app
 refuses to start in production on a development backend. Set
 `STORAGE_BACKEND=s3 OCR_BACKEND=bedrock EMAIL_BACKEND=ses` (plus
 `BEDROCK_MODEL_ID`, the Claude Haiku 5.5 model) once the account exists;
-nothing else changes. `OCR_BACKEND=textract` is still supported.
+nothing else changes. Bedrock is the only real OCR backend.
 
 **Errors.** `submit` before anything was uploaded is `409`. A *failed*
 extraction is not an error here — the row carries `status: "failed"` and the
@@ -545,9 +545,8 @@ for that item, as a whole number of months from 1 to 120 ("3-Y" is 36, "ปร�
 and the Add Asset screen uses it to pre-select Duration. `invoice_number` and
 `line_items[].category` pre-fill Invoice Number and Category the same way;
 the category is one label from a short fixed list in the OCR prompt (Laptop,
-Monitor, Computer Component, …) so the catalog does not fill with variants. Only the `bedrock`
-OCR backend fills it; `textract` leaves it `null`. The uploaded file may be an
-image or, with the `bedrock` backend, a PDF.
+Monitor, Computer Component, …) so the catalog does not fill with variants. The `fake`
+backend returns canned values. The uploaded file may be an image or a PDF.
 
 Every field in `extracted` is optional, including `purchase_date`: a receipt
 photographed at an angle gives some of them up, and the review screen is built

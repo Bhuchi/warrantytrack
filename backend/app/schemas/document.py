@@ -47,7 +47,7 @@ class DocumentRead(BaseModel):
 
     `extracted` is deliberately untyped (`dict`): it is whatever OCR read, and
     the review screen treats every field as optional and editable. Typing it
-    strictly here would mean a receipt Textract read badly could fail
+    strictly here would mean a receipt OCR read badly could fail
     serialisation instead of reaching the human who can fix it.
     """
 

@@ -6,8 +6,8 @@ The flow under test:
     ->  GET /documents/{id}  ->  POST .../confirm
 
 Runs on the development backends (`local` storage, `fake` OCR), which is what
-CI has and what a teammate without AWS has. The Textract parser itself is
-tested separately in test_ocr_parse.py.
+CI has and what a teammate without AWS has. The OCR parsers are
+tested separately in test_ocr_parse.py and test_ocr_bedrock.py.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ def asset_entry(**overrides: object) -> dict[str, object]:
     docs/database/WarrantyTrack-ERD-v1.2/README.md lines 35-36 — line 27 of the
     same document lists exactly these as what the confirm step validates).
 
-    None of the three come out of Textract: `extracted` holds vendor, purchase
+    None of the three come out of OCR: `extracted` holds vendor, purchase
     date, total and line items only. They are the user's edits on the OCR
     Review screen (D07), which has to collect them before confirm can succeed.
     """
@@ -148,9 +148,8 @@ def test_a_real_jpeg_survives_the_upload_path(api: TestClient, db: Session) -> N
     """The stored bytes must be the bytes that were sent.
 
     Runs on the `local` backend, so it checks our own plumbing rather than
-    Textract: a real 73KB JPEG, byte-for-byte, because an upload path that
+    OCR: a real 73KB JPEG, byte-for-byte, because an upload path that
     mangles binary would show up as unexplainable OCR failures later.
-    tests/test_ocr_live.py sends this same file to the real API.
     """
     receipt = Path(__file__).parent / "fixtures" / "receipts" / "jib-receipt.jpg"
     if not receipt.exists():

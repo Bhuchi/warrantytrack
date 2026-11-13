@@ -140,9 +140,8 @@ def write_local(key: str, data: bytes) -> None:
 def read_bytes(key: str) -> bytes:
     """The stored object, from wherever this backend keeps it.
 
-    OCR needs the bytes. On `s3` the extractor normally points Textract at the
-    object instead of downloading it, so this is the local path's answer and a
-    fallback.
+    OCR needs the bytes: Bedrock is sent the file itself, so on `s3` this
+    downloads the object.
     """
     if settings.storage_backend == "s3":
         try:

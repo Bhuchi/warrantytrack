@@ -33,9 +33,9 @@ locals {
     { name = "COGNITO_CLIENT_ID", value = aws_cognito_user_pool_client.web.id },
     { name = "SES_SENDER_EMAIL", value = var.ses_sender_email },
     # The defaults are the local/fake backends, which config.py refuses to run
-    # with in production. Without these three the API fails at startup.
+    # with in production. Without these the API fails at startup.
     { name = "STORAGE_BACKEND", value = "s3" },
-    { name = "OCR_BACKEND", value = var.ocr_backend },
+    { name = "OCR_BACKEND", value = "bedrock" },
     { name = "BEDROCK_MODEL_ID", value = var.bedrock_model_id },
     { name = "BEDROCK_REGION", value = var.bedrock_region },
     { name = "EMAIL_BACKEND", value = "ses" },

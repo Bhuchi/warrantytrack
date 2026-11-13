@@ -26,7 +26,7 @@ def test_production_refuses_to_start_with_dev_auth():
             auth_backend="dev",
             # Everything else production-ready, so AUTH_BACKEND is the only reason.
             storage_backend="s3",
-            ocr_backend="textract",
+            ocr_backend="bedrock",
             email_backend="ses",
             s3_bucket_name="bucket",
         )

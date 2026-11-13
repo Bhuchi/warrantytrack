@@ -14,7 +14,7 @@ Run it:
 
 or directly: `OCR_BACKEND=bedrock BEDROCK_MODEL_ID=... pytest tests/test_ocr_bedrock_live.py -m aws -s`
 
-`-s` prints the parsed reading. Like the Textract live test, this asserts the
+`-s` prints the parsed reading. This asserts the
 contract (shape, types, that something was read), not exact values: model
 output shifts, and a test pinned to one vendor name would fail for reasons
 that are not regressions. Compare the printed reading with the receipt by eye.

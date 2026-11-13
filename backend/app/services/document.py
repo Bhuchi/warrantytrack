@@ -135,7 +135,7 @@ def submit(db: Session, document: Document) -> Document:
     """Run extraction on an uploaded file and record what came back.
 
     Synchronous for now, which is the limitation docs/architecture.md already
-    records: a slow Textract call holds the request open, and a crash can
+    records: a slow Bedrock call holds the request open, and a crash can
     strand a row in `processing`. `attempts` is incremented here so a stuck job
     can be found and retried, and the documented next step (S3 event ->
     Lambda) replaces only this function.
