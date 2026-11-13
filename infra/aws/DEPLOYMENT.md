@@ -191,8 +191,30 @@ work.
 
 ## Redeploying
 
-Repeat phase 2 with a new `$TAG`, run the migration task, then apply with that
-tag. Migrations go **before** the new code serves traffic.
+After the first deployment, a push to `main` deploys automatically **only after
+the frontend and backend CI jobs pass**. The deploy job assumes the
+`warrantytrack-github-deploy` role through GitHub OIDC, builds both images with
+the commit SHA as an immutable tag, pushes them to ECR, registers a new job
+task revision, runs and checks migrations, registers a new app task revision,
+updates the ECS service, waits for stability, and checks `/api/health`.
+
+Apply `github_deploy.tf` **before** merging the workflow into `main`; otherwise
+the first deployment job cannot assume its AWS role. The role trusts only
+`Bhuchi/warrantytrack` on `main`. If this AWS account already has the GitHub
+OIDC provider outside this Terraform state, import it instead of creating a
+duplicate provider. No long-lived AWS key is stored in GitHub.
+
+For an urgent manual redeploy, build and push new SHA-tagged images, then run
+`deploy-ecs.sh` with their full ECR image URIs and `AWS_REGION=ap-southeast-1`.
+Do not use a plain `terraform apply` to deploy application code: Terraform
+ignores the ECS service's `task_definition` so infrastructure edits cannot
+roll back a CI deployment. Continue using Terraform for infrastructure
+changes and keep the local state and `terraform.tfvars` safe.
+
+CloudWatch sends ALB target-health, ECS CPU and RDS free-storage alarm events
+to the `warrantytrack-alerts` SNS topic. The alert email must confirm the SNS
+subscription before notifications arrive. The ALB health alarm intentionally
+enters ALARM when the service is scaled to zero.
 
 ## Logs and diagnosis
 

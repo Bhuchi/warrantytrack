@@ -194,4 +194,11 @@ resource "aws_ecs_service" "app" {
   }
 
   depends_on = [aws_lb_listener.http]
+
+  # GitHub Actions registers immutable, SHA-tagged task revisions after a
+  # successful CI run. Terraform keeps managing the service's network, count
+  # and load balancer without rolling its task revision back on the next apply.
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
 }

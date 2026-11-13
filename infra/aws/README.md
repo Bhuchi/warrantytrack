@@ -18,13 +18,20 @@ Step-by-step commands are in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 | **RDS PostgreSQL** | Single-AZ, encrypted, private, 7-day backups. No final snapshot — see DEPLOYMENT.md teardown. |
 | **Cognito** | User pool and public browser client |
 | **SSM Parameter Store** | `DATABASE_URL` and `SECRET_KEY` as SecureStrings; `TAVILY_API_KEY` too when the warranty lookup is on |
-| **CloudWatch Logs** | `/ecs/<name>`, 14-day retention |
-| **IAM** | Scoped execution and task roles |
+| **CloudWatch Logs and alarms** | `/ecs/<name>` with 14-day retention; ALB health, ECS CPU and RDS free-storage alarms |
+| **SNS** | Email notifications for CloudWatch alarms; the recipient must confirm the subscription |
+| **IAM** | Scoped execution and task roles plus a main-branch GitHub OIDC deployment role |
 | **AWS Budgets** | Monthly alert at 50%, 80% and forecast 100% |
 | **S3** | Private receipts bucket, encryption, public access block, browser CORS, and upload cleanup |
 | **SES** | Sender identity and optional recipient identities; inbox owners must complete verification |
 | **EventBridge Scheduler** | Daily one-off Fargate warranty scan; disable it until email is ready |
 | **Bedrock integration** | OCR model configuration and task IAM permission; model access is configured in the AWS account |
+
+After the first Terraform apply, the `main` branch's GitHub Actions workflow
+builds SHA-tagged images and deploys them to ECS after frontend and backend CI
+pass. It uses short-lived OIDC credentials, runs migrations before switching
+the service task definition, and checks `/api/health`. Terraform continues to
+manage infrastructure; the deployment script owns new ECS task revisions.
 
 ## What this deliberately does not create
 
@@ -106,6 +113,9 @@ database.tf        RDS PostgreSQL
 load_balancer.tf   ALB, target group, listeners
 ecs.tf             cluster, task definitions, service
 iam.tf             execution and task roles
+github_deploy.tf   GitHub OIDC provider and scoped ECS/ECR deploy role
+monitoring.tf      SNS alert topic and CloudWatch alarms
+deploy-ecs.sh      migrate, switch ECS task revision, verify health
 budget.tf          AWS Budgets alert
 outputs.tf         everything the deploy steps and the frontend build need
 ```
