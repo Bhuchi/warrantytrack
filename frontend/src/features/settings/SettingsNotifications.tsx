@@ -1,22 +1,27 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { signedInUser } from "@/features/auth/session";
+import type { NotificationSettings } from "@/types";
 
+import {
+  REMIND_DAY_OPTIONS,
+  getNotificationSettings,
+  saveNotificationSettings,
+} from "./notificationSettings";
 import SettingsTabs from "./SettingsTabs";
-
-const reminders = ["60 days", "30 days", "14 days", "7 days", "1 day"] as const;
 
 interface ToggleProps {
   checked: boolean;
   id: string;
   label: string;
+  disabled?: boolean;
   onChange: () => void;
 }
 
-function Toggle({ checked, id, label, onChange }: ToggleProps) {
+function Toggle({ checked, id, label, disabled, onChange }: ToggleProps) {
   return (
     <button
       type="button"
@@ -24,8 +29,9 @@ function Toggle({ checked, id, label, onChange }: ToggleProps) {
       id={id}
       aria-checked={checked}
       aria-label={label}
+      disabled={disabled}
       onClick={onChange}
-      className={`relative h-[26px] w-11 shrink-0 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${checked ? "bg-brand" : "bg-border"}`}
+      className={`relative h-[26px] w-11 shrink-0 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50 ${checked ? "bg-brand" : "bg-border"}`}
     >
       <span
         className={`absolute left-[3px] top-[3px] size-5 rounded-full bg-white shadow-sm transition-transform ${checked ? "translate-x-[18px]" : "translate-x-0"}`}
@@ -39,12 +45,14 @@ function DeliveryChannel({
   label,
   icon,
   checked,
+  disabled,
   onChange,
 }: {
   id: string;
   label: string;
   icon: string;
   checked: boolean;
+  disabled?: boolean;
   onChange: () => void;
 }) {
   return (
@@ -59,6 +67,7 @@ function DeliveryChannel({
         id={id}
         label={`${label} notifications`}
         checked={checked}
+        disabled={disabled}
         onChange={onChange}
       />
     </div>
@@ -82,15 +91,19 @@ function SettingCard({
   );
 }
 
+/**
+ * Settings → Notifications (CLOUDAPPG5-124, saved since CLOUDAPPG5-145).
+ * Every change is saved straight away; the daily scan reads these settings
+ * to decide whether and when to remind this person (GitHub #82).
+ */
 export default function SettingsNotifications() {
-  const [inAppEnabled, setInAppEnabled] = useState(true);
-  const [emailEnabled, setEmailEnabled] = useState(true);
-  const [weeklyDigestEnabled, setWeeklyDigestEnabled] = useState(true);
-  const [selectedReminders, setSelectedReminders] = useState<string[]>([
-    "30 days",
-    "14 days",
-    "7 days",
-  ]);
+  // null until the saved settings have loaded; the controls wait for them.
+  const [settings, setSettings] = useState<NotificationSettings | null>(null);
+  const [saving, setSaving] = useState<"idle" | "saving" | "saved">("idle");
+  const [error, setError] = useState<string | null>(null);
+  // Numbers each save, so a slow early reply can't overwrite a later choice.
+  const latestSave = useRef(0);
+
   // Where expiry emails go: the address the user signed in with. It lives in
   // localStorage, which only exists in the browser, so it is read after the
   // first render (the same way as AppTopBar).
@@ -103,13 +116,50 @@ export default function SettingsNotifications() {
     if (signedIn) setAlertEmail(signedIn.email);
   }, []);
 
-  function toggleReminder(reminder: string) {
-    setSelectedReminders((current) =>
-      current.includes(reminder)
-        ? current.filter((item) => item !== reminder)
-        : [...current, reminder],
-    );
+  useEffect(() => {
+    let ignore = false;
+    getNotificationSettings()
+      .then((loaded) => {
+        if (!ignore) setSettings(loaded);
+      })
+      .catch((caught: unknown) => {
+        if (!ignore) setError(caught instanceof Error ? caught.message : "Couldn't load your settings.");
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  /** Show the change at once, save it, and undo it on screen if saving fails. */
+  async function update(next: NotificationSettings) {
+    if (!settings) return;
+    const previous = settings;
+    const thisSave = ++latestSave.current;
+    setSettings(next);
+    setSaving("saving");
+    setError(null);
+    try {
+      const saved = await saveNotificationSettings(next);
+      if (thisSave !== latestSave.current) return; // A newer change is on its way.
+      setSettings(saved);
+      setSaving("saved");
+    } catch (caught) {
+      if (thisSave !== latestSave.current) return;
+      setSettings(previous);
+      setSaving("idle");
+      setError(caught instanceof Error ? caught.message : "Couldn't save your settings.");
+    }
   }
+
+  function toggleDay(day: number) {
+    if (!settings) return;
+    const days = settings.remind_days.includes(day)
+      ? settings.remind_days.filter((item) => item !== day)
+      : [...settings.remind_days, day];
+    update({ ...settings, remind_days: days });
+  }
+
+  const loading = settings === null;
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -119,11 +169,20 @@ export default function SettingsNotifications() {
             Settings
           </h1>
           <p className="text-xs leading-[17px] tracking-[-0.24px] text-muted">
-            Choose how you are warned before a warranty expires.
+            Choose how you are warned before a warranty expires.{" "}
+            <span role="status" className="font-semibold text-brand">
+              {saving === "saving" ? "Saving…" : saving === "saved" ? "Saved" : ""}
+            </span>
           </p>
         </div>
 
         <SettingsTabs active="notifications" />
+
+        {error && (
+          <p role="alert" className="rounded-[10px] bg-red-50 px-4 py-3 text-[13px] text-red-700">
+            {error}
+          </p>
+        )}
 
         <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2 md:gap-5">
           <SettingCard title="Delivery channels">
@@ -132,16 +191,18 @@ export default function SettingsNotifications() {
                 id="in-app-notifications"
                 label="In-app"
                 icon="/icons/settings-bell.svg"
-                checked={inAppEnabled}
-                onChange={() => setInAppEnabled((enabled) => !enabled)}
+                checked={settings?.in_app_enabled ?? true}
+                disabled={loading}
+                onChange={() => settings && update({ ...settings, in_app_enabled: !settings.in_app_enabled })}
               />
               <div className="h-px w-full bg-border" />
               <DeliveryChannel
                 id="email-notifications"
                 label="Email"
                 icon="/icons/settings-email.svg"
-                checked={emailEnabled}
-                onChange={() => setEmailEnabled((enabled) => !enabled)}
+                checked={settings?.email_enabled ?? true}
+                disabled={loading}
+                onChange={() => settings && update({ ...settings, email_enabled: !settings.email_enabled })}
               />
             </div>
           </SettingCard>
@@ -181,15 +242,17 @@ export default function SettingsNotifications() {
                 REMIND ME BEFORE EXPIRY
               </p>
               <div className="flex flex-wrap gap-2.5">
-                {reminders.map((reminder) => {
-                  const selected = selectedReminders.includes(reminder);
+                {REMIND_DAY_OPTIONS.map((day) => {
+                  const selected = settings?.remind_days.includes(day) ?? false;
+                  const label = `${day} ${day === 1 ? "day" : "days"}`;
                   return (
                     <button
-                      key={reminder}
+                      key={day}
                       type="button"
                       aria-pressed={selected}
-                      onClick={() => toggleReminder(reminder)}
-                      className={`flex h-[33px] items-center justify-center gap-[7px] rounded-full px-[14px] text-xs font-semibold tracking-[-0.24px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${selected ? "bg-brand text-brand-foreground" : "border border-border bg-surface text-muted"}`}
+                      disabled={loading}
+                      onClick={() => toggleDay(day)}
+                      className={`flex h-[33px] items-center justify-center gap-[7px] rounded-full px-[14px] text-xs font-semibold tracking-[-0.24px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50 ${selected ? "bg-brand text-brand-foreground" : "border border-border bg-surface text-muted"}`}
                     >
                       {selected ? (
                         <Image
@@ -199,28 +262,14 @@ export default function SettingsNotifications() {
                           height={13}
                         />
                       ) : null}
-                      {reminder}
+                      {label}
                     </button>
                   );
                 })}
               </div>
-            </div>
-            <div className="h-px w-full bg-border" />
-            <div className="flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold leading-[17px] text-foreground">
-                  Weekly digest
-                </p>
-                <p className="text-[11px] leading-[13px] text-muted-light">
-                  Monday summary at 09:00
-                </p>
-              </div>
-              <Toggle
-                id="weekly-digest"
-                label="Weekly digest"
-                checked={weeklyDigestEnabled}
-                onChange={() => setWeeklyDigestEnabled((enabled) => !enabled)}
-              />
+              <p className="text-[11px] leading-4 text-muted-light">
+                With no days chosen you are only told once a warranty has expired.
+              </p>
             </div>
           </SettingCard>
         </div>
