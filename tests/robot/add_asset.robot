@@ -24,6 +24,10 @@ ${BROWSER}          headlesschrome
 ${EMAIL}            test@warrantytrack.io
 ${PASSWORD}         Test1234!
 ${DELAY}            0.2
+# Recent Chrome tries https first and blocks plain-http pages (ERR_BLOCKED_BY_CLIENT)
+# in a fresh automated profile. The AWS load balancer only serves http, so turn
+# that off. Harmless for http://localhost.
+${CHROME_OPTIONS}   add_argument("--disable-features=HttpsUpgrades,HttpsFirstBalancedModeAutoEnable,HttpsFirstModeV2ForTypicallySecureUsers,HttpsFirstBalancedMode,HttpsFirstModeIncognito")
 ${RECEIPT}          ${CURDIR}/files/sample-receipt.png
 # What the receipt says. Locally the fake OCR always returns this product.
 ${PRODUCT}          Dell Latitude 5540
@@ -34,7 +38,7 @@ ${EXPIRY_LABEL}     1 Nov 2028
 
 *** Test Cases ***
 1. Open Browser
-    Open Browser    ${URL}/login    ${BROWSER}
+    Open Browser    ${URL}/login    ${BROWSER}    options=${CHROME_OPTIONS}
     Set Window Size    1440    900
     Set Selenium Speed    ${DELAY}
     Wait Until Page Contains    Sign in to your account
@@ -48,8 +52,10 @@ ${EXPIRY_LABEL}     1 Nov 2028
 
 3. Choose Personal Workspace
     # Clicking a card selects it. Only the selected card's Continue is a working link.
-    Click Element    xpath://button[.//*[normalize-space(text())='Personal Workspace']]
-    Click Link    xpath://*[normalize-space(text())='Personal Workspace']/ancestor::div[.//a[normalize-space()='Continue']][1]//a[normalize-space()='Continue']
+    # The card is titled "Personal Workspace" locally (AUTH_BACKEND=dev) and with
+    # the workspace's real name, "Personal", for a Cognito account on AWS.
+    Click Element    xpath://button[.//*[normalize-space(text())='Personal Workspace' or normalize-space(text())='Personal']]
+    Click Link    xpath://*[normalize-space(text())='Personal Workspace' or normalize-space(text())='Personal']/ancestor::div[.//a[normalize-space()='Continue']][1]//a[normalize-space()='Continue']
     Wait Until Location Contains    /dashboard    timeout=20s
 
 4. Open Add Asset
