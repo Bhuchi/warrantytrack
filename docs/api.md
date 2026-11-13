@@ -88,6 +88,9 @@ person may not have an account yet. They must accept before becoming a member.
 | `POST` | `/workspaces/{id}/members` | Invite an email as admin or employee; owner/admin only |
 | `POST` | `/workspaces/{id}/invite/accept` | Join the organization; returns a membership |
 | `POST` | `/workspaces/{id}/invite/decline` | Delete one's own pending invite; returns 204 |
+| `DELETE` | `/workspaces/{id}/invites?email=` | Cancel a pending invite; owner/admin only; 204 |
+| `DELETE` | `/workspaces/{id}/members/{user_id}` | Remove a member; owner/admin only; 204 |
+| `POST` | `/workspaces/{id}/leave` | The caller leaves; admin/employee only; 204 |
 
 `POST /workspaces` accepts `{ "name": "Acme Co", "type": "organization" }`
 and returns 201 with the new workspace's `id`, `name`, `type`, `created_at`,
@@ -118,6 +121,21 @@ returns 422. An employee receives 403; a nonmember receives 404.
 `{ "workspace": { ... }, "role": "employee" }`; declining has no body and
 returns 204. Only the signed-in user whose email matches the invitation can
 act on it. No pending invite returns 404.
+
+Undoing membership (GitHub #80). All three return 204 with no body. They check
+the caller's role in the workspace in the path, not the `X-Workspace-Id`
+header. No membership there is 404; deleting an organization is out of scope.
+
+- **Cancel invite** matches `email` case-insensitively. No pending invite for
+  it is 404; an employee is 403; a missing `email` is 422.
+- **Remove member**: the owner can't be removed (409), nor can the caller
+  remove themselves (409, use leave). Not a member is 404; an employee is 403.
+- **Leave**: the owner can't leave (409); a personal workspace is 422. Use
+  `POST .../leave`, not `DELETE .../members/me`, so it can't clash with
+  `DELETE .../members/{user_id}`.
+- Removing or leaving sets `assigned_to_user_id` back to null on that person's
+  assets **in this workspace**, so no asset points at someone who can no longer
+  see it.
 
 ---
 
