@@ -49,8 +49,13 @@ def _client():
         _s3_client = boto3.client(
             "s3",
             region_name=settings.aws_region,
-            # SigV4 so presigned URLs are valid in every region.
-            config=Config(signature_version="s3v4"),
+            # A newly created Singapore bucket may redirect the global host.
+            # Browsers cannot follow that redirect for a cross-origin PUT.
+            endpoint_url=f"https://s3.{settings.aws_region}.amazonaws.com",
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "virtual"},
+            ),
         )
     return _s3_client
 
@@ -140,9 +145,8 @@ def write_local(key: str, data: bytes) -> None:
 def read_bytes(key: str) -> bytes:
     """The stored object, from wherever this backend keeps it.
 
-    OCR needs the bytes. On `s3` the extractor normally points Textract at the
-    object instead of downloading it, so this is the local path's answer and a
-    fallback.
+    OCR needs the bytes. Bedrock downloads the S3 object before sending it to
+    the model; local development reads from disk.
     """
     if settings.storage_backend == "s3":
         try:
