@@ -3,6 +3,14 @@
 .github
 docs
 scripts
+infra/aws
+# Terraform state and provider downloads must never enter a Docker build context.
+**/.terraform
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+**/terraform.tfvars
+**/*.auto.tfvars
 **/node_modules
 **/.next
 **/out

@@ -21,18 +21,17 @@ variable "environment" {
 }
 
 # ---------------------------------------------------------------------------
-# Owned elsewhere. The S3 bucket and its CORS configuration belong to the
-# S3/Textract workstream, so this stack consumes the name and grants the task
-# role access to it, but does not create it.
+# The private documents bucket and CORS rules are created by storage.tf.
+# Choose a globally unique name before applying the full stack.
 # ---------------------------------------------------------------------------
 
 variable "document_bucket_name" {
-  description = "Existing private S3 bucket for receipts and invoices. Created by the S3/Textract workstream, not by this stack."
+  description = "Globally unique name for the private receipts and invoices bucket created by this stack."
   type        = string
 }
 
 variable "ses_sender_email" {
-  description = "Verified SES sender address. Verification happens outside this stack."
+  description = "SES sender address. This stack requests the identity; the inbox owner must complete verification."
   type        = string
   validation {
     condition     = can(regex("^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$", var.ses_sender_email))

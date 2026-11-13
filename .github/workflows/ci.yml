@@ -9,7 +9,8 @@ on:
 # A new push to the same branch cancels the older, now-pointless run.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer main push must wait rather than interrupt an ECS migration.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   frontend:
@@ -76,3 +77,53 @@ jobs:
         run: alembic check
 
       - run: pytest
+
+  deploy:
+    name: Deploy to AWS after CI
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [frontend, backend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ap-southeast-1
+      AWS_ACCOUNT_ID: '528301714999'
+      ECS_CLUSTER: warrantytrack
+      ECS_SERVICE: warrantytrack
+      COGNITO_CLIENT_ID: 52nhei8og2k4hj1b8anbca0n94
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::528301714999:role/warrantytrack-github-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS account
+        run: test "$(aws sts get-caller-identity --query Account --output text)" = "$AWS_ACCOUNT_ID"
+
+      - name: Build and push immutable images
+        run: |
+          set -euo pipefail
+          registry="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$registry"
+          docker build --platform linux/amd64 --target prod \
+            -f infra/docker/backend.Dockerfile \
+            -t "$registry/warrantytrack-api:$GITHUB_SHA" .
+          docker build --platform linux/amd64 --target prod \
+            -f infra/docker/frontend.Dockerfile \
+            --build-arg NEXT_PUBLIC_API_URL=/api \
+            --build-arg NEXT_PUBLIC_COGNITO_CLIENT_ID="$COGNITO_CLIENT_ID" \
+            -t "$registry/warrantytrack-web:$GITHUB_SHA" .
+          docker push "$registry/warrantytrack-api:$GITHUB_SHA"
+          docker push "$registry/warrantytrack-web:$GITHUB_SHA"
+
+      - name: Migrate and deploy ECS
+        run: |
+          registry="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+          bash infra/aws/deploy-ecs.sh \
+            "$registry/warrantytrack-api:$GITHUB_SHA" \
+            "$registry/warrantytrack-web:$GITHUB_SHA"
