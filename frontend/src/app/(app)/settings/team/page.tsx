@@ -9,6 +9,6 @@ export const metadata: Metadata = {
 
 /** Settings → Team (CLOUDAPPG5-141). */
 export default async function SettingsTeamPage() {
-  const { kind } = await getCurrentWorkspace();
-  return <SettingsTeam isOrganization={kind === "organization"} />;
+  const { kind, workspace } = await getCurrentWorkspace();
+  return <SettingsTeam isOrganization={kind === "organization"} organizationName={workspace.name} />;
 }

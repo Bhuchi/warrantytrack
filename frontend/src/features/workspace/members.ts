@@ -3,10 +3,13 @@ import { COGNITO_CLIENT_ID } from "@/lib/config";
 import type { WorkspaceMember } from "@/types";
 
 /**
- * Organization members and invites (CLOUDAPPG5-141). Contract: GitHub #69.
+ * Organization members and invites. Contract: GitHub #69 and #80.
  *
- *   getMembers(id)               → GET  /workspaces/{id}/members
- *   inviteMember(id, email, role)→ POST /workspaces/{id}/members
+ *   getMembers(id)               → GET    /workspaces/{id}/members
+ *   inviteMember(id, email, role)→ POST   /workspaces/{id}/members
+ *   cancelInvite(id, email)      → DELETE /workspaces/{id}/invites?email=
+ *   removeMember(id, userId)     → DELETE /workspaces/{id}/members/{userId}
+ *   leaveOrganization(id)        → POST   /workspaces/{id}/leave
  *
  * The local UI demo uses a mock when Cognito is not configured. Signed-in
  * sessions call the backend so team membership survives a page reload.
@@ -56,6 +59,44 @@ async function inviteMemberToApi(workspaceId: string, email: string, role: Invit
   }
 }
 
+/** Turns a failed membership change into a sentence for the screen. */
+function membershipError(error: unknown, fallback: string): Error {
+  if (error instanceof ApiError && error.status === 403) {
+    return new Error("Only an owner or admin can do this.");
+  }
+  if (error instanceof ApiError && error.status === 404) {
+    return new Error("That person or invite is no longer in this organization. Refresh to see the latest list.");
+  }
+  if (error instanceof ApiError && error.status === 409) {
+    return new Error("The owner can't be removed and can't leave the organization.");
+  }
+  return new Error(fallback);
+}
+
+async function cancelInviteInApi(workspaceId: string, email: string): Promise<void> {
+  try {
+    await api.delete(`/workspaces/${encodeURIComponent(workspaceId)}/invites?email=${encodeURIComponent(email)}`);
+  } catch (error) {
+    throw membershipError(error, "Couldn't cancel the invite. Check your connection and try again.");
+  }
+}
+
+async function removeMemberInApi(workspaceId: string, userId: string): Promise<void> {
+  try {
+    await api.delete(`/workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(userId)}`);
+  } catch (error) {
+    throw membershipError(error, "Couldn't remove them. Check your connection and try again.");
+  }
+}
+
+async function leaveInApi(workspaceId: string): Promise<void> {
+  try {
+    await api.post(`/workspaces/${encodeURIComponent(workspaceId)}/leave`);
+  } catch (error) {
+    throw membershipError(error, "Couldn't leave the organization. Check your connection and try again.");
+  }
+}
+
 // --- mock -------------------------------------------------------------------
 
 /** Lives as long as the browser tab, so invites survive moving between pages. */
@@ -97,7 +138,37 @@ async function inviteMemberToMock(email: string, role: InviteRole): Promise<Work
   return invited;
 }
 
+/** Removes one row from the mock list: an invite by email, a member by id. */
+async function removeFromMock(match: (member: WorkspaceMember) => boolean): Promise<void> {
+  await delay(600);
+  const index = mockMembers.findIndex(match);
+  if (index >= 0) mockMembers.splice(index, 1);
+}
+
 // --- what the screens call --------------------------------------------------
+
+/** Cancels a pending invite (owner or admin). GitHub #80. */
+export function cancelInvite(workspaceId: string, email: string): Promise<void> {
+  return USE_MOCK
+    ? removeFromMock((member) => member.status === "invited" && member.email === email)
+    : cancelInviteInApi(workspaceId, email);
+}
+
+/** Removes someone who has joined (owner or admin). Never the owner. GitHub #80. */
+export function removeMember(workspaceId: string, userId: string): Promise<void> {
+  return USE_MOCK
+    ? removeFromMock((member) => member.user_id === userId)
+    : removeMemberInApi(workspaceId, userId);
+}
+
+/** The signed-in user leaves (admin or employee; the owner can't). GitHub #80. */
+export async function leaveOrganization(workspaceId: string): Promise<void> {
+  if (USE_MOCK) {
+    await delay(600);
+    return;
+  }
+  await leaveInApi(workspaceId);
+}
 
 /** Everyone in the organization, active members first, then pending invites. */
 export function getMembers(workspaceId: string): Promise<WorkspaceMember[]> {
