@@ -6,8 +6,17 @@ resource "aws_sns_topic" "alerts" {
 
 data "aws_iam_policy_document" "alerts_topic" {
   statement {
-    sid       = "AccountAdministration"
-    actions   = ["SNS:*"]
+    sid = "AccountAdministration"
+    actions = [
+      "SNS:GetTopicAttributes",
+      "SNS:SetTopicAttributes",
+      "SNS:AddPermission",
+      "SNS:RemovePermission",
+      "SNS:DeleteTopic",
+      "SNS:Subscribe",
+      "SNS:ListSubscriptionsByTopic",
+      "SNS:Publish"
+    ]
     resources = [aws_sns_topic.alerts.arn]
     principals {
       type        = "AWS"
