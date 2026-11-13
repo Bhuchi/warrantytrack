@@ -4,7 +4,6 @@ import Image from "next/image";
 import AuthTabs from "@/features/auth/AuthTabs";
 import BrandPanel from "@/features/auth/BrandPanel";
 import SignInForm from "@/features/auth/SignInForm";
-import SocialLogins from "@/features/auth/SocialLogins";
 
 export const metadata: Metadata = {
   title: "Sign In",
@@ -32,7 +31,6 @@ export default function LoginPage() {
 
           <AuthTabs active="signin" />
           <SignInForm />
-          <SocialLogins />
 
           <div className="flex items-start gap-3 rounded-[10px] bg-brand-subtle px-4 py-3.5 md:rounded-lg">
             <Image
