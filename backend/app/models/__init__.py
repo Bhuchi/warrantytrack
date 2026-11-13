@@ -13,6 +13,7 @@ from app.models.notification import Notification, NotificationType
 from app.models.user import User
 from app.models.warranty import Warranty
 from app.models.workspace import Workspace, WorkspaceType
+from app.models.workspace_invite import WorkspaceInvite
 
 __all__ = [
     "Asset",
@@ -33,4 +34,5 @@ __all__ = [
     "Warranty",
     "Workspace",
     "WorkspaceType",
+    "WorkspaceInvite",
 ]

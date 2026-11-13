@@ -96,9 +96,10 @@ export default function WorkspaceSelector({ isNewUser = false }: { isNewUser?: b
     if (!COGNITO_CLIENT_ID) return;
     let ignore = false;
     api.get<MeResponse>("/me")
-      .then(({ memberships: result }) => {
+      .then(({ memberships: result, invites: pending }) => {
         if (ignore) return;
         setMemberships(result);
+        setInvites(pending);
         const saved = selectedWorkspaceId();
         setSelected(result.find((item) => item.workspace.id === saved)?.workspace.id
           ?? result[0]?.workspace.id ?? "");
@@ -137,8 +138,13 @@ export default function WorkspaceSelector({ isNewUser = false }: { isNewUser?: b
     try {
       const membership = await acceptInvite(invite.workspace.id);
       removeInvite(invite);
-      setJoinedName(membership.workspace.name);
-      setSelected("organization");
+      if (COGNITO_CLIENT_ID) {
+        setMemberships((current) => [...current, membership]);
+        setSelected(membership.workspace.id);
+      } else {
+        setJoinedName(membership.workspace.name);
+        setSelected("organization");
+      }
     } catch {
       setInviteError(
         `Couldn't accept the invite to ${invite.workspace.name}. Please try again.`,

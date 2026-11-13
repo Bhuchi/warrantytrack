@@ -180,7 +180,7 @@ resource "aws_ecs_service" "app" {
   health_check_grace_period_seconds = 60
 
   # No NAT gateway, so the task needs a public IP to pull images and reach
-  # Cognito, S3, Textract and SES. The security group is what keeps it private.
+  # Cognito, S3, Bedrock and SES. The security group limits inbound traffic.
   network_configuration {
     subnets          = aws_subnet.public[*].id
     security_groups  = [aws_security_group.app.id]
@@ -194,4 +194,11 @@ resource "aws_ecs_service" "app" {
   }
 
   depends_on = [aws_lb_listener.http]
+
+  # GitHub Actions registers immutable, SHA-tagged task revisions after a
+  # successful CI run. Terraform keeps managing the service's network, count
+  # and load balancer without rolling its task revision back on the next apply.
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
 }

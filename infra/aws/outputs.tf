@@ -55,6 +55,11 @@ output "log_group_name" {
   value = aws_cloudwatch_log_group.app.name
 }
 
+output "github_deploy_role_arn" {
+  description = "Main-branch GitHub Actions role for image and ECS deployment."
+  value       = var.create_iam_roles ? aws_iam_role.github_deploy[0].arn : null
+}
+
 output "database_mode" {
   description = "rds for a real deployment; container only in a lab account that denies RDS."
   value       = var.use_container_database ? "container" : "rds"
