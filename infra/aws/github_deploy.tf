@@ -6,6 +6,24 @@ variable "github_repository" {
   default     = "Bhuchi/warrantytrack"
 }
 
+# GitHub's immutable OIDC subject includes these numeric IDs for newer repos.
+# Match the exact repository and main branch rather than a wildcard subject.
+variable "github_owner_id" {
+  description = "Numeric GitHub owner ID used in the OIDC subject."
+  type        = number
+  default     = 94790727
+}
+
+variable "github_repository_id" {
+  description = "Numeric GitHub repository ID used in the OIDC subject."
+  type        = number
+  default     = 1366353162
+}
+
+locals {
+  github_oidc_subject = "repo:${split("/", var.github_repository)[0]}@${var.github_owner_id}/${split("/", var.github_repository)[1]}@${var.github_repository_id}:ref:refs/heads/main"
+}
+
 resource "aws_iam_openid_connect_provider" "github" {
   count          = var.create_iam_roles ? 1 : 0
   url            = "https://token.actions.githubusercontent.com"
@@ -27,7 +45,7 @@ resource "aws_iam_role" "github_deploy" {
       Condition = {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:sub" = local.github_oidc_subject
         }
       }
     }]
