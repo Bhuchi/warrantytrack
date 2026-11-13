@@ -35,6 +35,33 @@ class MembershipView(BaseModel):
 class MeView(BaseModel):
     user: UserView
     memberships: list[MembershipView]
+    invites: list["InviteView"]
+
+
+class InviteView(BaseModel):
+    workspace: WorkspaceView
+    role: MembershipRole
+    invited_by: str
+    invited_at: datetime
+
+
+class WorkspaceMemberView(BaseModel):
+    user_id: uuid.UUID | None
+    email: str
+    display_name: str | None
+    role: MembershipRole
+    status: Literal["active", "invited"]
+    invited_at: datetime | None
+
+
+class WorkspaceInviteCreate(BaseModel):
+    email: Annotated[str, StringConstraints(
+        strip_whitespace=True,
+        min_length=3,
+        max_length=320,
+        pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$",
+    )]
+    role: Literal["admin", "employee"]
 
 
 class WorkspaceCreate(BaseModel):

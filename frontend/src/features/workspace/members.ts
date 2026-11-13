@@ -1,4 +1,5 @@
 import { ApiError, api } from "@/lib/api";
+import { COGNITO_CLIENT_ID } from "@/lib/config";
 import type { WorkspaceMember } from "@/types";
 
 /**
@@ -7,11 +8,10 @@ import type { WorkspaceMember } from "@/types";
  *   getMembers(id)               → GET  /workspaces/{id}/members
  *   inviteMember(id, email, role)→ POST /workspaces/{id}/members
  *
- * The backend endpoints are not deployed yet (CLOUDAPPG5-140), so this runs
- * on a mock. When they are, set USE_MOCK to false. Nothing else changes: the
- * real calls below already follow the contract.
+ * The local UI demo uses a mock when Cognito is not configured. Signed-in
+ * sessions call the backend so team membership survives a page reload.
  */
-const USE_MOCK = true;
+const USE_MOCK = !COGNITO_CLIENT_ID;
 
 /** The roles you can invite someone as. Nobody is invited as owner. */
 export type InviteRole = "admin" | "employee";

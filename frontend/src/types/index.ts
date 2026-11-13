@@ -38,6 +38,7 @@ export interface Membership {
 export interface MeResponse {
   user: User;
   memberships: Membership[];
+  invites: Invite[];
 }
 
 /**
