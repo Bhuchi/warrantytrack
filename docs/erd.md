@@ -97,6 +97,7 @@ erDiagram
         json   confirmed_json "what the user approved"
         int    attempts
         string error
+        string textract_job_id "unused, to be dropped"
     }
     ASSET_DOCUMENTS {
         uuid asset_id PK_FK
