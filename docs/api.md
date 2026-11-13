@@ -27,14 +27,15 @@ Authorization: Bearer <jwt>
 The backend trusts exactly one claim from that token: `sub`. Roles and
 permissions are read from the `memberships` table, never from the token.
 
-**Workspace scoping** — every request acts inside one workspace, passed as:
+**Workspace scoping** — routes that act on a selected workspace pass:
 
 ```
 X-Workspace-Id: <uuid>
 ```
 
 The backend verifies the caller has a membership in that workspace before
-doing anything else.
+doing anything else. `/me`, workspace creation, and accepting or declining an
+invite use only the signed-in user and do not need this header.
 
 **Errors** — JSON body `{"detail": "..."}` with standard status codes.
 
@@ -70,8 +71,53 @@ target group.
 `GET /me` returns the signed-in user and every current workspace membership.
 It creates the user's personal workspace on first successful Cognito sign-in.
 `POST /workspaces` creates an organization and makes the caller its owner.
-Both use the request and response shapes below. Role checks on scoped routes
-read `memberships` on every request. The member invite endpoints remain planned.
+The contracts are listed below. Role checks on scoped routes
+read `memberships` on every scoped request.
+
+### Organization invitations
+
+An owner or admin can list members and invite an email address to an
+organization. A pending invitation is separate from `memberships` because the
+person may not have an account yet. They must accept before becoming a member.
+
+| Method | Path | Result |
+|---|---|---|
+| `GET` | `/me` | User, active `memberships`, and pending `invites` matched by email |
+| `POST` | `/workspaces` | Create an organization and become its owner |
+| `GET` | `/workspaces/{id}/members` | Active members first, then pending invites; owner/admin only |
+| `POST` | `/workspaces/{id}/members` | Invite an email as admin or employee; owner/admin only |
+| `POST` | `/workspaces/{id}/invite/accept` | Join the organization; returns a membership |
+| `POST` | `/workspaces/{id}/invite/decline` | Delete one's own pending invite; returns 204 |
+
+`POST /workspaces` accepts `{ "name": "Acme Co", "type": "organization" }`
+and returns 201 with the new workspace's `id`, `name`, `type`, `created_at`,
+and `role: "owner"`.
+
+`GET /me` adds an `invites` array, empty when there are none:
+
+```jsonc
+{
+  "user": { "id": "uuid", "email": "new@acme.com", "display_name": "New User" },
+  "memberships": [{ "workspace": { "id": "uuid", "name": "Personal",
+    "type": "personal", "created_at": "..." }, "role": "owner" }],
+  "invites": [{ "workspace": { "id": "uuid", "name": "Acme Co",
+    "type": "organization", "created_at": "..." }, "role": "employee",
+    "invited_by": "Bhuchi", "invited_at": "..." }]
+}
+```
+
+`POST /workspaces/{id}/members` accepts `{ "email": "new@acme.com", "role":
+"employee" }` and returns 201 with `{ "user_id": null, "email": "new@acme.com",
+"display_name": null, "role": "employee", "status": "invited", "invited_at":
+"..." }`. `GET /workspaces/{id}/members` returns these rows alongside active
+members, whose `status` is `active` and `invited_at` is null. A duplicate member
+or invite returns 409. Invalid email, `owner` role, or a personal workspace
+returns 422. An employee receives 403; a nonmember receives 404.
+
+`POST /workspaces/{id}/invite/accept` has no body and returns 200 with
+`{ "workspace": { ... }, "role": "employee" }`; declining has no body and
+returns 204. Only the signed-in user whose email matches the invitation can
+act on it. No pending invite returns 404.
 
 ---
 
@@ -107,41 +153,6 @@ inline:
     "price": "required"
   }
 }
-```
-
-### Auth and workspaces · owner: Chaitawat (foundation)
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/me` | **Implemented** — current user + every workspace they belong to |
-| `POST` | `/workspaces` | **Implemented** — create an organization workspace |
-| `GET` | `/workspaces/{id}/members` | List members (admin only) |
-| `POST` | `/workspaces/{id}/members` | Invite a member (admin only) |
-
-```jsonc
-// GET /me
-{
-  "user": { "id": "uuid", "email": "a@b.com", "display_name": "Bhuchi" },
-  "memberships": [
-    {
-      "workspace": { "id": "uuid", "name": "Personal", "type": "personal",
-                     "created_at": "2026-09-12T04:20:00Z" },
-      "role": "owner"
-    }
-  ]
-}
-
-// POST /workspaces   (request)
-{ "name": "Acme Co", "type": "organization" }
-// → 201
-{ "id": "uuid", "name": "Acme Co", "type": "organization",
-  "role": "owner", "created_at": "..." }
-
-// POST /workspaces/{id}/members   (request)
-{ "email": "new@acme.com", "role": "employee" }   // role: admin | employee
-// → 201
-{ "user_id": "uuid", "email": "new@acme.com", "role": "employee",
-  "status": "invited" }
 ```
 
 ### Assets · owner: Sirawich (Leg A)

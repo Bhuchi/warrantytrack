@@ -35,6 +35,27 @@ erDiagram
 `memberships` is unique on `(user_id, workspace_id)` — one role per person per
 workspace.
 
+## Pending invitations (migration `0004_workspace_invites`)
+
+```mermaid
+erDiagram
+    WORKSPACES ||--o{ WORKSPACE_INVITES : has
+    USERS ||--o{ WORKSPACE_INVITES : sends
+    WORKSPACE_INVITES {
+        uuid id PK
+        uuid workspace_id FK
+        string email "lowercase; unique per workspace"
+        enum role "admin | employee"
+        uuid invited_by FK
+        datetime created_at
+    }
+```
+
+An invitation is matched to the signed-in user's email. It remains separate
+from `memberships` until accepted because the invited person may not have a
+`users` row yet. Accepting creates a membership and removes the invitation in
+one transaction; declining only removes it.
+
 ## Features (migration `0002_assets_documents`)
 
 Eight more tables: the asset, its warranty, the documents it was proved by,

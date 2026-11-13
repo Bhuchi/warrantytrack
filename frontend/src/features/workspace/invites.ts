@@ -1,12 +1,12 @@
-import type { Invite, Membership } from "@/types";
+import { api } from "@/lib/api";
+import { COGNITO_CLIENT_ID } from "@/lib/config";
+import type { Invite, MeResponse, Membership } from "@/types";
 
 /**
  * Pending organization invites: list, accept, decline (CLOUDAPPG5-133).
  * The contract is the one agreed on GitHub issue #37.
  *
- * Mock for now, until Chaitawat's endpoints exist (CLOUDAPPG5-92). Each call
- * prints the request it would send and waits a moment. The real versions go
- * through lib/api and the screens keep calling these three functions:
+ * Cognito sessions use the API. A local UI demo without Cognito keeps a mock:
  *
  *   getInvites()     → GET /me, its `invites` array
  *   acceptInvite(id) → POST /workspaces/{id}/invite/accept  → 200 Membership
@@ -46,6 +46,7 @@ function logMock(request: string): void {
  * demos and user tests don't show an invite nobody sent.
  */
 export async function getInvites(): Promise<Invite[]> {
+  if (COGNITO_CLIENT_ID) return (await api.get<MeResponse>("/me")).invites;
   await delay(300);
   const wantsMock = new URLSearchParams(window.location.search).get("invite") === "1";
   return wantsMock && !handled.has(MOCK_INVITE.workspace.id) ? [MOCK_INVITE] : [];
@@ -53,6 +54,9 @@ export async function getInvites(): Promise<Invite[]> {
 
 /** Joins the organization. Returns the new membership, for its workspace card. */
 export async function acceptInvite(workspaceId: string): Promise<Membership> {
+  if (COGNITO_CLIENT_ID) {
+    return api.post<Membership>(`/workspaces/${encodeURIComponent(workspaceId)}/invite/accept`);
+  }
   logMock(`POST /workspaces/${workspaceId}/invite/accept`);
   await delay(800);
   handled.add(workspaceId);
@@ -61,6 +65,10 @@ export async function acceptInvite(workspaceId: string): Promise<Membership> {
 
 /** Turns the invite down. The admin can invite again later. */
 export async function declineInvite(workspaceId: string): Promise<void> {
+  if (COGNITO_CLIENT_ID) {
+    await api.post<void>(`/workspaces/${encodeURIComponent(workspaceId)}/invite/decline`);
+    return;
+  }
   logMock(`POST /workspaces/${workspaceId}/invite/decline`);
   await delay(800);
   handled.add(workspaceId);
