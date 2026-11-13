@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useState, type ReactNode } from "react";
 
+import SettingsTabs from "./SettingsTabs";
+
 const reminders = ["60 days", "30 days", "14 days", "7 days", "1 day"] as const;
 
 interface ToggleProps {
@@ -108,22 +110,7 @@ export default function SettingsNotifications() {
           </p>
         </div>
 
-        <nav aria-label="Settings sections" className="flex flex-wrap gap-2">
-          <span
-            aria-current="page"
-            className="flex h-[31px] items-center justify-center rounded-full bg-brand px-[14px] text-xs font-semibold tracking-[-0.24px] text-brand-foreground"
-          >
-            Notifications
-          </span>
-          {["Profile", "Team", "Workspace"].map((tab) => (
-            <span
-              key={tab}
-              className="flex h-[31px] items-center justify-center rounded-full border border-border bg-surface px-[14px] text-xs font-semibold tracking-[-0.24px] text-muted"
-            >
-              {tab}
-            </span>
-          ))}
-        </nav>
+        <SettingsTabs active="notifications" />
 
         <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2 md:gap-5">
           <SettingCard title="Delivery channels">

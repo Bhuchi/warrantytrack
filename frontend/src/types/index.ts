@@ -54,6 +54,22 @@ export interface Invite {
   invited_at: string;
 }
 
+/**
+ * One row of GET /workspaces/{id}/members (issue #69): either someone who
+ * has joined (`active`) or an email that was invited and hasn't accepted yet
+ * (`invited`). An invited person may not have an account, so their
+ * `user_id` and `display_name` are null.
+ */
+export interface WorkspaceMember {
+  user_id: string | null;
+  email: string;
+  display_name: string | null;
+  role: MembershipRole;
+  status: "active" | "invited";
+  /** ISO timestamp for invites; null for active members. */
+  invited_at: string | null;
+}
+
 export type WarrantyStatus = "active" | "expiring_soon" | "expired" | "unknown";
 
 /** One bar in "Assets by Department". */
