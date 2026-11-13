@@ -2,13 +2,14 @@ import Link from "next/link";
 
 type SettingsTab = "notifications" | "team";
 
-/** Tabs that have a page. Profile and Workspace are still placeholders. */
+/**
+ * Only sections that have a page. Figma also shows Profile and Workspace;
+ * they were removed because nothing was built behind them.
+ */
 const TABS: { id: SettingsTab; label: string; href: string }[] = [
   { id: "notifications", label: "Notifications", href: "/settings" },
   { id: "team", label: "Team", href: "/settings/team" },
 ];
-
-const PLACEHOLDERS = ["Profile", "Workspace"];
 
 const pill =
   "flex h-[31px] items-center justify-center rounded-full px-[14px] text-xs font-semibold tracking-[-0.24px]";
@@ -32,11 +33,6 @@ export default function SettingsTabs({ active }: { active: SettingsTab }) {
           </Link>
         ),
       )}
-      {PLACEHOLDERS.map((label) => (
-        <span key={label} className={`${pill} border border-border bg-surface text-muted`}>
-          {label}
-        </span>
-      ))}
     </nav>
   );
 }
