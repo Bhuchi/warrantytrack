@@ -1,7 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+
+import { signedInUser } from "@/features/auth/session";
 
 import SettingsTabs from "./SettingsTabs";
 
@@ -89,6 +91,17 @@ export default function SettingsNotifications() {
     "14 days",
     "7 days",
   ]);
+  // Where expiry emails go: the address the user signed in with. It lives in
+  // localStorage, which only exists in the browser, so it is read after the
+  // first render (the same way as AppTopBar).
+  const [alertEmail, setAlertEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const signedIn = signedInUser();
+    // Reading browser storage is a one-off sync with an outside system.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (signedIn) setAlertEmail(signedIn.email);
+  }, []);
 
   function toggleReminder(reminder: string) {
     setSelectedReminders((current) =>
@@ -133,44 +146,18 @@ export default function SettingsNotifications() {
             </div>
           </SettingCard>
 
-          <SettingCard title="Connected email">
-            <p className="-mt-3 text-[11px] leading-4 text-muted-light">
-              Personal Workspace
-            </p>
-            <div className="flex items-center gap-3 rounded-[11px] border-[1.5px] border-green-600 p-[14px]">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-canvas text-xl font-bold text-[#4285f4]">
-                G
+          <SettingCard title="Alert email">
+            <div className="flex items-center gap-3 rounded-[11px] border border-border p-[14px]">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-brand-subtle">
+                <Image src="/icons/settings-email.svg" alt="" width={20} height={20} />
               </span>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-foreground">Gmail</span>
-                  <Image
-                    src="/icons/settings-connected-dot.svg"
-                    alt=""
-                    width={7}
-                    height={7}
-                  />
-                  <span className="text-[11px] font-semibold text-status-active">
-                    Connected
-                  </span>
-                </div>
-                <p className="truncate text-[11px] leading-4 text-muted">
-                  you@example.com
+                <p className="truncate text-sm font-bold text-foreground">
+                  {alertEmail ?? "Your sign-in email"}
                 </p>
-              </div>
-            </div>
-            <div className="flex gap-2.5">
-              <div className="flex h-[42px] flex-1 items-center justify-center gap-2 rounded-[9px] border border-border text-[13px] font-semibold text-brand">
-                <Image
-                  src="/icons/settings-send-test.svg"
-                  alt=""
-                  width={15}
-                  height={15}
-                />
-                Send test
-              </div>
-              <div className="flex h-[42px] flex-1 items-center justify-center rounded-[9px] border border-border text-[13px] font-semibold text-muted">
-                Disconnect
+                <p className="text-[11px] leading-4 text-muted">
+                  The address you signed in with
+                </p>
               </div>
             </div>
             <div className="flex items-start gap-2 text-[11px] leading-4 text-muted-light">
@@ -181,7 +168,10 @@ export default function SettingsNotifications() {
                 height={14}
                 className="mt-0.5 shrink-0"
               />
-              <p>Send-only permission — WarrantyTrack never reads your inbox.</p>
+              <p>
+                WarrantyTrack sends expiry alerts to this address. Turn them off
+                with the Email switch under Delivery channels.
+              </p>
             </div>
           </SettingCard>
 
