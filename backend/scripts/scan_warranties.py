@@ -3,7 +3,7 @@
 Run it:
 
     docker compose exec backend python -m scripts.scan_warranties
-    docker compose exec backend python -m scripts.scan_warranties --days 60
+    docker compose exec backend python -m scripts.scan_warranties --today 2026-12-01
 
 On AWS this is a **one-off ECS task started by EventBridge Scheduler**, not a
 thread inside the API. docs/architecture.md explains why: with more than one
@@ -29,7 +29,6 @@ from sqlalchemy import text
 
 from app.db.session import SessionLocal
 from app.services import warranty_scan
-from app.services.warranty import EXPIRING_SOON_DAYS
 
 logger = logging.getLogger("scan_warranties")
 
@@ -43,8 +42,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--days",
         type=int,
-        default=EXPIRING_SOON_DAYS,
-        help=f"How far ahead to look (default {EXPIRING_SOON_DAYS}).",
+        default=None,
+        help=(
+            "Cap on how far ahead to look (default: the largest reminder day, "
+            f"{warranty_scan.SCAN_WINDOW_DAYS}). Each person's reminder days still apply."
+        ),
     )
     parser.add_argument(
         "--today",

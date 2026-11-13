@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.models.asset import Asset, AssetCondition
 from app.models.membership import Membership, MembershipRole
 from app.models.notification import Notification, NotificationType
+from app.models.notification_settings import NotificationSettings
 from app.models.user import User
 from app.models.warranty import Warranty
 from app.models.workspace import Workspace, WorkspaceType
@@ -100,6 +101,23 @@ def make_asset(
     return asset
 
 
+def set_settings(db: Session, user: User, **changes) -> None:
+    """Save a person's notification settings over the defaults."""
+    row = db.get(NotificationSettings, user.id) or NotificationSettings(user_id=user.id)
+    row.in_app_enabled = changes.get("in_app_enabled", True)
+    row.email_enabled = changes.get("email_enabled", True)
+    row.remind_days = changes.get("remind_days", [30, 14, 7])
+    db.add(row)
+    db.flush()
+
+
+def age_notifications(db: Session, user: User, days: int = 1) -> None:
+    """Move a person's rows back in real time, as a day passing would."""
+    for row in notifications_for(db, user):
+        row.created_at = row.created_at - timedelta(days=days)
+    db.flush()
+
+
 def notifications_for(db: Session, user: User) -> list[Notification]:
     return list(
         db.scalars(select(Notification).where(Notification.user_id == user.id)).all()
@@ -158,13 +176,16 @@ def test_the_title_counts_down(db: Session, sent) -> None:
     assert "Monitor warranty expires today" in titles
 
 
-def test_the_window_can_be_widened(db: Session, sent) -> None:
+def test_the_window_follows_the_persons_reminder_days(db: Session, sent) -> None:
     owner = make_user(db, "owner")
     workspace = make_workspace(db, owner=owner)
     make_asset(db, workspace, end_offset=45)
 
+    # Default reminder days are 30, 14, 7: 45 days out is not due yet.
     assert warranty_scan.scan(db, today=TODAY).notifications_created == 0
-    assert warranty_scan.scan(db, today=TODAY, days=60).notifications_created == 1
+
+    set_settings(db, owner, remind_days=[60])
+    assert warranty_scan.scan(db, today=TODAY).notifications_created == 1
 
 
 # --- who hears about it ----------------------------------------------------
@@ -368,3 +389,83 @@ def test_a_broken_mailer_still_leaves_the_notification(db: Session, monkeypatch)
     assert result.errors == [f"{owner.email}: SES is down"]
     # Written and committed before the send was attempted.
     assert len(notifications_for(db, owner)) == 1
+
+
+# --- reminder days, email and in-app switches (GitHub #82) ------------------
+
+
+def test_a_daily_run_reminds_once_at_each_chosen_day(db: Session, sent) -> None:
+    """Thirty-one daily runs, reminder days 30 and 7: exactly two reminders."""
+    owner = make_user(db, "owner")
+    workspace = make_workspace(db, owner=owner)
+    set_settings(db, owner, remind_days=[30, 7])
+    make_asset(db, workspace, end_offset=31, name="Laptop")
+
+    for day in range(31):  # days left 31 down to 1
+        warranty_scan.scan(db, today=TODAY + timedelta(days=day))
+        age_notifications(db, owner)
+
+    titles = sorted(n.title for n in notifications_for(db, owner))
+    assert titles == ["Laptop warranty expires in 30 days", "Laptop warranty expires in 7 days"]
+
+
+def test_nothing_before_the_first_chosen_day(db: Session, sent) -> None:
+    owner = make_user(db, "owner")
+    workspace = make_workspace(db, owner=owner)
+    set_settings(db, owner, remind_days=[7])
+    make_asset(db, workspace, end_offset=20)
+
+    result = warranty_scan.scan(db, today=TODAY)
+
+    assert result.notifications_created == 0
+    assert result.skipped_by_settings == 1
+
+
+def test_a_missed_run_still_reminds_the_next_day(db: Session, sent) -> None:
+    """Crossing, not equality: 14 days left was two days ago, nobody was told."""
+    owner = make_user(db, "owner")
+    workspace = make_workspace(db, owner=owner)
+    set_settings(db, owner, remind_days=[14])
+    make_asset(db, workspace, end_offset=12)
+
+    assert warranty_scan.scan(db, today=TODAY).notifications_created == 1
+
+
+def test_no_reminder_days_still_says_it_expired(db: Session, sent) -> None:
+    owner = make_user(db, "owner")
+    workspace = make_workspace(db, owner=owner)
+    set_settings(db, owner, remind_days=[])
+    make_asset(db, workspace, end_offset=3, name="Laptop")
+    make_asset(db, workspace, end_offset=-1, name="Monitor")
+
+    warranty_scan.scan(db, today=TODAY)
+
+    assert [n.title for n in notifications_for(db, owner)] == ["Monitor warranty expired yesterday"]
+
+
+def test_email_off_writes_the_row_but_sends_nothing(db: Session, sent) -> None:
+    owner = make_user(db, "owner")
+    admin = make_user(db, "admin")
+    workspace = make_workspace(db, owner=owner, admin=admin)
+    set_settings(db, owner, email_enabled=False)
+    make_asset(db, workspace, end_offset=10)
+
+    result = warranty_scan.scan(db, today=TODAY)
+
+    assert len(notifications_for(db, owner)) == 1
+    assert [to for to, _, _ in sent] == [admin.email]
+    assert result.emails_sent == 1
+
+
+def test_in_app_off_still_writes_the_row(db: Session, sent) -> None:
+    """The row is the de-duplication record; the bell list hides it instead."""
+    owner = make_user(db, "owner")
+    workspace = make_workspace(db, owner=owner)
+    set_settings(db, owner, in_app_enabled=False)
+    make_asset(db, workspace, end_offset=10)
+
+    warranty_scan.scan(db, today=TODAY)
+    second = warranty_scan.scan(db, today=TODAY)
+
+    assert len(notifications_for(db, owner)) == 1
+    assert second.skipped_as_duplicate == 1

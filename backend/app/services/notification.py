@@ -13,7 +13,12 @@ from datetime import datetime, timezone
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.models.notification import Notification
+from app.models.notification import Notification, NotificationType
+from app.services import notification_settings
+
+#: The alerts the In-app switch controls. Other kinds (an asset assigned to
+#: you) are not warranty reminders and always show.
+WARRANTY_TYPES = (NotificationType.warranty_expiring, NotificationType.warranty_expired)
 
 
 def list_for_workspace_user(
@@ -29,14 +34,15 @@ def list_for_workspace_user(
     rows we already loaded rather than firing a second COUNT query. If this ever
     needs to page, split it into a COUNT + a LIMIT query instead.
     """
-    items = db.scalars(
-        select(Notification)
-        .where(
-            Notification.workspace_id == workspace_id,
-            Notification.user_id == user_id,
-        )
-        .order_by(Notification.created_at.desc())
-    ).all()
+    query = select(Notification).where(
+        Notification.workspace_id == workspace_id,
+        Notification.user_id == user_id,
+    )
+    # In-app off: the scan still writes the rows (they are its de-duplication
+    # record) but the bell list and its badge leave the warranty ones out.
+    if not notification_settings.for_user(db, user_id).in_app_enabled:
+        query = query.where(Notification.type.not_in(WARRANTY_TYPES))
+    items = db.scalars(query.order_by(Notification.created_at.desc())).all()
 
     unread = sum(1 for n in items if not n.read)
     return unread, list(items)
