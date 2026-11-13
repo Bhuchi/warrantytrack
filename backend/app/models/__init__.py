@@ -10,6 +10,7 @@ from app.models.document import (
 )
 from app.models.membership import Membership, MembershipRole
 from app.models.notification import Notification, NotificationType
+from app.models.notification_settings import NotificationSettings
 from app.models.user import User
 from app.models.warranty import Warranty
 from app.models.workspace import Workspace, WorkspaceType
@@ -29,6 +30,7 @@ __all__ = [
     "MembershipRole",
     "Notification",
     "NotificationType",
+    "NotificationSettings",
     "User",
     "Vendor",
     "Warranty",

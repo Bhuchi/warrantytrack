@@ -663,6 +663,8 @@ asset, and the row still appears without them.
 |---|---|---|
 | `GET` | `/notifications` | In-app list (bell + Notifications screen D09) |
 | `POST` | `/notifications/mark-all-read` | Mark all as read |
+| `GET` | `/me/notification-settings` | The signed-in person's alert settings (defaults if never saved) |
+| `PUT` | `/me/notification-settings` | Replace all three settings |
 
 ```jsonc
 // GET /notifications
@@ -688,8 +690,38 @@ gets duplicate mail). It also takes a Postgres advisory lock, so a double-fired
 schedule still sends once.
 
 It tells the workspace's owners and admins, plus the employee an asset is
-assigned to, and it tells each of them at most once every 30 days per asset —
-a daily scan would otherwise write the same row every day for a month. Each
-person gets **one digest email**, not one per asset. The in-app row is written
-and committed before the email is attempted, so a broken mailer still leaves
-the bell menu correct.
+assigned to. Each person gets **one digest email**, not one per asset. The
+in-app row is written and committed before the email is attempted, so a broken
+mailer still leaves the bell menu correct.
+
+#### Notification settings (GitHub #82)
+
+Per person, not per workspace: the same choices apply in every workspace. No
+`X-Workspace-Id` needed. Stored in `notification_settings`; no row means the
+defaults.
+
+```jsonc
+// GET /me/notification-settings  → 200 (the defaults if never saved)
+{ "in_app_enabled": true, "email_enabled": true, "remind_days": [30, 14, 7] }
+
+// PUT /me/notification-settings  (all three fields)  → 200, the saved settings
+{ "in_app_enabled": true, "email_enabled": false, "remind_days": [30, 7] }
+```
+
+- `remind_days` values come from `60, 30, 14, 7, 1`, no duplicates, returned
+  largest first. Anything else, a missing field, or an unknown field is `422`.
+  An empty list is allowed: no reminders before expiry.
+- Signed out is `401`.
+
+How the daily scan uses them:
+
+- **Reminder days.** A reminder goes out when a warranty *crosses* one of the
+  person's days (`days_left <= t`), once per day chosen, so a missed run still
+  reminds the next day. The scan looks 60 days ahead; each person's days decide
+  whether they hear about it.
+- **Expired.** Unchanged: one "expired" alert within 7 days after the end date,
+  whatever `remind_days` says, at most once every 30 days per asset.
+- **Email off.** The row is written; it is left out of that person's email.
+- **In-app off.** The row is still written (it is the de-duplication record),
+  but `GET /notifications` and its `unread` count leave out
+  `warranty_expiring` and `warranty_expired` rows for that person.

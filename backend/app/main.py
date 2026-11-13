@@ -8,6 +8,7 @@ from app.api.routes import (
     dashboard,
     documents,
     health,
+    notification_settings,
     notifications,
     workspaces,
 )
@@ -33,6 +34,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(workspaces.router)
 app.include_router(notifications.router, prefix="/notifications")
+app.include_router(notification_settings.router)
 # The four catalog lists the asset pickers are built from. One router each, so
 # every path is still defined here and nowhere else.
 app.include_router(catalog.categories_router, prefix="/categories")
