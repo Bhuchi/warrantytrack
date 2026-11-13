@@ -1,4 +1,5 @@
 import { ApiError, api } from "@/lib/api";
+import { COGNITO_CLIENT_ID } from "@/lib/config";
 import type { NotificationSettings } from "@/types";
 
 /**
@@ -8,10 +9,11 @@ import type { NotificationSettings } from "@/types";
  *   getNotificationSettings()      → GET /me/notification-settings
  *   saveNotificationSettings(next) → PUT /me/notification-settings
  *
- * The backend is not deployed yet (CLOUDAPPG5-144), so this runs on a mock
- * that keeps the settings in this browser. When it is, set USE_MOCK to false.
+ * Local UI work without Cognito keeps the settings in this browser. A Cognito
+ * build uses the signed-in API so the choices persist across browsers and the
+ * daily warranty scan can respect them.
  */
-const USE_MOCK = true;
+const USE_MOCK = !COGNITO_CLIENT_ID;
 
 /** The reminder chips, in the order they are shown. */
 export const REMIND_DAY_OPTIONS = [60, 30, 14, 7, 1] as const;
