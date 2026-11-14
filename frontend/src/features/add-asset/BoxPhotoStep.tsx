@@ -56,12 +56,12 @@ export default function BoxPhotoStep({ draft, onChange, saving, onBack, onSave, 
         <p className="text-[15px] font-bold tracking-[-0.3px] text-brand">
           {photo ? photo.name : "Add a photo of the box"}
         </p>
-        <p className="text-[12px] tracking-[-0.24px] text-muted">Or of where it&apos;s kept · JPG or PNG</p>
+        <p className="text-[12px] tracking-[-0.24px] text-muted">Or of where it&apos;s kept · JPG, PNG or HEIC</p>
 
         <input
           id="box-photo"
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
           capture="environment"
           className="sr-only"
           onChange={(event) => {

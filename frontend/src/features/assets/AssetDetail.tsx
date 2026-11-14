@@ -286,13 +286,30 @@ function StoragePanel({ asset }: { asset: Asset }) {
   return (
     <Panel title="Box / Storage">
       <div className="flex flex-col gap-3 sm:flex-row md:flex-col lg:flex-row">
-        <div
-          role="img"
-          aria-label="No storage photo attached"
-          className="flex h-28 w-full shrink-0 items-center justify-center rounded-[10px] border border-dashed border-border bg-canvas text-xs text-muted sm:w-36 md:w-full lg:w-36"
-        >
-          No photo attached
-        </div>
+        {asset.location_image_url ? (
+          <a
+            href={asset.location_image_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block h-28 w-full shrink-0 overflow-hidden rounded-[10px] border border-border sm:w-36 md:w-full lg:w-36"
+          >
+            {/* A presigned S3 link, so a plain <img>: next/image would need the bucket's host configured. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={asset.location_image_url}
+              alt="Photo of the box or where it is kept"
+              className="h-full w-full object-cover"
+            />
+          </a>
+        ) : (
+          <div
+            role="img"
+            aria-label="No storage photo attached"
+            className="flex h-28 w-full shrink-0 items-center justify-center rounded-[10px] border border-dashed border-border bg-canvas text-xs text-muted sm:w-36 md:w-full lg:w-36"
+          >
+            No photo attached
+          </div>
+        )}
         <dl className="flex min-w-0 flex-1 flex-col gap-2">
           <div>
             <dt className="text-[11px] text-muted">Storage location</dt>

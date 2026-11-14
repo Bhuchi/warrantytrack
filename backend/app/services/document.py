@@ -18,9 +18,6 @@ import.
 
 from __future__ import annotations
 
-import hashlib
-import hmac
-import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -147,16 +144,15 @@ def download_url_for(document: Document) -> str:
     if presigned is not None:
         return presigned
 
-    expires = int(time.time()) + settings.presigned_url_ttl_seconds
-    query = urlencode({"expires": expires, "signature": _dev_signature(document.id, expires)})
+    expires = storage.dev_link_expiry()
+    signature = storage.dev_link_signature(f"document:{document.id}", expires)
+    query = urlencode({"expires": expires, "signature": signature})
     return f"{settings.api_base_url.rstrip('/')}/documents/{document.id}/dev-download?{query}"
 
 
 def dev_download_allowed(document_id: uuid.UUID, expires: int, signature: str) -> bool:
     """Whether a dev download link is genuine and still in date."""
-    if expires < time.time():
-        return False
-    return hmac.compare_digest(_dev_signature(document_id, expires), signature)
+    return storage.dev_link_valid(f"document:{document_id}", expires, signature)
 
 
 def read_for_dev_download(db: Session, document_id: uuid.UUID) -> tuple[Document, bytes]:
@@ -171,11 +167,6 @@ def read_for_dev_download(db: Session, document_id: uuid.UUID) -> tuple[Document
     if not storage.exists(document.s3_key):
         raise DocumentFileMissing(document.s3_key)
     return document, storage.read_bytes(document.s3_key)
-
-
-def _dev_signature(document_id: uuid.UUID, expires: int) -> str:
-    message = f"dev-download:{document_id}:{expires}".encode()
-    return hmac.new(settings.secret_key.encode(), message, hashlib.sha256).hexdigest()
 
 
 def get_visible(

@@ -17,7 +17,10 @@ Two backends, chosen by `STORAGE_BACKEND`:
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import re
+import time
 import unicodedata
 import uuid
 from pathlib import Path
@@ -113,6 +116,7 @@ def object_key(
     workspace_name: str | None = None,
     uploader_id: uuid.UUID | None = None,
     uploader_name: str | None = None,
+    folder: str | None = None,
 ) -> str:
     """Where one upload lives in the bucket.
 
@@ -130,9 +134,12 @@ def object_key(
         uploader_label = safe_path_label(uploader_name, "user")
         uploader_folder = f"{uploader_label}-{uploader_id}"
 
+    # `folder` keeps kinds of upload apart, e.g. asset photos under
+    # `photos/`, so a key of one kind can never be passed off as another.
+    subfolder = f"{folder}/" if folder else ""
     return (
         f"workspaces/{workspace_folder}/users/{uploader_folder}/"
-        f"{uuid.uuid4()}-{safe_filename(filename)}"
+        f"{subfolder}{uuid.uuid4()}-{safe_filename(filename)}"
     )
 
 
@@ -205,7 +212,34 @@ def presigned_get_url(
         raise StorageError(f"Could not presign a download for {key}: {exc}") from exc
 
 
-# --- local backend ---------------------------------------------------------
+# --- local backend---------------------------------------------------------
+
+
+def dev_link_signature(subject: str, expires: int) -> str:
+    """Sign a local-backend link the way S3 signs a presigned one.
+
+    A link opened in a new tab or an `<img>` carries no auth headers, so the
+    dev-only routes that serve files trust this signature instead. `subject`
+    names what the link opens, prefixed by kind (`document:<id>`,
+    `photo:<key>`), so a signature for one thing never opens another.
+    """
+    message = f"dev-link:{subject}:{expires}".encode()
+    return hmac.new(settings.secret_key.encode(), message, hashlib.sha256).hexdigest()
+
+
+def dev_link_valid(subject: str, expires: int, signature: str) -> bool:
+    """Whether a local-backend link is genuine and still in date."""
+    if expires < time.time():
+        return False
+    return hmac.compare_digest(dev_link_signature(subject, expires), signature)
+
+
+def dev_link_expiry() -> int:
+    """When a local-backend link made now should stop working."""
+    return int(time.time()) + settings.presigned_url_ttl_seconds
+
+
+# --- local backend (files) ---------------------------------------------------------
 
 
 def _local_path(key: str) -> Path:

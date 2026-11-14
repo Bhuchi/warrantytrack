@@ -3,12 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import Button from "@/components/Button";
 import Field, { inputClasses } from "@/features/add-asset/Field";
 import type { AssetDetail, UpdateAssetRequest } from "@/types/assets";
 
+import { uploadAssetPhoto } from "./assetPhoto";
 import { getAsset } from "./getAsset";
 import { updateAsset } from "./updateAsset";
 
@@ -98,8 +99,9 @@ function changedFields(before: FormValues, after: FormValues): UpdateAssetReques
  * Edit Asset (/assets/{id}/edit). Bhuchi found the Edit button on Asset
  * Details did nothing; this is where it now goes.
  *
- * Same fields as the Add Asset review step, minus the receipt and photo,
- * which PATCH cannot change. Saving goes back to Asset Details.
+ * Same fields as the Add Asset review step plus the box / storage photo,
+ * minus the receipt, which PATCH cannot change. Saving goes back to Asset
+ * Details.
  */
 export default function EditAssetForm({ assetId }: { assetId: string }) {
   const router = useRouter();
@@ -109,6 +111,20 @@ export default function EditAssetForm({ assetId }: { assetId: string }) {
   const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // The box photo as loaded, and what the user wants done to it: null keeps
+  // it, a File replaces it, "remove" clears it.
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoChange, setPhotoChange] = useState<File | "remove" | null>(null);
+  const newPhotoPreview = useMemo(
+    () => (photoChange instanceof File ? URL.createObjectURL(photoChange) : null),
+    [photoChange],
+  );
+  useEffect(() => {
+    return () => {
+      if (newPhotoPreview) URL.revokeObjectURL(newPhotoPreview);
+    };
+  }, [newPhotoPreview]);
+  const shownPhoto = newPhotoPreview ?? (photoChange === "remove" ? null : photoUrl);
 
   useEffect(() => {
     let ignore = false;
@@ -118,6 +134,7 @@ export default function EditAssetForm({ assetId }: { assetId: string }) {
         const loaded = asset && toFormValues(asset);
         setOriginal(loaded);
         setValues(loaded);
+        setPhotoUrl(asset?.location_image_url ?? null);
       })
       .catch(() => {
         if (!ignore) setLoadFailed(true);
@@ -139,7 +156,7 @@ export default function EditAssetForm({ assetId }: { assetId: string }) {
     if (!original || !values) return;
 
     const changes = changedFields(original, values);
-    if (Object.keys(changes).length === 0) {
+    if (Object.keys(changes).length === 0 && photoChange === null) {
       router.push(detailHref);
       return;
     }
@@ -147,6 +164,8 @@ export default function EditAssetForm({ assetId }: { assetId: string }) {
     setError(null);
     setSaving(true);
     try {
+      if (photoChange === "remove") changes.location_image_key = null;
+      else if (photoChange) changes.location_image_key = await uploadAssetPhoto(photoChange);
       await updateAsset(assetId, changes);
       router.push(detailHref);
     } catch (caught) {
@@ -248,6 +267,49 @@ export default function EditAssetForm({ assetId }: { assetId: string }) {
               <Field id="storage_note" label="Note">
                 {input("storage_note")}
               </Field>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {shownPhoto ? (
+                // A blob: preview or a presigned S3 link, so a plain <img>.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={shownPhoto}
+                  alt="Photo of the box or where it is kept"
+                  className="h-20 w-28 rounded-lg border border-border object-cover"
+                />
+              ) : (
+                <div className="flex h-20 w-28 items-center justify-center rounded-lg border border-dashed border-border bg-canvas text-[11px] text-muted">
+                  No photo
+                </div>
+              )}
+              <input
+                id="edit-box-photo"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                className="sr-only"
+                disabled={saving}
+                onChange={(event) => {
+                  const picked = event.target.files?.[0];
+                  if (picked) setPhotoChange(picked);
+                  event.target.value = "";
+                }}
+              />
+              <label
+                htmlFor="edit-box-photo"
+                className="cursor-pointer text-[14px] font-semibold tracking-[-0.28px] text-brand"
+              >
+                {shownPhoto ? "Replace photo" : "Add photo"}
+              </label>
+              {shownPhoto && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setPhotoChange(photoUrl ? "remove" : null)}
+                  className="text-[14px] font-semibold tracking-[-0.28px] text-muted"
+                >
+                  Remove
+                </button>
+              )}
             </div>
           </section>
 

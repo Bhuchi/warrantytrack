@@ -16,6 +16,7 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+    Response,
     status as http_status,
 )
 from fastapi.concurrency import run_in_threadpool
@@ -37,6 +38,8 @@ from app.schemas.asset import (
     AssetList,
     AssetListItem,
     AssetUpdate,
+    PhotoPresignRequest,
+    PhotoPresignResponse,
 )
 from app.schemas.asset_import import (
     ImportCommitResponse,
@@ -45,9 +48,11 @@ from app.schemas.asset_import import (
 )
 from app.services import asset as asset_service
 from app.services import asset_import
+from app.services import asset_photo, storage
 from app.services import asset_validation
 from app.services.asset import DuplicateSerialNumber, UnknownDocument
 from app.services.asset_validation import AssetValidationError
+from app.core.config import settings
 from app.services.warranty import WarrantyStatus
 
 # No prefix here — main.py mounts this router at "/assets", so the collection
@@ -154,6 +159,94 @@ def create_asset(
         )
 
     return AssetDetail.from_asset(created)
+
+
+#: Same ceiling as receipts (PUT /documents/{id}/dev-upload).
+_MAX_DEV_PHOTO_BYTES = 15 * 1024 * 1024
+
+
+@router.post("/photos/presign", response_model=PhotoPresignResponse)
+def presign_photo(
+    data: PhotoPresignRequest,
+    db: Session = Depends(get_db),
+    membership: Membership = Depends(get_current_membership),
+) -> PhotoPresignResponse:
+    """POST /assets/photos/presign — somewhere to upload a box / storage photo.
+
+    Then PUT the photo to `upload_url` and send `key` as `location_image_key`
+    on POST or PATCH /assets. Images only.
+    """
+    try:
+        key, upload_url = asset_photo.reserve(
+            db, membership.workspace_id, membership.user_id, data.filename, data.content_type
+        )
+    except asset_photo.NotAPhoto:
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=[{
+                "type": "value_error",
+                "loc": ["body", "content_type"],
+                "msg": "Upload a JPG, PNG, WEBP or HEIC photo.",
+            }],
+        ) from None
+    except storage.StorageError as error:
+        raise HTTPException(
+            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)
+        ) from None
+    return PhotoPresignResponse(upload_url=upload_url, key=key)
+
+
+@router.put("/photos/dev-upload", status_code=http_status.HTTP_204_NO_CONTENT)
+async def dev_upload_photo(
+    request: Request,
+    key: str = Query(max_length=1024),
+    membership: Membership = Depends(get_current_membership),
+) -> Response:
+    """Accept a photo directly. **Development only**, like the receipt one.
+
+    404 on any other backend: in production the browser PUTs to S3.
+    """
+    if settings.storage_backend != "local":
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Not found")
+    if not asset_photo.owns(membership.workspace_id, key):
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    body = await request.body()
+    if not body:
+        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="Empty upload.")
+    if len(body) > _MAX_DEV_PHOTO_BYTES:
+        raise HTTPException(
+            status_code=http_status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Photo is larger than 15MB.",
+        )
+    await run_in_threadpool(storage.write_local, key, body)
+    return Response(status_code=http_status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/photos/dev-view")
+def dev_view_photo(
+    key: str = Query(max_length=1024),
+    expires: int = Query(),
+    signature: str = Query(max_length=128),
+) -> Response:
+    """Serve a photo from local storage. **Development only.**
+
+    The local twin of the presigned S3 GET in `location_image_url`. No login,
+    because an `<img>` sends no auth headers; the signed, expiring query
+    string stands in for it, as S3's own signature does in production.
+    """
+    if settings.storage_backend != "local":
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Not found")
+    if not asset_photo.dev_view_allowed(key, expires, signature):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="This link has expired or is not valid.",
+        )
+    try:
+        body = storage.read_bytes(key)
+    except storage.StorageError:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Not found") from None
+    return Response(content=body, media_type=asset_photo.content_type_of(key))
 
 
 @router.get("/{asset_id}", response_model=AssetDetail)
