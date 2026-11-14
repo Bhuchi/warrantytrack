@@ -509,6 +509,7 @@ classification. There is therefore no "in use" check and no 409 for it.
 | `POST` | `/documents/{id}/submit` | Upload finished; start OCR (Bedrock) |
 | `GET` | `/documents/{id}` | Poll OCR status + extracted fields |
 | `POST` | `/documents/{id}/confirm` | Create asset(s) from reviewed OCR (multi-line) |
+| `GET` | `/documents/{id}/download` | Short-lived link that opens the uploaded file |
 
 The browser uploads **straight to S3** with the presigned URL — the file never
 passes through the API. Then it polls `GET /documents/{id}` until `status`
@@ -620,6 +621,30 @@ Each asset is created through Leg A's `asset_service.create_asset()`, so the
 required fields, the vendor-by-name lookup and the warranty end-date
 calculation are identical to `POST /assets`. The document is linked to every
 asset it produced, without the client having to ask for it.
+
+#### Opening an uploaded file (GitHub #95)
+
+```jsonc
+// GET /documents/{id}/download
+// → 200
+{ "url": "https://<bucket>.s3.ap-southeast-1.amazonaws.com/...?X-Amz-...", "expires_in": 900 }
+```
+
+`url` is a presigned S3 GET: the bucket stays private and the file does not
+pass through the API. It opens the file **inline** (browsers show JPG, PNG and
+PDF directly) under its original filename, so one link serves both "view" and
+"download". Open it straight away (`window.open(url)`) and ask again next
+time rather than storing it; it stops working after `expires_in` seconds.
+
+Visibility is the same as `GET /documents/{id}`: `404` for another
+workspace's document or, for an employee, a colleague's upload. `404` also
+when nothing was ever uploaded to the document.
+
+On `STORAGE_BACKEND=local`, `url` points at
+`GET /documents/{id}/dev-download?expires=…&signature=…`, which streams the file
+from the container's disk. It needs no auth headers, because a new tab sends
+none; the signed, expiring query string stands in for them, the way S3's own
+signature does. Like `dev-upload`, it 404s on any other backend.
 
 ### Warranty status · owner: Bhuchi (Leg B)
 

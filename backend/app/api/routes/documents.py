@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi import status as http_status
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from app.models.membership import Membership
 from app.schemas.document import (
     ConfirmRequest,
     ConfirmResponse,
+    DocumentDownload,
     DocumentRead,
     PresignRequest,
     PresignResponse,
@@ -143,6 +144,76 @@ def get_document(
     """GET /documents/{id} — poll OCR status and read the extracted fields."""
     document = _visible_or_404(db, membership, document_id)
     return DocumentRead(**document_service.as_api_dict(document))
+
+
+@router.get("/{document_id}/download", response_model=DocumentDownload)
+def download_document(
+    document_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    membership: Membership = Depends(get_current_membership),
+) -> DocumentDownload:
+    """GET /documents/{id}/download — a short-lived link to open the file.
+
+    Same visibility as `GET /documents/{id}`, so an employee cannot open a
+    colleague's receipt. 404 also when nothing was ever uploaded, because
+    there is nothing to open.
+    """
+    document = _visible_or_404(db, membership, document_id)
+    try:
+        url = document_service.download_url_for(document)
+    except document_service.DocumentFileMissing:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Nothing has been uploaded for this document.",
+        ) from None
+    except storage.StorageError as error:
+        raise HTTPException(
+            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)
+        ) from None
+    return DocumentDownload(url=url, expires_in=settings.presigned_url_ttl_seconds)
+
+
+@router.get("/{document_id}/dev-download")
+def dev_download(
+    document_id: uuid.UUID,
+    expires: int = Query(),
+    signature: str = Query(max_length=128),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Serve the file from local storage. **Development only.**
+
+    The local-backend twin of a presigned S3 GET, so the download button can
+    be tried with docker compose. There is no login here because a new browser
+    tab sends no auth headers; the signed, expiring query string from
+    `GET /documents/{id}/download` stands in for it, exactly as S3's own
+    signature does in production. Refuses to answer on any other backend.
+    """
+    if settings.storage_backend != "local":
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND, detail="Not found"
+        )
+    if not document_service.dev_download_allowed(document_id, expires, signature):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="This link has expired or is not valid.",
+        )
+
+    try:
+        document, body = document_service.read_for_dev_download(db, document_id)
+    except (document_service.DocumentNotFound, document_service.DocumentFileMissing):
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND, detail="Document not found"
+        ) from None
+
+    headers = {}
+    disposition = storage.inline_disposition(document.filename)
+    if disposition:
+        headers["Content-Disposition"] = disposition
+    return Response(
+        content=body,
+        media_type=document.content_type or "application/octet-stream",
+        headers=headers,
+    )
 
 
 @router.post(

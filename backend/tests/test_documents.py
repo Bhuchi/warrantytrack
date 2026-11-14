@@ -12,8 +12,10 @@ tested separately in test_ocr_parse.py.
 
 from __future__ import annotations
 
+import time
 import uuid
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -21,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.main import app
 from app.services import storage
 from app.models.asset import Asset
 from app.models.document import AssetDocument, Document, DocumentStatus
@@ -344,3 +347,118 @@ def test_missing_vendor_names_the_field_and_the_row(api: TestClient) -> None:
     response = api.post(f"/documents/{document_id}/confirm", json={"assets": [entry]})
     assert response.status_code == 422
     assert response.json()["detail"][0]["loc"][:3] == ["body", "assets", 0]
+
+
+# --- download (GitHub #95) ---------------------------------------------------
+
+
+def _path_of(url: str) -> str:
+    """The path and query of a dev link, so TestClient can follow it."""
+    parts = urlsplit(url)
+    return f"{parts.path}?{parts.query}"
+
+
+def test_download_opens_the_uploaded_file_under_its_name(api: TestClient) -> None:
+    document = presign(api, filename="ใบเสร็จ Power Buy.jpg")
+    upload(api, document["document_id"], b"the-receipt-bytes")
+
+    response = api.get(f"/documents/{document['document_id']}/download")
+
+    assert response.status_code == 200, response.text
+    link = response.json()
+    assert link["expires_in"] == settings.presigned_url_ttl_seconds
+    assert "/dev-download?" in link["url"]
+
+    # A new browser tab sends no auth headers; the signed link is enough.
+    opened = TestClient(app).get(_path_of(link["url"]))
+    assert opened.status_code == 200
+    assert opened.content == b"the-receipt-bytes"
+    assert opened.headers["content-type"] == "image/jpeg"
+    disposition = opened.headers["content-disposition"]
+    assert disposition.startswith("inline;")
+    assert "filename*=UTF-8''%E0%B9%83%E0%B8%9A" in disposition
+
+
+def test_download_before_upload_is_404(api: TestClient) -> None:
+    document = presign(api)
+    assert api.get(f"/documents/{document['document_id']}/download").status_code == 404
+
+
+def test_download_follows_the_same_visibility_as_get(
+    api: TestClient, db: Session, workspace: Workspace, other_workspace: Workspace,
+    membership: Membership,
+) -> None:
+    theirs = Document(
+        workspace_id=other_workspace.id,
+        s3_key=f"ws/{other_workspace.id}/{uuid.uuid4()}-theirs.jpg",
+        filename="theirs.jpg",
+    )
+    colleague = User(cognito_sub=f"other-{uuid.uuid4()}", email=f"o-{uuid.uuid4()}@t.local")
+    db.add_all([theirs, colleague])
+    db.flush()
+    colleagues = Document(
+        workspace_id=workspace.id,
+        uploaded_by_user_id=colleague.id,
+        s3_key=f"ws/{workspace.id}/{uuid.uuid4()}-colleague.jpg",
+        filename="colleague.jpg",
+    )
+    db.add(colleagues)
+    db.flush()
+    storage.write_local(theirs.s3_key, b"x")
+    storage.write_local(colleagues.s3_key, b"x")
+
+    assert api.get(f"/documents/{theirs.id}/download").status_code == 404
+    assert api.get(f"/documents/{colleagues.id}/download").status_code == 200
+
+    membership.role = MembershipRole.employee
+    db.flush()
+    assert api.get(f"/documents/{colleagues.id}/download").status_code == 404
+
+
+def test_a_tampered_or_expired_dev_link_is_refused(
+    api: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    document = presign(api)
+    upload(api, document["document_id"])
+    url = _path_of(api.get(f"/documents/{document['document_id']}/download").json()["url"])
+    anonymous = TestClient(app)
+
+    assert anonymous.get(url.replace("signature=", "signature=0")).status_code == 403
+    other_id = uuid.uuid4()
+    assert anonymous.get(url.replace(document["document_id"], str(other_id))).status_code == 403
+
+    later = time.time() + settings.presigned_url_ttl_seconds + 1
+    monkeypatch.setattr(time, "time", lambda: later)
+    assert anonymous.get(url).status_code == 403
+
+
+def test_the_dev_download_route_is_off_on_s3(api: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    document = presign(api)
+    upload(api, document["document_id"])
+    url = _path_of(api.get(f"/documents/{document['document_id']}/download").json()["url"])
+
+    monkeypatch.setattr(settings, "storage_backend", "s3")
+    assert TestClient(app).get(url).status_code == 404
+
+
+def test_the_s3_link_opens_inline_under_the_original_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The overrides are signed into the presigned GET, not left to S3 metadata."""
+    calls: list[dict] = []
+
+    class FakeS3:
+        def generate_presigned_url(self, operation: str, Params: dict, ExpiresIn: int) -> str:
+            calls.append({"operation": operation, **Params})
+            return "https://bucket.example/signed"
+
+    monkeypatch.setattr(settings, "storage_backend", "s3")
+    monkeypatch.setattr(settings, "s3_bucket_name", "bucket")
+    monkeypatch.setattr(storage, "_client", lambda: FakeS3())
+
+    url = storage.presigned_get_url("k", filename='bad "name".pdf', content_type="application/pdf")
+
+    assert url == "https://bucket.example/signed"
+    assert calls[0]["operation"] == "get_object"
+    assert calls[0]["ResponseContentType"] == "application/pdf"
+    assert calls[0]["ResponseContentDisposition"] == (
+        "inline; filename=\"bad _name_.pdf\"; filename*=UTF-8''bad%20%22name%22.pdf"
+    )
