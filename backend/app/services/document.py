@@ -27,6 +27,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.document import Document, DocumentKind, DocumentStatus
+from app.models.user import User
+from app.models.workspace import Workspace
 from app.schemas.asset import AssetCreate
 from app.services import asset as asset_service
 from app.services import ocr, storage, warranty_lookup
@@ -77,10 +79,18 @@ def create_for_upload(
     kind: DocumentKind = DocumentKind.invoice,
 ) -> Document:
     """Reserve a storage key and a document row for an upload about to happen."""
+    workspace = db.get(Workspace, workspace_id)
+    uploader = db.get(User, uploaded_by_user_id) if uploaded_by_user_id else None
     document = Document(
         workspace_id=workspace_id,
         uploaded_by_user_id=uploaded_by_user_id,
-        s3_key=storage.object_key(workspace_id, filename),
+        s3_key=storage.object_key(
+            workspace_id,
+            filename,
+            workspace_name=workspace.name if workspace else None,
+            uploader_id=uploaded_by_user_id,
+            uploader_name=uploader.display_name if uploader else None,
+        ),
         filename=filename,
         content_type=content_type,
         kind=kind,
