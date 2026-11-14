@@ -48,6 +48,21 @@ class OcrError(RuntimeError):
     """Extraction could not be completed. The document's `error` records it."""
 
 
+class NotAReceipt(OcrError):
+    """The file was read fine, but it is not an invoice or a receipt.
+
+    A subclass of OcrError on purpose: the caller already records an OcrError
+    as `failed` with `str(error)` for the review screen, and that message is
+    written to be shown to the person who picked the wrong file.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            "This doesn't look like an invoice or receipt. "
+            "Please upload only an invoice or receipt."
+        )
+
+
 # Textract's own field names. ITEM/PRICE/PRODUCT_CODE appear per line item,
 # the rest in the document summary.
 _VENDOR = "VENDOR_NAME"
@@ -292,6 +307,12 @@ def parse_model_json(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise OcrError("The model returned an unexpected answer.")
 
+    # Only an explicit "no" rejects the file. A missing or unclear answer is
+    # treated as a receipt, so a blurry real receipt is never turned away; the
+    # review screen is where a person fixes what could not be read.
+    if data.get("is_receipt") is False or str(data.get("is_receipt")).strip().lower() == "false":
+        raise NotAReceipt()
+
     def text(value: Any) -> str | None:
         return str(value).strip() or None if value is not None else None
 
@@ -330,6 +351,7 @@ _BEDROCK_SYSTEM_PROMPT = """You extract data from a purchase receipt or invoice.
 
 Return ONLY one JSON object, no prose and no markdown, with exactly these keys:
 {
+  "is_receipt": boolean,
   "vendor_name": string | null,
   "purchase_date": "YYYY-MM-DD" | null,
   "invoice_number": string | null,
@@ -343,6 +365,11 @@ Return ONLY one JSON object, no prose and no markdown, with exactly these keys:
 }
 
 Rules:
+- is_receipt: true when the document is a purchase receipt, invoice, tax invoice
+  or order confirmation that shows something bought, even if it is blurry or
+  partly unreadable. false for anything else, such as a photo of a product or a
+  room, a screenshot of an app, an ID card, a form, a letter or a blank page.
+  When it is false, set every other key to null and line_items to [].
 - Use null for anything you cannot read with confidence. Never guess: an empty
   field is better than a wrong one.
 - purchase_date: the purchase / issue date. Dates are day-first (01/03/2025 is

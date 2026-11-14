@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.main import app
-from app.services import storage
+from app.services import ocr, storage
 from app.models.asset import Asset
 from app.models.document import AssetDocument, Document, DocumentStatus
 from app.models.membership import Membership, MembershipRole
@@ -147,6 +147,28 @@ def test_submit_extracts_and_records_the_fields(api: TestClient, db: Session) ->
     # The fake backend deliberately leaves the date blank, like a real photo.
     assert document.extracted_json["purchase_date"] is None
     assert len(document.extracted_json["line_items"]) == 2
+
+
+def test_a_file_that_is_not_a_receipt_fails_with_advice(
+    api: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CLOUDAPPG5-148: a product photo or a screenshot is not an invoice."""
+    def refuse(*_args: object, **_kwargs: object) -> dict:
+        raise ocr.NotAReceipt()
+
+    monkeypatch.setattr(ocr, "extract", refuse)
+    document = presign(api, filename="cat.jpg")
+    upload(api, document["document_id"])
+
+    submitted = api.post(f"/documents/{document['document_id']}/submit")
+
+    assert submitted.status_code == 202
+    for body in (submitted.json(), api.get(f"/documents/{document['document_id']}").json()):
+        assert body["status"] == "failed"
+        assert body["extracted"] is None
+        assert body["error"] == (
+            "This doesn't look like an invoice or receipt. Please upload only an invoice or receipt."
+        )
 
 
 def test_a_real_jpeg_survives_the_upload_path(api: TestClient, db: Session) -> None:
