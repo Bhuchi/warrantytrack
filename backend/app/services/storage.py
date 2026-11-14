@@ -21,6 +21,7 @@ import re
 import unicodedata
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 
 import boto3
 from botocore.config import Config
@@ -157,14 +158,47 @@ def presigned_put_url(key: str, content_type: str | None) -> str | None:
         raise StorageError(f"Could not presign an upload for {key}: {exc}") from exc
 
 
-def presigned_get_url(key: str) -> str | None:
-    """A short-lived URL for viewing one object, or None on `local`."""
+def inline_disposition(filename: str | None) -> str | None:
+    """`Content-Disposition: inline` that names the file as the user called it.
+
+    `inline` so the browser shows a JPG, PNG or PDF instead of saving it, and
+    the original name so "Save as" offers `ใบเสร็จ.jpg` rather than the object
+    key. The plain `filename=` is an ASCII fallback with quotes and
+    backslashes removed; `filename*=` (RFC 6266) carries the real name.
+    """
+    if not filename:
+        return None
+    fallback = "".join(
+        char if 32 <= ord(char) < 127 and char not in '"\\' else "_"
+        for char in filename
+    ).strip() or "download"
+    return f"inline; filename=\"{fallback}\"; filename*=UTF-8''{quote(filename, safe='')}"
+
+
+def presigned_get_url(
+    key: str,
+    *,
+    filename: str | None = None,
+    content_type: str | None = None,
+) -> str | None:
+    """A short-lived URL for viewing one object, or None on `local`.
+
+    `filename` and `content_type` are signed into the URL as response
+    overrides, so S3 serves the file inline under its original name whatever
+    metadata the upload left on the object.
+    """
     if settings.storage_backend != "s3":
         return None
+    params: dict[str, str] = {"Bucket": settings.s3_bucket_name, "Key": key}
+    disposition = inline_disposition(filename)
+    if disposition:
+        params["ResponseContentDisposition"] = disposition
+    if content_type:
+        params["ResponseContentType"] = content_type
     try:
         return _client().generate_presigned_url(
             "get_object",
-            Params={"Bucket": settings.s3_bucket_name, "Key": key},
+            Params=params,
             ExpiresIn=settings.presigned_url_ttl_seconds,
         )
     except (BotoCoreError, ClientError) as exc:  # pragma: no cover - needs AWS
