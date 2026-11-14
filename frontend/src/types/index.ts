@@ -82,7 +82,17 @@ export interface NotificationSettings {
   remind_days: number[];
 }
 
-export type WarrantyStatus = "active" | "expiring_soon" | "expired" | "unknown";
+/**
+ * GET /documents/{id}/download (GitHub #95): a short-lived link to open or
+ * save an uploaded receipt. The bucket is private, so the link stops working
+ * after `expires_in` seconds; ask again rather than storing it.
+ */
+export interface DocumentDownload {
+  url: string;
+  expires_in: number;
+}
+
+export type WarrantyStatus ="active" | "expiring_soon" | "expired" | "unknown";
 
 /** One bar in "Assets by Department". */
 export interface DepartmentCount {

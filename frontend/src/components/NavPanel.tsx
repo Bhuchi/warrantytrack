@@ -36,6 +36,17 @@ const MENU = [
   { href: "/settings", label: "Settings", Icon: SettingsIcon },
 ] as const;
 
+/**
+ * The menu item to highlight: the one whose link is the page itself or a
+ * folder above it. When two match, the longer (more specific) one wins, so
+ * /assets/123/edit highlights Assets but /assets/new highlights Add Asset.
+ */
+function activeHref(pathname: string): string | undefined {
+  return MENU.map((item) => item.href)
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.length - a.length)[0];
+}
+
 export interface NavWorkspace {
   name: string;
   /** "Personal workspace" or "Organization workspace". */
@@ -68,6 +79,7 @@ export default function NavPanel({
   // usePathname tells us the URL being viewed, so the matching item can be
   // highlighted without every page passing its own name down.
   const pathname = usePathname();
+  const active = activeHref(pathname);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // useEffect runs after render. This one wires a keyboard listener while the
@@ -151,7 +163,7 @@ export default function NavPanel({
           </p>
           <ul className="flex flex-col gap-1 pt-1.5">
             {MENU.map(({ href, label, Icon }) => {
-              const isActive = pathname === href;
+              const isActive = href === active;
               return (
                 <li key={href}>
                   <Link

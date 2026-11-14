@@ -7,6 +7,7 @@ import Button from "@/components/Button";
 import Modal from "@/components/Modal";
 import { CameraIcon, PencilIcon, UploadIcon } from "@/components/NavIcons";
 import { useToast } from "@/components/ToastProvider";
+import { PhotoUploadError } from "@/features/assets/assetPhoto";
 import type { OcrDocument } from "@/types/documents";
 
 import BoxPhotoStep from "./BoxPhotoStep";
@@ -14,6 +15,7 @@ import { type AssetDraft, EMPTY_DRAFT, draftFromScan } from "./draft";
 import MethodCards, { type MethodOption } from "./MethodCards";
 import ReceiptReview from "./ReceiptReview";
 import ReceiptUpload, { type UploadStatus } from "./ReceiptUpload";
+import { NOT_A_RECEIPT_FILE_MESSAGE, isReceiptFile } from "./receiptFile";
 import SerialStep from "./SerialStep";
 import StepProgress from "./StepProgress";
 import { saveAsset } from "./saveAsset";
@@ -78,9 +80,11 @@ export default function AddAssetWizard() {
       queueSavedToast(final.name);
       showToast({ tone: "success", title: "Asset saved successfully", message: `${final.name} was added.` });
       router.push("/dashboard");
-    } catch {
-      // Stay on the page so nothing typed is lost.
-      showToast({ tone: "error", title: "Could not save the asset", message: "Please try again." });
+    } catch (error) {
+      // Stay on the page so nothing typed is lost. A failed photo upload says
+      // so, because "Skip for now" is then a way to save without it.
+      const message = error instanceof PhotoUploadError ? error.message : "Please try again.";
+      showToast({ tone: "error", title: "Could not save the asset", message });
       setSaving(false);
     }
   }
@@ -94,6 +98,12 @@ export default function AddAssetWizard() {
   /** Runs when a file is picked or dropped: show "Reading…", wait for OCR, then show the result. */
   async function handleFile(picked: File) {
     setFile(picked);
+
+    if (!isReceiptFile(picked)) {
+      setScan({ id: "", status: "failed", extracted: null, error: NOT_A_RECEIPT_FILE_MESSAGE });
+      setPhase("failed");
+      return;
+    }
 
     if (picked.size > MAX_FILE_BYTES) {
       setScan({ id: "", status: "failed", extracted: null, error: "This file is larger than 10 MB." });

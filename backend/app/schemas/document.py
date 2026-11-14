@@ -42,6 +42,17 @@ class PresignResponse(BaseModel):
     s3_key: str
 
 
+class DocumentDownload(BaseModel):
+    """GET /documents/{id}/download — a link that opens the uploaded file.
+
+    Short-lived on purpose: open it straight away and ask again next time
+    rather than storing it. `expires_in` is in seconds.
+    """
+
+    url: str
+    expires_in: int
+
+
 class DocumentRead(BaseModel):
     """GET /documents/{id} — what the review screen polls.
 

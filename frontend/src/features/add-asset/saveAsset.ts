@@ -1,3 +1,4 @@
+import { uploadAssetPhoto } from "@/features/assets/assetPhoto";
 import { api } from "@/lib/api";
 
 import { type AssetDraft, toCreateAssetRequest } from "./draft";
@@ -17,13 +18,12 @@ interface ConfirmResponse {
  *   several assets, so the body is a list; this form always sends one.
  * - Manual entry: POST /assets.
  *
- * TODO: the box photo (step 3) is not uploaded yet. The only upload route,
- * POST /documents/presign, makes a document record, so the photo would show
- * up as a receipt under Linked Documents. Needs an image upload route from
- * the backend; until then location_image_key is sent as null.
+ * The box photo (step 3) is uploaded first and saved as location_image_key.
+ * If that upload fails nothing is saved, so the photo is never silently lost.
  */
 export async function saveAsset(draft: AssetDraft): Promise<{ id: string }> {
-  const request = toCreateAssetRequest(draft, null);
+  const photoKey = draft.location_photo ? await uploadAssetPhoto(draft.location_photo) : null;
+  const request = toCreateAssetRequest(draft, photoKey);
 
   if (draft.document_id) {
     const result = await api.post<ConfirmResponse>(

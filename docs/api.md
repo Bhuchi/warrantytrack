@@ -188,6 +188,7 @@ inline:
 | `DELETE` | `/assets/{id}` | Delete (admin/owner) |
 | `POST` | `/assets/{id}/assign` | Assign / unassign to an employee (admin only) |
 | `POST` | `/assets/import` | Bulk CSV/Excel import |
+| `POST` | `/assets/photos/presign` | Upload URL + key for a box / storage photo |
 
 ```jsonc
 // GET /assets  → paginated (lightweight rows for the list screen D05)
@@ -244,7 +245,7 @@ tenants, `assigned_to_user_id` separates people inside one.
   "location_name": "HQ Floor 3",       // or "location_id": "uuid" — the SITE
   "department_id": "uuid",             // optional
   "storage_note": "Box is on the top shelf",   // optional, free text
-  "location_image_key": null,          // optional S3 key
+  "location_image_key": null,          // optional: key from POST /assets/photos/presign
   "document_ids": ["uuid"],            // optional: receipts already uploaded
   "assigned_to_user_id": null,         // optional
   "warranty": {                        // optional
@@ -302,6 +303,7 @@ ignored if sent in the body.
   "department": { "id": "uuid", "name": "IT" },
   "location":   { "id": "uuid", "name": "HQ Floor 3" },   // the site
   "storage_note": "Box is on the top shelf",
+  "location_image_url": "https://...",   // short-lived link to the box photo, or null
   "assigned_to": { "user_id": "uuid", "display_name": "Earth" },
   "warranty": {
     "provider": "Dell",
@@ -417,6 +419,34 @@ A whole-file problem — not UTF-8, a missing required column, more than 1000
 rows — is a **422 with a plain message**, because there is no row to blame.
 Empty body is **400**; over 15MB is **413**.
 
+#### Box / storage photo (CLOUDAPPG5-147, GitHub #98)
+
+```jsonc
+// POST /assets/photos/presign
+{ "filename": "box.jpg", "content_type": "image/jpeg" }
+// → 200
+{ "upload_url": "https://<bucket>.s3...?X-Amz-...", "key": "workspaces/.../photos/<uuid>-box.jpg" }
+```
+
+PUT the photo to `upload_url` with the same `Content-Type`, then send `key` as
+`location_image_key` on `POST /assets` or `PATCH /assets/{id}` (`null` removes
+the photo). Images only: JPEG, PNG, WEBP, HEIC/HEIF; anything else is `422` on
+`content_type`.
+
+`location_image_key` must be a key from this endpoint **in the caller's
+workspace**; anything else is `422` on that field. That stops an asset from
+pointing at another workspace's file, or at a receipt, which would otherwise be
+served through `location_image_url` past the receipt routes' employee check.
+
+`GET /assets/{id}` (and the POST/PATCH responses) carry `location_image_url`,
+a presigned GET for an `<img src>`. It expires; reload the asset for a fresh
+one rather than storing it.
+
+On `STORAGE_BACKEND=local` the upload goes to `PUT /assets/photos/dev-upload?key=…`
+(auth required) and `location_image_url` points at
+`GET /assets/photos/dev-view?key=…&expires=…&signature=…`. Both 404 on any
+other backend.
+
 ### Catalog · owner: Sirawich (Leg A)
 
 The four lookup lists an asset points at. They fill the pickers on Add Asset
@@ -509,6 +539,7 @@ classification. There is therefore no "in use" check and no 409 for it.
 | `POST` | `/documents/{id}/submit` | Upload finished; start OCR (Bedrock) |
 | `GET` | `/documents/{id}` | Poll OCR status + extracted fields |
 | `POST` | `/documents/{id}/confirm` | Create asset(s) from reviewed OCR (multi-line) |
+| `GET` | `/documents/{id}/download` | Short-lived link that opens the uploaded file |
 
 The browser uploads **straight to S3** with the presigned URL — the file never
 passes through the API. Then it polls `GET /documents/{id}` until `status`
@@ -529,6 +560,14 @@ extraction is not an error here — the row carries `status: "failed"` and the
 reason in `error`, which is what the review screen shows. `confirm` on a
 document that is not `extracted` (including one already confirmed, so a
 double-tap cannot create the assets twice) is `409`.
+
+**A file that is not an invoice or receipt** (a product photo, a screenshot, an
+ID) is also `failed`, with `error` set to *"This doesn't look like an invoice or
+receipt. Please upload only an invoice or receipt."* — written to be shown as
+is. The `bedrock` backend decides this from an `is_receipt` flag the model
+returns; only an explicit `false` rejects, so an unclear answer or a blurry real
+receipt still reaches the review screen. The frontend also refuses anything
+that is not a PDF, JPG, PNG or WEBP before uploading.
 
 **An employee sees only the receipts they uploaded themselves** — a receipt
 shows what the company paid for things that are none of their business, even
@@ -620,6 +659,30 @@ Each asset is created through Leg A's `asset_service.create_asset()`, so the
 required fields, the vendor-by-name lookup and the warranty end-date
 calculation are identical to `POST /assets`. The document is linked to every
 asset it produced, without the client having to ask for it.
+
+#### Opening an uploaded file (GitHub #95)
+
+```jsonc
+// GET /documents/{id}/download
+// → 200
+{ "url": "https://<bucket>.s3.ap-southeast-1.amazonaws.com/...?X-Amz-...", "expires_in": 900 }
+```
+
+`url` is a presigned S3 GET: the bucket stays private and the file does not
+pass through the API. It opens the file **inline** (browsers show JPG, PNG and
+PDF directly) under its original filename, so one link serves both "view" and
+"download". Open it straight away (`window.open(url)`) and ask again next
+time rather than storing it; it stops working after `expires_in` seconds.
+
+Visibility is the same as `GET /documents/{id}`: `404` for another
+workspace's document or, for an employee, a colleague's upload. `404` also
+when nothing was ever uploaded to the document.
+
+On `STORAGE_BACKEND=local`, `url` points at
+`GET /documents/{id}/dev-download?expires=…&signature=…`, which streams the file
+from the container's disk. It needs no auth headers, because a new tab sends
+none; the signed, expiring query string stands in for them, the way S3's own
+signature does. Like `dev-upload`, it 404s on any other backend.
 
 ### Warranty status · owner: Bhuchi (Leg B)
 

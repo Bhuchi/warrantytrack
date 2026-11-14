@@ -17,10 +17,14 @@ Two backends, chosen by `STORAGE_BACKEND`:
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import re
+import time
 import unicodedata
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 
 import boto3
 from botocore.config import Config
@@ -112,6 +116,7 @@ def object_key(
     workspace_name: str | None = None,
     uploader_id: uuid.UUID | None = None,
     uploader_name: str | None = None,
+    folder: str | None = None,
 ) -> str:
     """Where one upload lives in the bucket.
 
@@ -129,9 +134,12 @@ def object_key(
         uploader_label = safe_path_label(uploader_name, "user")
         uploader_folder = f"{uploader_label}-{uploader_id}"
 
+    # `folder` keeps kinds of upload apart, e.g. asset photos under
+    # `photos/`, so a key of one kind can never be passed off as another.
+    subfolder = f"{folder}/" if folder else ""
     return (
         f"workspaces/{workspace_folder}/users/{uploader_folder}/"
-        f"{uuid.uuid4()}-{safe_filename(filename)}"
+        f"{subfolder}{uuid.uuid4()}-{safe_filename(filename)}"
     )
 
 
@@ -157,21 +165,81 @@ def presigned_put_url(key: str, content_type: str | None) -> str | None:
         raise StorageError(f"Could not presign an upload for {key}: {exc}") from exc
 
 
-def presigned_get_url(key: str) -> str | None:
-    """A short-lived URL for viewing one object, or None on `local`."""
+def inline_disposition(filename: str | None) -> str | None:
+    """`Content-Disposition: inline` that names the file as the user called it.
+
+    `inline` so the browser shows a JPG, PNG or PDF instead of saving it, and
+    the original name so "Save as" offers `ใบเสร็จ.jpg` rather than the object
+    key. The plain `filename=` is an ASCII fallback with quotes and
+    backslashes removed; `filename*=` (RFC 6266) carries the real name.
+    """
+    if not filename:
+        return None
+    fallback = "".join(
+        char if 32 <= ord(char) < 127 and char not in '"\\' else "_"
+        for char in filename
+    ).strip() or "download"
+    return f"inline; filename=\"{fallback}\"; filename*=UTF-8''{quote(filename, safe='')}"
+
+
+def presigned_get_url(
+    key: str,
+    *,
+    filename: str | None = None,
+    content_type: str | None = None,
+) -> str | None:
+    """A short-lived URL for viewing one object, or None on `local`.
+
+    `filename` and `content_type` are signed into the URL as response
+    overrides, so S3 serves the file inline under its original name whatever
+    metadata the upload left on the object.
+    """
     if settings.storage_backend != "s3":
         return None
+    params: dict[str, str] = {"Bucket": settings.s3_bucket_name, "Key": key}
+    disposition = inline_disposition(filename)
+    if disposition:
+        params["ResponseContentDisposition"] = disposition
+    if content_type:
+        params["ResponseContentType"] = content_type
     try:
         return _client().generate_presigned_url(
             "get_object",
-            Params={"Bucket": settings.s3_bucket_name, "Key": key},
+            Params=params,
             ExpiresIn=settings.presigned_url_ttl_seconds,
         )
     except (BotoCoreError, ClientError) as exc:  # pragma: no cover - needs AWS
         raise StorageError(f"Could not presign a download for {key}: {exc}") from exc
 
 
-# --- local backend ---------------------------------------------------------
+# --- local backend---------------------------------------------------------
+
+
+def dev_link_signature(subject: str, expires: int) -> str:
+    """Sign a local-backend link the way S3 signs a presigned one.
+
+    A link opened in a new tab or an `<img>` carries no auth headers, so the
+    dev-only routes that serve files trust this signature instead. `subject`
+    names what the link opens, prefixed by kind (`document:<id>`,
+    `photo:<key>`), so a signature for one thing never opens another.
+    """
+    message = f"dev-link:{subject}:{expires}".encode()
+    return hmac.new(settings.secret_key.encode(), message, hashlib.sha256).hexdigest()
+
+
+def dev_link_valid(subject: str, expires: int, signature: str) -> bool:
+    """Whether a local-backend link is genuine and still in date."""
+    if expires < time.time():
+        return False
+    return hmac.compare_digest(dev_link_signature(subject, expires), signature)
+
+
+def dev_link_expiry() -> int:
+    """When a local-backend link made now should stop working."""
+    return int(time.time()) + settings.presigned_url_ttl_seconds
+
+
+# --- local backend (files) ---------------------------------------------------------
 
 
 def _local_path(key: str) -> Path:

@@ -21,6 +21,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlencode
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -113,6 +114,59 @@ def upload_url_for(document: Document) -> str:
     if presigned is not None:
         return presigned
     return f"{settings.api_base_url.rstrip('/')}/documents/{document.id}/dev-upload"
+
+
+class DocumentFileMissing(Exception):
+    """The row exists but nothing was ever uploaded to its key."""
+
+
+def download_url_for(document: Document) -> str:
+    """A short-lived link that opens the uploaded file (GitHub #95).
+
+    A presigned S3 GET normally: the bucket stays private and the file never
+    passes through this API. On `STORAGE_BACKEND=local` there is no bucket, so
+    it points at the dev-only download route with a signature instead.
+
+    The signature is there because the browser opens the link in a new tab,
+    which sends no Authorization or X-Workspace-Id header. The route trusts the
+    signature in their place, and the signature can only come from here, after
+    the caller passed the same workspace and employee checks as
+    `GET /documents/{id}`.
+    """
+    if not storage.exists(document.s3_key):
+        raise DocumentFileMissing(document.s3_key)
+
+    presigned = storage.presigned_get_url(
+        document.s3_key,
+        filename=document.filename,
+        content_type=document.content_type,
+    )
+    if presigned is not None:
+        return presigned
+
+    expires = storage.dev_link_expiry()
+    signature = storage.dev_link_signature(f"document:{document.id}", expires)
+    query = urlencode({"expires": expires, "signature": signature})
+    return f"{settings.api_base_url.rstrip('/')}/documents/{document.id}/dev-download?{query}"
+
+
+def dev_download_allowed(document_id: uuid.UUID, expires: int, signature: str) -> bool:
+    """Whether a dev download link is genuine and still in date."""
+    return storage.dev_link_valid(f"document:{document_id}", expires, signature)
+
+
+def read_for_dev_download(db: Session, document_id: uuid.UUID) -> tuple[Document, bytes]:
+    """The document and its bytes, for the local-only download route.
+
+    Looked up by id alone: the caller has already checked the signature, which
+    is what proves the workspace and employee checks passed.
+    """
+    document = db.get(Document, document_id)
+    if document is None:
+        raise DocumentNotFound(str(document_id))
+    if not storage.exists(document.s3_key):
+        raise DocumentFileMissing(document.s3_key)
+    return document, storage.read_bytes(document.s3_key)
 
 
 def get_visible(
