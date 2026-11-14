@@ -90,7 +90,18 @@ def safe_path_label(value: str | None, fallback: str) -> str:
         else "-"
         for char in normalized
     )
-    cleaned = _REPEATED_DASHES.sub("-", cleaned).strip("-._")[:64].rstrip("-._")
+    cleaned = _REPEATED_DASHES.sub("-", cleaned).strip("-._")
+    # Leave room for the separator and UUID suffix in a filesystem-safe
+    # segment, including names that use multibyte Unicode characters.
+    label: list[str] = []
+    byte_length = 0
+    for char in cleaned:
+        char_length = len(char.encode("utf-8"))
+        if len(label) >= 64 or byte_length + char_length > 200:
+            break
+        label.append(char)
+        byte_length += char_length
+    cleaned = "".join(label).rstrip("-._")
     return cleaned or fallback
 
 
@@ -164,16 +175,31 @@ def presigned_get_url(key: str) -> str | None:
 
 
 def _local_path(key: str) -> Path:
-    """The file backing one key, with the key's own directories flattened.
+    """Return a local path for a safe object key.
 
-    The key is already sanitised by `object_key`, but this is the one place a
-    key becomes a filesystem path, so it re-checks rather than trusting that:
-    a key is one path segment here, never a directory walk.
+    Keep the key's folder structure so long workspace and uploader labels do
+    not become one overlong filesystem component. Revalidate every segment
+    here because this is where an object key becomes a filesystem path.
     """
-    flattened = key.replace("/", "__")
-    if flattened != safe_filename(flattened):
+    parts = key.split("/")
+    if not parts or any(part in {"", ".", ".."} for part in parts):
         raise StorageError(f"Refusing to write an unsafe key: {key!r}")
-    return Path(settings.local_upload_dir) / flattened
+
+    for part in parts:
+        if any(
+            unicodedata.category(char)[0] not in {"L", "M", "N"}
+            and char not in "._-"
+            for char in part
+        ):
+            raise StorageError(f"Refusing to write an unsafe key: {key!r}")
+        if len(part.encode("utf-8")) > 255:
+            raise StorageError(f"Refusing to write an overlong key segment: {key!r}")
+
+    root = Path(settings.local_upload_dir).resolve()
+    path = root.joinpath(*parts)
+    if not path.resolve().is_relative_to(root):
+        raise StorageError(f"Refusing to write an unsafe key: {key!r}")
+    return path
 
 
 def write_local(key: str, data: bytes) -> None:
