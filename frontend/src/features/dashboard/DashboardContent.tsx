@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import ErrorState from "@/components/ErrorState";
 import Skeleton from "@/components/Skeleton";
+import { useToast } from "@/components/ToastProvider";
+import { takeSavedToast } from "@/features/add-asset/savedToast";
 
 import DepartmentBreakdown from "./DepartmentBreakdown";
 import ExpiringList from "./ExpiringList";
@@ -17,8 +19,16 @@ import StatusBreakdown from "./StatusBreakdown";
  * address and the sign-in token only exist in the browser.
  */
 export default function DashboardContent() {
+  const showToast = useToast();
   const [data, setData] = useState<DashboardData | null>(null);
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const name = takeSavedToast();
+    if (name !== null) {
+      showToast({ tone: "success", title: "Asset saved successfully", message: `${name} was added.` });
+    }
+  }, [showToast]);
 
   useEffect(() => {
     let ignore = false;

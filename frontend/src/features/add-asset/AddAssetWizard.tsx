@@ -17,6 +17,7 @@ import ReceiptUpload, { type UploadStatus } from "./ReceiptUpload";
 import SerialStep from "./SerialStep";
 import StepProgress from "./StepProgress";
 import { saveAsset } from "./saveAsset";
+import { queueSavedToast } from "./savedToast";
 import { scanReceipt } from "./scanReceipt";
 
 /** How the user brings the receipt in. Manual entry is always offered up front. */
@@ -74,6 +75,7 @@ export default function AddAssetWizard() {
     setSaving(true);
     try {
       await saveAsset(final);
+      queueSavedToast(final.name);
       showToast({ tone: "success", title: "Asset saved successfully", message: `${final.name} was added.` });
       router.push("/dashboard");
     } catch {
