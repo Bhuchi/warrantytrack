@@ -561,6 +561,14 @@ reason in `error`, which is what the review screen shows. `confirm` on a
 document that is not `extracted` (including one already confirmed, so a
 double-tap cannot create the assets twice) is `409`.
 
+**A file that is not an invoice or receipt** (a product photo, a screenshot, an
+ID) is also `failed`, with `error` set to *"This doesn't look like an invoice or
+receipt. Please upload only an invoice or receipt."* — written to be shown as
+is. The `bedrock` backend decides this from an `is_receipt` flag the model
+returns; only an explicit `false` rejects, so an unclear answer or a blurry real
+receipt still reaches the review screen. The frontend also refuses anything
+that is not a PDF, JPG, PNG or WEBP before uploading.
+
 **An employee sees only the receipts they uploaded themselves** — a receipt
 shows what the company paid for things that are none of their business, even
 for an asset assigned to them. Anything else is `404`, never `403`.

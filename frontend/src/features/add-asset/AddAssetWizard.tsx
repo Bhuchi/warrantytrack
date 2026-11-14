@@ -15,6 +15,7 @@ import { type AssetDraft, EMPTY_DRAFT, draftFromScan } from "./draft";
 import MethodCards, { type MethodOption } from "./MethodCards";
 import ReceiptReview from "./ReceiptReview";
 import ReceiptUpload, { type UploadStatus } from "./ReceiptUpload";
+import { NOT_A_RECEIPT_FILE_MESSAGE, isReceiptFile } from "./receiptFile";
 import SerialStep from "./SerialStep";
 import StepProgress from "./StepProgress";
 import { saveAsset } from "./saveAsset";
@@ -97,6 +98,12 @@ export default function AddAssetWizard() {
   /** Runs when a file is picked or dropped: show "Reading…", wait for OCR, then show the result. */
   async function handleFile(picked: File) {
     setFile(picked);
+
+    if (!isReceiptFile(picked)) {
+      setScan({ id: "", status: "failed", extracted: null, error: NOT_A_RECEIPT_FILE_MESSAGE });
+      setPhase("failed");
+      return;
+    }
 
     if (picked.size > MAX_FILE_BYTES) {
       setScan({ id: "", status: "failed", extracted: null, error: "This file is larger than 10 MB." });

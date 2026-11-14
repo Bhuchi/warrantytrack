@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.services import ocr
-from app.services.ocr import OcrError, _clean_category, _clean_invoice_number, _clean_product_name, _json_from_reply, _parse_months, parse_model_json
+from app.services.ocr import NotAReceipt, OcrError, _clean_category, _clean_invoice_number, _clean_product_name, _json_from_reply, _parse_months, parse_model_json
 
 
 def test_clean_answer_is_normalised():
@@ -139,3 +139,32 @@ def test_invoice_number_and_category_reach_the_result():
     })
     assert out["invoice_number"] == "A-100"
     assert out["line_items"][0]["category"] == "Computer Component"
+
+
+# --- files that are not an invoice or receipt (CLOUDAPPG5-148) -------------------
+
+
+@pytest.mark.parametrize("answer", [False, "false", "False", " FALSE "])
+def test_a_file_the_model_says_is_not_a_receipt_is_refused_with_advice(answer):
+    with pytest.raises(NotAReceipt) as refused:
+        parse_model_json({"is_receipt": answer, "vendor_name": None, "line_items": []})
+    assert str(refused.value) == (
+        "This doesn't look like an invoice or receipt. Please upload only an invoice or receipt."
+    )
+    assert isinstance(refused.value, OcrError)  # recorded as `failed` like any OCR error
+
+
+@pytest.mark.parametrize("answer", [True, "true", None, "maybe", 1])
+def test_anything_but_an_explicit_no_is_treated_as_a_receipt(answer):
+    """A blurry real receipt must reach the review screen, not be turned away."""
+    out = parse_model_json({"is_receipt": answer, "vendor_name": "Power Buy"})
+    assert out["vendor_name"] == "Power Buy"
+
+
+def test_an_answer_without_the_key_still_works():
+    """Older prompts and the other backends never send it."""
+    assert parse_model_json({"vendor_name": "Power Buy"})["vendor_name"] == "Power Buy"
+
+
+def test_the_prompt_asks_for_is_receipt():
+    assert '"is_receipt": boolean' in ocr._BEDROCK_SYSTEM_PROMPT
