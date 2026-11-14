@@ -117,12 +117,6 @@ export default function AddAssetWizard() {
       return;
     }
 
-    if (!isReceiptFile(picked)) {
-      setScan({ id: "", status: "failed", extracted: null, error: NOT_A_RECEIPT_FILE_MESSAGE });
-      setPhase("failed");
-      return;
-    }
-
     if (picked.size > MAX_FILE_BYTES) {
       setScan({ id: "", status: "failed", extracted: null, error: "This file is larger than 10 MB." });
       setPhase("failed");
