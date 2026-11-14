@@ -89,15 +89,27 @@ export default function AddAssetWizard() {
     }
   }
 
-  /** Manual entry, chosen up front or offered after a failed scan: start from an empty form. */
+  /**
+   * Manual entry, chosen up front or offered after a failed scan. The draft is
+   * not cleared here: it is already empty, unless the user typed something,
+   * pressed Back and came in again, and then their typing is kept.
+   */
   function enterManually() {
-    setDraft(EMPTY_DRAFT);
     setPhase("review");
+  }
+
+  /** Back from the review form to where the user came from. The draft is kept. */
+  function backFromReview() {
+    if (scan?.status === "extracted") setPhase("scanned");
+    else if (scan) setPhase("failed");
+    else setPhase("choose");
   }
 
   /** Runs when a file is picked or dropped: show "Reading…", wait for OCR, then show the result. */
   async function handleFile(picked: File) {
     setFile(picked);
+    // A new file starts over, so nothing from an earlier file is left in the form.
+    setDraft(EMPTY_DRAFT);
 
     if (!isReceiptFile(picked)) {
       setScan({ id: "", status: "failed", extracted: null, error: NOT_A_RECEIPT_FILE_MESSAGE });
@@ -168,6 +180,7 @@ export default function AddAssetWizard() {
           draft={draft}
           onChange={updateDraft}
           scan={scan}
+          onBack={backFromReview}
           onConfirm={() => setStep(2)}
           onCancel={() => setDiscardOpen(true)}
         />
