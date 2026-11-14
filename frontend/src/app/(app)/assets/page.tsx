@@ -36,6 +36,7 @@ export default async function AssetsPage() {
         {/* Desktop: next to the title (D05). Mobile has it at the bottom instead. */}
         <Link
           href="/assets/new"
+          prefetch={false}
           className="hidden h-[42px] shrink-0 items-center gap-2 rounded-lg bg-brand px-4 text-[14px] font-bold tracking-[-0.28px] text-brand-foreground md:flex"
         >
           <AddAssetIcon className="size-[17px]" />
@@ -48,6 +49,7 @@ export default async function AssetsPage() {
       {/* Mobile only, as on the Dashboard. M05 3460:171. */}
       <Link
         href="/assets/new"
+        prefetch={false}
         className="flex h-[54px] items-center justify-center gap-2 rounded-lg bg-brand text-[14px] font-bold tracking-[-0.28px] text-brand-foreground md:hidden"
       >
         <AddAssetIcon className="size-[17px]" />

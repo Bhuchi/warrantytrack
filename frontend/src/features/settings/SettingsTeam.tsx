@@ -1,14 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import Button from "@/components/Button";
+import Modal from "@/components/Modal";
 import TextField from "@/components/TextField";
 import { useToast } from "@/components/ToastProvider";
-import { getMembers, inviteMember, isValidEmail, type InviteRole } from "@/features/workspace/members";
+import { signedInUser } from "@/features/auth/session";
+import {
+  cancelInvite,
+  getMembers,
+  inviteMember,
+  isValidEmail,
+  leaveOrganization,
+  removeMember,
+  type InviteRole,
+} from "@/features/workspace/members";
 import { canManageAssets, useWorkspaceRole } from "@/features/workspace/WorkspaceRole";
-import { selectedWorkspaceId } from "@/features/workspace/workspaces";
+import { rememberWorkspace, selectedWorkspaceId } from "@/features/workspace/workspaces";
 import type { MembershipRole, WorkspaceMember } from "@/types";
 
 import SettingsTabs from "./SettingsTabs";
@@ -34,7 +45,24 @@ function Note({ children }: { children: ReactNode }) {
   return <p className="text-sm leading-5 text-muted">{children}</p>;
 }
 
-function MemberRow({ member }: { member: WorkspaceMember }) {
+/** What the confirm dialog is about. `null` means the dialog is closed. */
+type PendingAction =
+  | { kind: "cancel"; member: WorkspaceMember }
+  | { kind: "remove"; member: WorkspaceMember }
+  | { kind: "leave" };
+
+function nameOf(member: WorkspaceMember): string {
+  return member.display_name ?? member.email;
+}
+
+function MemberRow({
+  member,
+  action,
+}: {
+  member: WorkspaceMember;
+  /** The one button this row offers, if any (Remove or Cancel invite). */
+  action?: { label: string; onClick: () => void };
+}) {
   return (
     <li className="flex items-center gap-3 py-2.5">
       <div className="min-w-0 flex-1">
@@ -49,19 +77,51 @@ function MemberRow({ member }: { member: WorkspaceMember }) {
       <span className="shrink-0 rounded-full bg-brand-subtle px-2.5 py-1 text-[11px] font-semibold text-brand">
         {ROLE_LABELS[member.role]}
       </span>
+      {action && (
+        <button
+          type="button"
+          onClick={action.onClick}
+          aria-label={`${action.label}: ${nameOf(member)}`}
+          className="-my-1.5 shrink-0 rounded-md px-2 py-1.5 text-xs font-semibold text-danger hover:bg-red-50"
+        >
+          {action.label}
+        </button>
+      )}
     </li>
   );
 }
 
 /**
- * Settings → Team (CLOUDAPPG5-141): who is in this organization, and a form
- * to invite someone by email. The invited person sees the invite on
- * Workspace Selection the next time they sign in with that email.
+ * Settings → Team (CLOUDAPPG5-141): who is in this organization, a form to
+ * invite someone by email, and the actions that undo membership: cancel an
+ * invite, remove a member, leave (GitHub #80). The invited person sees the
+ * invite on Workspace Selection the next time they sign in with that email.
  */
-export default function SettingsTeam({ isOrganization }: { isOrganization: boolean }) {
+export default function SettingsTeam({
+  isOrganization,
+  organizationName,
+}: {
+  isOrganization: boolean;
+  organizationName: string;
+}) {
   const role = useWorkspaceRole();
+  const router = useRouter();
   const showToast = useToast();
   const canManage = isOrganization && canManageAssets(role);
+  // The owner can't leave: an organization must always keep its owner.
+  const canLeave = isOrganization && (role === "admin" || role === "employee");
+
+  // Your own email, so your row never offers "Remove" (use Leave instead).
+  const [myEmail, setMyEmail] = useState<string | null>(null);
+  useEffect(() => {
+    // Reading browser storage is a one-off sync with an outside system.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMyEmail(signedInUser()?.email.toLowerCase() ?? null);
+  }, []);
+
+  const [pending, setPending] = useState<PendingAction | null>(null);
+  const [working, setWorking] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const [members, setMembers] = useState<WorkspaceMember[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -110,6 +170,88 @@ export default function SettingsTeam({ isOrganization }: { isOrganization: boole
       setSending(false);
     }
   }
+
+  function closeDialog() {
+    if (working) return; // Don't hide the dialog halfway through a request.
+    setPending(null);
+    setActionError(null);
+  }
+
+  /** Runs whatever the open dialog is about, then updates the screen. */
+  async function confirmAction() {
+    if (!pending) return;
+    const workspaceId = selectedWorkspaceId() ?? "";
+    setWorking(true);
+    setActionError(null);
+    try {
+      if (pending.kind === "leave") {
+        await leaveOrganization(workspaceId);
+        rememberWorkspace("personal"); // This organization is no longer yours to open.
+        showToast({ tone: "success", title: `You left ${organizationName}` });
+        router.push("/workspace");
+        return;
+      }
+      const { member } = pending;
+      if (pending.kind === "cancel") {
+        await cancelInvite(workspaceId, member.email);
+        showToast({ tone: "success", title: "Invite cancelled", message: `${member.email} won't see it any more.` });
+      } else {
+        await removeMember(workspaceId, member.user_id ?? "");
+        showToast({ tone: "success", title: "Member removed", message: `${nameOf(member)} no longer has access.` });
+      }
+      setMembers((current) => (current ?? []).filter((item) => item.email !== member.email));
+      setPending(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Something went wrong. Please try again.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  /** Which button a row gets: none for the owner or yourself. */
+  function actionFor(member: WorkspaceMember) {
+    if (member.status === "invited") {
+      return { label: "Cancel invite", onClick: () => setPending({ kind: "cancel", member }) };
+    }
+    if (member.role === "owner" || member.email.toLowerCase() === myEmail || !member.user_id) return undefined;
+    return { label: "Remove", onClick: () => setPending({ kind: "remove", member }) };
+  }
+
+  // The dialog's words depend on which action is pending.
+  const dialog =
+    pending?.kind === "cancel"
+      ? {
+          title: "Cancel this invite?",
+          text: `${pending.member.email} won't see the invite on Workspace Selection any more. You can invite them again later.`,
+          confirm: "Cancel invite",
+          dismiss: "Keep invite",
+        }
+      : pending?.kind === "remove"
+        ? {
+            title: `Remove ${nameOf(pending.member)}?`,
+            text: `They lose access to ${organizationName} straight away. Assets assigned to them become unassigned. You can invite them again later.`,
+            confirm: "Remove",
+            dismiss: "Cancel",
+          }
+        : {
+            title: `Leave ${organizationName}?`,
+            text: `You lose access to its assets straight away. An owner or admin can invite you again.`,
+            confirm: "Leave",
+            dismiss: "Cancel",
+          };
+
+  const leaveCard = canLeave ? (
+    <Card title={`Leave ${organizationName}`}>
+      <Note>You will lose access to this organization and its assets. Your Personal workspace is not affected.</Note>
+      <button
+        type="button"
+        onClick={() => setPending({ kind: "leave" })}
+        className="flex h-[48px] w-full items-center justify-center rounded-[10px] border border-danger bg-surface text-[15px] font-bold text-danger md:w-fit md:px-6"
+      >
+        Leave organization
+      </button>
+    </Card>
+  ) : null;
 
   let body: ReactNode;
   if (!isOrganization) {
@@ -191,7 +333,7 @@ export default function SettingsTeam({ isOrganization }: { isOrganization: boole
           ) : (
             <ul className="-my-2.5 divide-y divide-border">
               {members.map((member) => (
-                <MemberRow key={member.email} member={member} />
+                <MemberRow key={member.email} member={member} action={actionFor(member)} />
               ))}
             </ul>
           )}
@@ -211,7 +353,31 @@ export default function SettingsTeam({ isOrganization }: { isOrganization: boole
         </div>
         <SettingsTabs active="team" />
         {body}
+        {leaveCard}
       </main>
+
+      <Modal
+        open={pending !== null}
+        onClose={closeDialog}
+        title={dialog.title}
+        actions={
+          <>
+            <Button variant="secondary" onClick={closeDialog} disabled={working}>
+              {dialog.dismiss}
+            </Button>
+            <Button variant="danger" onClick={confirmAction} disabled={working}>
+              {working ? "Working…" : dialog.confirm}
+            </Button>
+          </>
+        }
+      >
+        <p>{dialog.text}</p>
+        {actionError && (
+          <p role="alert" className="mt-3 rounded-[10px] bg-red-50 px-4 py-3 text-[13px] text-red-700">
+            {actionError}
+          </p>
+        )}
+      </Modal>
     </div>
   );
 }

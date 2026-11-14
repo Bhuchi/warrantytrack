@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_membership, get_current_user
 from app.db.session import get_db
+from app.models.asset import Asset
 from app.models.membership import Membership, MembershipRole
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceType
@@ -189,4 +190,94 @@ def decline_invite(
 ) -> None:
     invite = _own_invite(db, workspace_id, user_id)
     db.delete(invite)
+    db.commit()
+
+
+# --- undoing membership (GitHub #80) -----------------------------------------
+#
+# These read the caller's role in the workspace named by the path, not by the
+# X-Workspace-Id header: leaving or tidying up a workspace should not depend on
+# which one the browser happens to have selected. No membership there is 404,
+# as everywhere else.
+
+
+def _caller_in(db: Session, workspace_id: uuid.UUID, user_id: uuid.UUID) -> Membership:
+    membership = db.scalar(select(Membership).where(
+        Membership.workspace_id == workspace_id, Membership.user_id == user_id
+    ))
+    if membership is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    return membership
+
+
+def _require_manager(membership: Membership) -> None:
+    if membership.role is MembershipRole.employee:
+        raise HTTPException(status_code=403, detail="Only an owner or admin can do this.")
+
+
+def _unassign(db: Session, workspace_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    """Assets assigned to someone who can no longer see them go back to nobody."""
+    db.execute(
+        update(Asset)
+        .where(Asset.workspace_id == workspace_id, Asset.assigned_to_user_id == user_id)
+        .values(assigned_to_user_id=None)
+    )
+
+
+@router.delete("/workspaces/{workspace_id}/invites", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_invite(
+    workspace_id: uuid.UUID,
+    email: str = Query(min_length=1, max_length=320),
+    user_id: uuid.UUID = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Cancel a pending invite. Owner or admin."""
+    _require_manager(_caller_in(db, workspace_id, user_id))
+    invite = db.scalar(select(WorkspaceInvite).where(
+        WorkspaceInvite.workspace_id == workspace_id,
+        WorkspaceInvite.email == email.strip().lower(),
+    ))
+    if invite is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    db.delete(invite)
+    db.commit()
+
+
+@router.delete("/workspaces/{workspace_id}/members/{member_user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_member(
+    workspace_id: uuid.UUID,
+    member_user_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Remove someone who has joined. Owner or admin; never the owner, never yourself."""
+    _require_manager(_caller_in(db, workspace_id, user_id))
+    target = db.scalar(select(Membership).where(
+        Membership.workspace_id == workspace_id, Membership.user_id == member_user_id
+    ))
+    if target is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    if target.role is MembershipRole.owner:
+        raise HTTPException(status_code=409, detail="The owner can't be removed.")
+    if member_user_id == user_id:
+        raise HTTPException(status_code=409, detail="Use leave to remove yourself.")
+    _unassign(db, workspace_id, member_user_id)
+    db.delete(target)
+    db.commit()
+
+
+@router.post("/workspaces/{workspace_id}/leave", status_code=status.HTTP_204_NO_CONTENT)
+def leave_workspace(
+    workspace_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """The caller leaves an organization. Admin or employee; the owner stays."""
+    membership = _caller_in(db, workspace_id, user_id)
+    if db.get(Workspace, workspace_id).type is WorkspaceType.personal:
+        raise HTTPException(status_code=422, detail="You can't leave your personal workspace.")
+    if membership.role is MembershipRole.owner:
+        raise HTTPException(status_code=409, detail="The owner can't leave the organization.")
+    _unassign(db, workspace_id, user_id)
+    db.delete(membership)
     db.commit()

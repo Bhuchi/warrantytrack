@@ -14,6 +14,7 @@ Documentation       Add an asset from a receipt, end to end in a real browser (C
 
 Library             SeleniumLibrary
 Library             DateTime
+Library             OperatingSystem
 
 Suite Teardown      Close All Browsers
 
@@ -24,6 +25,11 @@ ${BROWSER}          headlesschrome
 ${EMAIL}            test@warrantytrack.io
 ${PASSWORD}         Test1234!
 ${DELAY}            0.2
+# Recent Chrome tries https first and blocks plain-http pages (ERR_BLOCKED_BY_CLIENT)
+# in a fresh automated profile. The AWS load balancer only serves http, so turn
+# that off. Harmless for http://localhost.
+# The performance log lets a failed step print Chrome's own reason for a failed request.
+${CHROME_OPTIONS}   add_argument("--disable-features=HttpsUpgrades,HttpsFirstBalancedModeAutoEnable,HttpsFirstModeV2ForTypicallySecureUsers,HttpsFirstBalancedMode,HttpsFirstModeIncognito"); set_capability("goog:loggingPrefs", {"performance": "ALL"})
 ${RECEIPT}          ${CURDIR}/files/sample-receipt.png
 # What the receipt says. Locally the fake OCR always returns this product.
 ${PRODUCT}          Dell Latitude 5540
@@ -34,7 +40,7 @@ ${EXPIRY_LABEL}     1 Nov 2028
 
 *** Test Cases ***
 1. Open Browser
-    Open Browser    ${URL}/login    ${BROWSER}
+    Open Browser    ${URL}/login    ${BROWSER}    options=${CHROME_OPTIONS}
     Set Window Size    1440    900
     Set Selenium Speed    ${DELAY}
     Wait Until Page Contains    Sign in to your account
@@ -48,16 +54,30 @@ ${EXPIRY_LABEL}     1 Nov 2028
 
 3. Choose Personal Workspace
     # Clicking a card selects it. Only the selected card's Continue is a working link.
-    Click Element    xpath://button[.//*[normalize-space(text())='Personal Workspace']]
-    Click Link    xpath://*[normalize-space(text())='Personal Workspace']/ancestor::div[.//a[normalize-space()='Continue']][1]//a[normalize-space()='Continue']
+    # The card is titled "Personal Workspace" locally (AUTH_BACKEND=dev) and with
+    # the workspace's real name, "Personal", for a Cognito account on AWS.
+    # The cards appear only after GET /me answers ("Loading your workspaces…"), so wait.
+    Wait Until Element Is Visible    xpath://button[.//*[normalize-space(text())='Personal Workspace' or normalize-space(text())='Personal']]    timeout=20s
+    Click Element    xpath://button[.//*[normalize-space(text())='Personal Workspace' or normalize-space(text())='Personal']]
+    Click Link    xpath://*[normalize-space(text())='Personal Workspace' or normalize-space(text())='Personal']/ancestor::div[.//a[normalize-space()='Continue']][1]//a[normalize-space()='Continue']
     Wait Until Location Contains    /dashboard    timeout=20s
 
 4. Open Add Asset
-    Click Link    Add Asset
+    # A marker in window survives a client-side route change, but not a full reload.
+    Execute Javascript    window.__clientNavigationMarker = true
+    Click Link    xpath://nav[@aria-label='Main menu']//a[normalize-space()='Add Asset']
     Wait Until Page Contains    Scan the receipt, or enter the details yourself.
+    ${marker}=    Execute Javascript    return window.__clientNavigationMarker === true
+    Should Be True    ${marker}    msg=Opening Add Asset caused a full page reload.
 
 5. Upload Receipt And Check The Extracted Details
-    Choose File    id:receipt-file    ${RECEIPT}
+    [Teardown]    Run Keyword If Test Failed    Log Upload Requests
+    Record Requests
+    # Upload a copy from the temp folder. On macOS, Chrome started by the test may not
+    # be allowed to read files under ~/Documents; the upload then fails with net::ERR_FAILED.
+    ${folder}=    Evaluate    tempfile.mkdtemp()    modules=tempfile
+    Copy File    ${RECEIPT}    ${folder}
+    Choose File    id:receipt-file    ${folder}${/}sample-receipt.png
     # The button stays disabled until the receipt has been uploaded and read.
     Wait Until Page Contains    Receipt read    timeout=90s
     Click Button    Continue to review
@@ -89,8 +109,11 @@ ${EXPIRY_LABEL}     1 Nov 2028
     Wait Until Page Contains    Add a photo of the box
     Input Text    id:box-note    Box is on the top shelf
     Click Button    Save asset
-    Wait Until Page Contains    Asset saved successfully    timeout=20s
-    Location Should Contain    /dashboard
+    Wait Until Location Contains    /dashboard    timeout=20s
+    # The toast lives in the page's memory. On AWS the load balancer sometimes answers
+    # the Dashboard's background request (?_rsc=) with 503, Next.js reloads the page and
+    # the toast is gone. Step 9 proves the save, so a missing toast is only a warning.
+    Run Keyword And Warn On Failure    Wait Until Page Contains    Asset saved successfully    timeout=5s
     Capture Page Screenshot
 
 9. Find The New Asset In The Assets List
@@ -106,6 +129,43 @@ ${EXPIRY_LABEL}     1 Nov 2028
 
 
 *** Keywords ***
+Record Requests
+    [Documentation]    Remembers every request the page makes from now on, with its
+    ...    status or error, so a failed upload can say which step broke
+    ...    (presign, S3 upload or submit). Only printed if the test fails.
+    Execute Javascript
+    ...    window.__requests = [];
+    ...    const originalFetch = window.fetch;
+    ...    window.fetch = async function (input, init) {
+    ...      const url = (typeof input === 'string' ? input : input.url).split('?')[0];
+    ...      const method = (init && init.method) || 'GET';
+    ...      try {
+    ...        const response = await originalFetch.apply(this, arguments);
+    ...        let body = '';
+    ...        if (!response.ok) { try { body = (await response.clone().text()).slice(0, 200); } catch (e) {} }
+    ...        window.__requests.push(method + ' ' + url + ' ' + response.status + ' ' + body);
+    ...        return response;
+    ...      } catch (error) {
+    ...        window.__requests.push(method + ' ' + url + ' ' + String(error));
+    ...        throw error;
+    ...      }
+    ...    };
+
+Log Upload Requests
+    ${requests}=    Execute Javascript    return (window.__requests || []).join('\\n');
+    Log To Console    \nRequests during the upload:\n${requests}
+    Log    ${requests}
+    # Chrome's own reason for each request that never got a response.
+    ${lib}=    Get Library Instance    SeleniumLibrary
+    ${entries}=    Call Method    ${lib.driver}    get_log    performance
+    ${events}=    Evaluate    [json.loads(e['message'])['message'] for e in $entries]    modules=json
+    ${urls}=    Evaluate    {m['params']['requestId']: m['params']['request']['method'] + ' ' + m['params']['request']['url'].split('?')[0] for m in $events if m['method'] == 'Network.requestWillBeSent'}
+    ${failures}=    Evaluate    [m['params'] for m in $events if m['method'] == 'Network.loadingFailed']
+    FOR    ${failure}    IN    @{failures}
+        ${url}=    Evaluate    $urls.get($failure['requestId'], '?')
+        Log To Console    Chrome: ${url} -> ${failure.get('errorText')} blocked=${failure.get('blockedReason')} cors=${failure.get('corsErrorStatus')}
+    END
+
 Set Date
     [Documentation]    Sets a date input to an ISO date (YYYY-MM-DD).
     ...    Typing into a date picker depends on the browser's language, so this sets

@@ -71,6 +71,17 @@ export interface WorkspaceMember {
   invited_at: string | null;
 }
 
+/**
+ * GET / PUT /me/notification-settings (GitHub #82). Per person, the same in
+ * every workspace they belong to.
+ */
+export interface NotificationSettings {
+  in_app_enabled: boolean;
+  email_enabled: boolean;
+  /** Days before expiry to be reminded, from 60, 30, 14, 7 and 1; largest first. */
+  remind_days: number[];
+}
+
 export type WarrantyStatus = "active" | "expiring_soon" | "expired" | "unknown";
 
 /** One bar in "Assets by Department". */

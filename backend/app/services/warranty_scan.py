@@ -11,9 +11,13 @@ task running, an in-process scheduler fires on every task and sends duplicate
 emails (docs/architecture.md). The entrypoint takes a Postgres advisory lock so
 only one run proceeds even if the scheduler double-fires.
 
-**It will not nag.** A daily scan would otherwise create the same row every day
-for the thirty days before a warranty lapses. A person is told about one asset
-at most once every `RENOTIFY_AFTER_DAYS`.
+**It reminds at the person's chosen days, once each.** Settings →
+Notifications picks reminder days from 60 / 30 / 14 / 7 / 1 (default 30, 14,
+7; GitHub #82). A reminder goes out when the warranty *crosses* one of them,
+not only on that exact day, so a missed scheduler run still reminds the next
+day. Each crossed threshold reminds once; the existing rows are the record.
+Turning Email off writes the row but leaves it out of the email; turning
+In-app off still writes the row (it is the record) and the bell list hides it.
 
 **The in-app row is the record; the email is the nudge.** If SES fails the row
 still exists, so the bell menu is right even when mail is broken.
@@ -24,7 +28,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -34,13 +38,19 @@ from app.models.membership import Membership, MembershipRole
 from app.models.notification import Notification, NotificationType
 from app.models.user import User
 from app.models.warranty import Warranty
+from app.models.notification_settings import REMIND_DAY_OPTIONS
 from app.services import email as email_service
-from app.services.warranty import EXPIRING_SOON_DAYS, compute_status, soon_cutoff
+from app.services import notification_settings
+from app.services.warranty import compute_status, soon_cutoff
 
 logger = logging.getLogger(__name__)
 
-#: Don't tell the same person about the same asset again within this many days.
+#: Don't tell the same person an asset has expired again within this many days.
 RENOTIFY_AFTER_DAYS = 30
+
+#: How far ahead the scan looks: the largest reminder day anyone can choose.
+#: Each person's own reminder days then decide whether they hear about it.
+SCAN_WINDOW_DAYS = max(REMIND_DAY_OPTIONS)
 
 #: How far back to look for warranties that have just lapsed. Bounded so the
 #: first ever run does not email years of history.
@@ -55,6 +65,7 @@ class ScanResult:
     emails_sent: int = 0
     emails_failed: int = 0
     skipped_as_duplicate: int = 0
+    skipped_by_settings: int = 0
     errors: list[str] = field(default_factory=list)
 
     def __str__(self) -> str:
@@ -62,7 +73,8 @@ class ScanResult:
             f"{self.notifications_created} notification(s), "
             f"{self.emails_sent} email(s) sent, "
             f"{self.emails_failed} failed, "
-            f"{self.skipped_as_duplicate} skipped as recently notified"
+            f"{self.skipped_as_duplicate} skipped as recently notified, "
+            f"{self.skipped_by_settings} not yet due by the person's reminder days"
         )
 
 
@@ -145,6 +157,42 @@ def _notified_recently(
     return existing is not None
 
 
+def _threshold_to_remind(remind_days: tuple[int, ...], days_left: int) -> int | None:
+    """The smallest chosen reminder day this warranty has crossed, if any.
+
+    `days_left <= t` rather than `== t`: if yesterday's run was missed, today's
+    still reminds. The smallest crossed one is what matters, because a reminder
+    for it also covers every larger one.
+    """
+    crossed = [t for t in remind_days if days_left <= t]
+    return min(crossed) if crossed else None
+
+
+def _reminded_since_crossing(
+    db: Session, user_id: uuid.UUID, asset_id: uuid.UUID, days_since_crossing: int
+) -> bool:
+    """Whether this person got an expiring reminder for this asset since the
+    warranty crossed the threshold now in force.
+
+    No extra column: the reminder was sent if a row exists from on or after the
+    day of crossing. Like `_notified_recently`, measured on the **real clock**
+    (today's real date minus how many days ago the crossing was), never the
+    scan's simulated `today`, so `--today` cannot rewind it. Whole days, not
+    24-hour spans, so a run at 09:00 still sees yesterday's 08:00 row.
+    """
+    crossing_day = datetime.now(timezone.utc).date() - timedelta(days=days_since_crossing)
+    since = datetime.combine(crossing_day, time.min, tzinfo=timezone.utc)
+    existing = db.scalars(
+        select(Notification).where(
+            Notification.user_id == user_id,
+            Notification.asset_id == asset_id,
+            Notification.type == NotificationType.warranty_expiring,
+            Notification.created_at >= since,
+        )
+    ).first()
+    return existing is not None
+
+
 def _due_warranties(db: Session, today: date, days: int) -> list[tuple[Asset, Warranty]]:
     """Warranties lapsing within `days`, plus those that just lapsed."""
     rows = db.execute(
@@ -162,7 +210,7 @@ def _due_warranties(db: Session, today: date, days: int) -> list[tuple[Asset, Wa
 
 
 def scan(
-    db: Session, today: date | None = None, days: int = EXPIRING_SOON_DAYS
+    db: Session, today: date | None = None, days: int | None = None
 ) -> ScanResult:
     """Create the notifications due today and email them. Commits its own work.
 
@@ -171,7 +219,9 @@ def scan(
     carries the workspace the asset belongs to.
     """
     today = today or datetime.now(timezone.utc).date()
+    days = SCAN_WINDOW_DAYS if days is None else days
     result = ScanResult()
+    settings_cache: dict[uuid.UUID, notification_settings.Settings] = {}
 
     # Built up per person so everyone gets one digest instead of one email per
     # asset. A manager with forty assets lapsing should not get forty emails.
@@ -180,10 +230,26 @@ def scan(
     for asset, warranty in _due_warranties(db, today, days):
         notification_type, title = _title(asset.name, warranty.end_date, today)
 
+        days_left = (warranty.end_date - today).days
+
         for user in _recipients(db, asset):
-            if _notified_recently(db, user.id, asset.id, notification_type):
-                result.skipped_as_duplicate += 1
-                continue
+            if user.id not in settings_cache:
+                settings_cache[user.id] = notification_settings.for_user(db, user.id)
+            prefs = settings_cache[user.id]
+
+            if notification_type is NotificationType.warranty_expired:
+                # Unchanged by reminder days: one "expired" alert, always.
+                if _notified_recently(db, user.id, asset.id, notification_type):
+                    result.skipped_as_duplicate += 1
+                    continue
+            else:
+                threshold = _threshold_to_remind(prefs.remind_days, days_left)
+                if threshold is None:
+                    result.skipped_by_settings += 1
+                    continue
+                if _reminded_since_crossing(db, user.id, asset.id, threshold - days_left):
+                    result.skipped_as_duplicate += 1
+                    continue
 
             db.add(
                 Notification(
@@ -200,7 +266,8 @@ def scan(
                 )
             )
             result.notifications_created += 1
-            digests.setdefault(user.id, (user, []))[1].append(title)
+            if prefs.email_enabled:
+                digests.setdefault(user.id, (user, []))[1].append(title)
 
     # Committed before the emails go out: if SES is down, or this task is
     # killed mid-send, the bell menu is still correct and the next run skips

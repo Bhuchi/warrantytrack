@@ -10,9 +10,11 @@ from sqlalchemy.orm import configure_mappers
 import app.models  # noqa: F401  (registers every table on Base.metadata)
 from app.db.base import Base
 
-# The only two tables that are not inside a workspace: a workspace cannot
-# contain itself, and a user exists before they belong to anything.
-GLOBAL_TABLES = {"workspaces", "users"}
+# The only tables that are not inside a workspace: a workspace cannot contain
+# itself, a user exists before they belong to anything, and a user's
+# notification settings belong to the person, applying in every workspace they
+# are in (GitHub #82). Keyed by user_id, which cascades with the user.
+GLOBAL_TABLES = {"workspaces", "users", "notification_settings"}
 
 TENANT_TABLES = sorted(set(Base.metadata.tables) - GLOBAL_TABLES)
 

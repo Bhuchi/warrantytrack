@@ -101,7 +101,7 @@ export default function NavPanel({
     >
       <div className="flex flex-col gap-[22px]">
         <div className="flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
+          <Link href="/dashboard" prefetch={false} className="flex items-center gap-2.5">
             <Image
               src="/warranty-logo-blue.svg"
               alt=""
@@ -126,6 +126,7 @@ export default function NavPanel({
 
         <Link
           href="/workspace"
+          prefetch={false}
           onClick={onClose}
           aria-label={`${workspace.name}, ${workspace.kind}. Switch workspace`}
           className="flex w-full items-center gap-2.5 rounded-[10px] border border-border bg-canvas px-3 py-[11px] text-left hover:border-brand"
@@ -155,6 +156,7 @@ export default function NavPanel({
                 <li key={href}>
                   <Link
                     href={href}
+                    prefetch={false}
                     onClick={onClose}
                     aria-current={isActive ? "page" : undefined}
                     className={`flex items-center gap-3.5 rounded-[10px] px-3.5 py-[13px] text-[15px] tracking-[-0.3px] ${

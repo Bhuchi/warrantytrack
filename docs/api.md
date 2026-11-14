@@ -88,6 +88,9 @@ person may not have an account yet. They must accept before becoming a member.
 | `POST` | `/workspaces/{id}/members` | Invite an email as admin or employee; owner/admin only |
 | `POST` | `/workspaces/{id}/invite/accept` | Join the organization; returns a membership |
 | `POST` | `/workspaces/{id}/invite/decline` | Delete one's own pending invite; returns 204 |
+| `DELETE` | `/workspaces/{id}/invites?email=` | Cancel a pending invite; owner/admin only; 204 |
+| `DELETE` | `/workspaces/{id}/members/{user_id}` | Remove a member; owner/admin only; 204 |
+| `POST` | `/workspaces/{id}/leave` | The caller leaves; admin/employee only; 204 |
 
 `POST /workspaces` accepts `{ "name": "Acme Co", "type": "organization" }`
 and returns 201 with the new workspace's `id`, `name`, `type`, `created_at`,
@@ -118,6 +121,21 @@ returns 422. An employee receives 403; a nonmember receives 404.
 `{ "workspace": { ... }, "role": "employee" }`; declining has no body and
 returns 204. Only the signed-in user whose email matches the invitation can
 act on it. No pending invite returns 404.
+
+Undoing membership (GitHub #80). All three return 204 with no body. They check
+the caller's role in the workspace in the path, not the `X-Workspace-Id`
+header. No membership there is 404; deleting an organization is out of scope.
+
+- **Cancel invite** matches `email` case-insensitively. No pending invite for
+  it is 404; an employee is 403; a missing `email` is 422.
+- **Remove member**: the owner can't be removed (409), nor can the caller
+  remove themselves (409, use leave). Not a member is 404; an employee is 403.
+- **Leave**: the owner can't leave (409); a personal workspace is 422. Use
+  `POST .../leave`, not `DELETE .../members/me`, so it can't clash with
+  `DELETE .../members/{user_id}`.
+- Removing or leaving sets `assigned_to_user_id` back to null on that person's
+  assets **in this workspace**, so no asset points at someone who can no longer
+  see it.
 
 ---
 
@@ -663,6 +681,8 @@ asset, and the row still appears without them.
 |---|---|---|
 | `GET` | `/notifications` | In-app list (bell + Notifications screen D09) |
 | `POST` | `/notifications/mark-all-read` | Mark all as read |
+| `GET` | `/me/notification-settings` | The signed-in person's alert settings (defaults if never saved) |
+| `PUT` | `/me/notification-settings` | Replace all three settings |
 
 ```jsonc
 // GET /notifications
@@ -688,8 +708,38 @@ gets duplicate mail). It also takes a Postgres advisory lock, so a double-fired
 schedule still sends once.
 
 It tells the workspace's owners and admins, plus the employee an asset is
-assigned to, and it tells each of them at most once every 30 days per asset —
-a daily scan would otherwise write the same row every day for a month. Each
-person gets **one digest email**, not one per asset. The in-app row is written
-and committed before the email is attempted, so a broken mailer still leaves
-the bell menu correct.
+assigned to. Each person gets **one digest email**, not one per asset. The
+in-app row is written and committed before the email is attempted, so a broken
+mailer still leaves the bell menu correct.
+
+#### Notification settings (GitHub #82)
+
+Per person, not per workspace: the same choices apply in every workspace. No
+`X-Workspace-Id` needed. Stored in `notification_settings`; no row means the
+defaults.
+
+```jsonc
+// GET /me/notification-settings  → 200 (the defaults if never saved)
+{ "in_app_enabled": true, "email_enabled": true, "remind_days": [30, 14, 7] }
+
+// PUT /me/notification-settings  (all three fields)  → 200, the saved settings
+{ "in_app_enabled": true, "email_enabled": false, "remind_days": [30, 7] }
+```
+
+- `remind_days` values come from `60, 30, 14, 7, 1`, no duplicates, returned
+  largest first. Anything else, a missing field, or an unknown field is `422`.
+  An empty list is allowed: no reminders before expiry.
+- Signed out is `401`.
+
+How the daily scan uses them:
+
+- **Reminder days.** A reminder goes out when a warranty *crosses* one of the
+  person's days (`days_left <= t`), once per day chosen, so a missed run still
+  reminds the next day. The scan looks 60 days ahead; each person's days decide
+  whether they hear about it.
+- **Expired.** Unchanged: one "expired" alert within 7 days after the end date,
+  whatever `remind_days` says, at most once every 30 days per asset.
+- **Email off.** The row is written; it is left out of that person's email.
+- **In-app off.** The row is still written (it is the de-duplication record),
+  but `GET /notifications` and its `unread` count leave out
+  `warranty_expiring` and `warranty_expired` rows for that person.
