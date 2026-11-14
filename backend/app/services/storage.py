@@ -18,6 +18,7 @@ Two backends, chosen by `STORAGE_BACKEND`:
 from __future__ import annotations
 
 import re
+import unicodedata
 import uuid
 from pathlib import Path
 
@@ -33,6 +34,7 @@ class StorageError(RuntimeError):
 
 
 _UNSAFE_FILENAME = re.compile(r"[^A-Za-z0-9._-]+")
+_REPEATED_DASHES = re.compile(r"-+")
 
 # Built once and reused: creating a boto3 client parses config and costs real
 # time, and a module-level client is safe to share across requests.
@@ -72,15 +74,65 @@ def safe_filename(filename: str) -> str:
     return cleaned[:120] or "upload"
 
 
-def object_key(workspace_id: uuid.UUID, filename: str) -> str:
+def safe_path_label(value: str | None, fallback: str) -> str:
+    """Make a readable S3 prefix segment without allowing path syntax.
+
+    Keep Unicode letters and marks so names in Thai and other scripts remain
+    legible in the S3 console. Separators and punctuation become dashes; the
+    caller adds an opaque ID suffix so duplicate names stay distinct.
+    """
+    normalized = unicodedata.normalize("NFKC", value or "").strip()
+    if "@" in normalized:
+        normalized = ""
+    cleaned = "".join(
+        char
+        if unicodedata.category(char)[0] in {"L", "M", "N"} or char == "_"
+        else "-"
+        for char in normalized
+    )
+    cleaned = _REPEATED_DASHES.sub("-", cleaned).strip("-._")
+    # Leave room for the separator and UUID suffix in a filesystem-safe
+    # segment, including names that use multibyte Unicode characters.
+    label: list[str] = []
+    byte_length = 0
+    for char in cleaned:
+        char_length = len(char.encode("utf-8"))
+        if len(label) >= 64 or byte_length + char_length > 200:
+            break
+        label.append(char)
+        byte_length += char_length
+    cleaned = "".join(label).rstrip("-._")
+    return cleaned or fallback
+
+
+def object_key(
+    workspace_id: uuid.UUID,
+    filename: str,
+    *,
+    workspace_name: str | None = None,
+    uploader_id: uuid.UUID | None = None,
+    uploader_name: str | None = None,
+) -> str:
     """Where one upload lives in the bucket.
 
-    Prefixed by workspace so an object's tenant is visible from its key alone,
-    which makes an accidental cross-tenant read obvious in logs and lets an
-    IAM policy or lifecycle rule be written per prefix later. The random
-    segment keeps two uploads of `receipt.jpg` apart.
+    The workspace and uploader labels make S3 console folders understandable
+    to an administrator. Stable UUID suffixes keep same-named workspaces and
+    users distinct without placing email addresses in object keys. The random
+    document segment keeps uploads of the same filename apart.
     """
-    return f"ws/{workspace_id}/{uuid.uuid4()}-{safe_filename(filename)}"
+    workspace_label = safe_path_label(workspace_name, "workspace")
+    workspace_folder = f"{workspace_label}-{workspace_id}"
+
+    if uploader_id is None:
+        uploader_folder = "unknown-uploader"
+    else:
+        uploader_label = safe_path_label(uploader_name, "user")
+        uploader_folder = f"{uploader_label}-{uploader_id}"
+
+    return (
+        f"workspaces/{workspace_folder}/users/{uploader_folder}/"
+        f"{uuid.uuid4()}-{safe_filename(filename)}"
+    )
 
 
 def presigned_put_url(key: str, content_type: str | None) -> str | None:
@@ -123,16 +175,31 @@ def presigned_get_url(key: str) -> str | None:
 
 
 def _local_path(key: str) -> Path:
-    """The file backing one key, with the key's own directories flattened.
+    """Return a local path for a safe object key.
 
-    The key is already sanitised by `object_key`, but this is the one place a
-    key becomes a filesystem path, so it re-checks rather than trusting that:
-    a key is one path segment here, never a directory walk.
+    Keep the key's folder structure so long workspace and uploader labels do
+    not become one overlong filesystem component. Revalidate every segment
+    here because this is where an object key becomes a filesystem path.
     """
-    flattened = key.replace("/", "__")
-    if flattened != safe_filename(flattened):
+    parts = key.split("/")
+    if not parts or any(part in {"", ".", ".."} for part in parts):
         raise StorageError(f"Refusing to write an unsafe key: {key!r}")
-    return Path(settings.local_upload_dir) / flattened
+
+    for part in parts:
+        if any(
+            unicodedata.category(char)[0] not in {"L", "M", "N"}
+            and char not in "._-"
+            for char in part
+        ):
+            raise StorageError(f"Refusing to write an unsafe key: {key!r}")
+        if len(part.encode("utf-8")) > 255:
+            raise StorageError(f"Refusing to write an overlong key segment: {key!r}")
+
+    root = Path(settings.local_upload_dir).resolve()
+    path = root.joinpath(*parts)
+    if not path.resolve().is_relative_to(root):
+        raise StorageError(f"Refusing to write an unsafe key: {key!r}")
+    return path
 
 
 def write_local(key: str, data: bytes) -> None:

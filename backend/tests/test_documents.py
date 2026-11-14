@@ -110,8 +110,9 @@ def test_presign_reserves_a_row_and_an_upload_url(api: TestClient, db: Session, 
     # Created before the file exists — that is the whole point of presign.
     assert document.status is DocumentStatus.pending
     assert document.workspace_id == workspace.id
-    # The key names its tenant, so a stray object's owner is obvious.
-    assert reserved["s3_key"].startswith(f"ws/{workspace.id}/")
+    # The key names its tenant and uploader for S3 console browsing.
+    assert reserved["s3_key"].startswith("workspaces/")
+    assert f"-{workspace.id}/users/" in reserved["s3_key"]
     assert reserved["upload_url"].endswith(f"/documents/{document.id}/dev-upload")
 
 
@@ -120,7 +121,8 @@ def test_presign_sanitises_the_filename(api: TestClient) -> None:
     reserved = presign(api, filename="../../etc/passwd")
     key = reserved["s3_key"]
     assert ".." not in key
-    assert key.count("/") == 2  # ws/<uuid>/<name>, nothing deeper
+    assert "../" not in key
+    assert "/users/" in key
 
 
 # --- submit ----------------------------------------------------------------

@@ -540,7 +540,7 @@ for an asset assigned to them. Anything else is `404`, never `403`.
 // → 200
 { "document_id": "uuid",
   "upload_url": "https://s3.amazonaws.com/...signed...",
-  "s3_key": "ws/<workspace>/receipt.jpg" }
+  "s3_key": "workspaces/<workspace-name>-<workspace-uuid>/users/<uploader-name>-<user-uuid>/<document-uuid>-receipt.jpg" }
 
 // POST /documents/{id}/submit   → 202, then poll GET /documents/{id}
 // Extraction is still synchronous, so the first poll usually already says
