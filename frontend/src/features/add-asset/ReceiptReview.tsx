@@ -11,6 +11,7 @@ interface ReceiptReviewProps {
   onChange: (changes: Partial<AssetDraft>) => void;
   /** What OCR read, to mark those fields "OCR"; null for manual entry. */
   scan: OcrDocument | null;
+  onBack: () => void;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -40,7 +41,7 @@ const DURATIONS = [
  * TODO: Department and Location (desktop frame) need lists from the backend
  * (/departments) that do not exist yet.
  */
-export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCancel }: ReceiptReviewProps) {
+export default function ReceiptReview({ draft, onChange, scan, onBack, onConfirm, onCancel }: ReceiptReviewProps) {
   // What OCR filled in, to decide where the "OCR" badges go.
   const ocr = scan?.status === "extracted" ? draftFromScan(scan) : null;
   const fromOcr = (key: keyof AssetDraft) => Boolean(ocr?.[key]);
@@ -215,16 +216,24 @@ export default function ReceiptReview({ draft, onChange, scan, onConfirm, onCanc
         </Card>
       </div>
 
-      <div className="flex flex-col gap-3 md:flex-row-reverse md:justify-start">
-        <div className="md:w-60">
-          <Button disabled={!isReceiptComplete(draft)} onClick={onConfirm}>
-            Confirm
+      {/* Same layout as SerialStep. Mobile: Confirm on top, then Cancel, then Back. Desktop: Back on the left, Cancel and Confirm on the right. */}
+      <div className="flex flex-col-reverse gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="md:w-40">
+          <Button variant="secondary" onClick={onBack}>
+            Back
           </Button>
         </div>
-        <div className="md:w-40">
-          <Button variant="secondary" onClick={onCancel}>
-            Cancel
-          </Button>
+        <div className="flex flex-col-reverse gap-3 md:flex-row">
+          <div className="md:w-40">
+            <Button variant="secondary" onClick={onCancel}>
+              Cancel
+            </Button>
+          </div>
+          <div className="md:w-60">
+            <Button disabled={!isReceiptComplete(draft)} onClick={onConfirm}>
+              Confirm
+            </Button>
+          </div>
         </div>
       </div>
     </div>
