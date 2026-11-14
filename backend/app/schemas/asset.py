@@ -35,6 +35,7 @@ from pydantic import (
 
 from app.models.asset import Asset, AssetCondition
 from app.models.document import DocumentKind, DocumentStatus
+from app.services import asset_photo
 from app.services import warranty as warranty_service
 from app.services.warranty import WarrantyStatus
 
@@ -345,6 +346,9 @@ class AssetDetail(BaseModel):
     location: CatalogRef | None
     # Free text from Add Asset step 3, shown under "Box / Storage" on D08.
     storage_note: str | None
+    # A short-lived link to the box / storage photo, or null. Ask again
+    # (reload the asset) rather than storing it: it stops working.
+    location_image_url: str | None = None
     assigned_to: AssignedToRef | None
     warranty: WarrantyDetail | None
     documents: list[DocumentRef]
@@ -375,6 +379,7 @@ class AssetDetail(BaseModel):
                 else None
             ),
             storage_note=asset.location,
+            location_image_url=asset_photo.view_url(asset.location_image_key),
             assigned_to=(
                 AssignedToRef(
                     user_id=asset.assigned_to.id,
@@ -396,3 +401,21 @@ class AssetDetail(BaseModel):
             documents=[DocumentRef.model_validate(doc) for doc in asset.documents],
             created_at=asset.created_at,
         )
+
+
+class PhotoPresignRequest(BaseModel):
+    """POST /assets/photos/presign."""
+
+    filename: str = Field(min_length=1, max_length=255)
+    content_type: str = Field(min_length=1, max_length=100)
+
+
+class PhotoPresignResponse(BaseModel):
+    """Where to PUT the photo, and the key to save on the asset afterwards.
+
+    Send the same `Content-Type` on the PUT as in the request: it is signed
+    into `upload_url`.
+    """
+
+    upload_url: str
+    key: str

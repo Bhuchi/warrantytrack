@@ -188,6 +188,7 @@ inline:
 | `DELETE` | `/assets/{id}` | Delete (admin/owner) |
 | `POST` | `/assets/{id}/assign` | Assign / unassign to an employee (admin only) |
 | `POST` | `/assets/import` | Bulk CSV/Excel import |
+| `POST` | `/assets/photos/presign` | Upload URL + key for a box / storage photo |
 
 ```jsonc
 // GET /assets  → paginated (lightweight rows for the list screen D05)
@@ -244,7 +245,7 @@ tenants, `assigned_to_user_id` separates people inside one.
   "location_name": "HQ Floor 3",       // or "location_id": "uuid" — the SITE
   "department_id": "uuid",             // optional
   "storage_note": "Box is on the top shelf",   // optional, free text
-  "location_image_key": null,          // optional S3 key
+  "location_image_key": null,          // optional: key from POST /assets/photos/presign
   "document_ids": ["uuid"],            // optional: receipts already uploaded
   "assigned_to_user_id": null,         // optional
   "warranty": {                        // optional
@@ -302,6 +303,7 @@ ignored if sent in the body.
   "department": { "id": "uuid", "name": "IT" },
   "location":   { "id": "uuid", "name": "HQ Floor 3" },   // the site
   "storage_note": "Box is on the top shelf",
+  "location_image_url": "https://...",   // short-lived link to the box photo, or null
   "assigned_to": { "user_id": "uuid", "display_name": "Earth" },
   "warranty": {
     "provider": "Dell",
@@ -416,6 +418,34 @@ workspace's list is added to it, exactly as `POST /assets` does.
 A whole-file problem — not UTF-8, a missing required column, more than 1000
 rows — is a **422 with a plain message**, because there is no row to blame.
 Empty body is **400**; over 15MB is **413**.
+
+#### Box / storage photo (CLOUDAPPG5-147, GitHub #98)
+
+```jsonc
+// POST /assets/photos/presign
+{ "filename": "box.jpg", "content_type": "image/jpeg" }
+// → 200
+{ "upload_url": "https://<bucket>.s3...?X-Amz-...", "key": "workspaces/.../photos/<uuid>-box.jpg" }
+```
+
+PUT the photo to `upload_url` with the same `Content-Type`, then send `key` as
+`location_image_key` on `POST /assets` or `PATCH /assets/{id}` (`null` removes
+the photo). Images only: JPEG, PNG, WEBP, HEIC/HEIF; anything else is `422` on
+`content_type`.
+
+`location_image_key` must be a key from this endpoint **in the caller's
+workspace**; anything else is `422` on that field. That stops an asset from
+pointing at another workspace's file, or at a receipt, which would otherwise be
+served through `location_image_url` past the receipt routes' employee check.
+
+`GET /assets/{id}` (and the POST/PATCH responses) carry `location_image_url`,
+a presigned GET for an `<img src>`. It expires; reload the asset for a fresh
+one rather than storing it.
+
+On `STORAGE_BACKEND=local` the upload goes to `PUT /assets/photos/dev-upload?key=…`
+(auth required) and `location_image_url` points at
+`GET /assets/photos/dev-view?key=…&expires=…&signature=…`. Both 404 on any
+other backend.
 
 ### Catalog · owner: Sirawich (Leg A)
 

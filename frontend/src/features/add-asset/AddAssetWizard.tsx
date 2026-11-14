@@ -7,6 +7,7 @@ import Button from "@/components/Button";
 import Modal from "@/components/Modal";
 import { CameraIcon, PencilIcon, UploadIcon } from "@/components/NavIcons";
 import { useToast } from "@/components/ToastProvider";
+import { PhotoUploadError } from "@/features/assets/assetPhoto";
 import type { OcrDocument } from "@/types/documents";
 
 import BoxPhotoStep from "./BoxPhotoStep";
@@ -78,9 +79,11 @@ export default function AddAssetWizard() {
       queueSavedToast(final.name);
       showToast({ tone: "success", title: "Asset saved successfully", message: `${final.name} was added.` });
       router.push("/dashboard");
-    } catch {
-      // Stay on the page so nothing typed is lost.
-      showToast({ tone: "error", title: "Could not save the asset", message: "Please try again." });
+    } catch (error) {
+      // Stay on the page so nothing typed is lost. A failed photo upload says
+      // so, because "Skip for now" is then a way to save without it.
+      const message = error instanceof PhotoUploadError ? error.message : "Please try again.";
+      showToast({ tone: "error", title: "Could not save the asset", message });
       setSaving(false);
     }
   }

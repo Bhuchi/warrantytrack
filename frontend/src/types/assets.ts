@@ -31,6 +31,11 @@ export interface AssetDetail {
   location: CatalogRef | null;
   /** Free text from Add Asset step 3, shown under "Box / Storage". */
   storage_note: string | null;
+  /**
+   * A short-lived link to the box / storage photo, or null. Use it straight
+   * away (an <img src>); reload the asset for a fresh one rather than storing it.
+   */
+  location_image_url: string | null;
   assigned_to: { user_id: string; display_name: string | null } | null;
   /** Null only for assets saved before a warranty became required. */
   warranty: {
@@ -117,6 +122,7 @@ export type UpdateAssetRequest = Partial<
     | "location_id"
     | "location_name"
     | "storage_note"
+    | "location_image_key"
     | "warranty"
   >
 >;

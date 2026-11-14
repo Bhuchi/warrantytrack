@@ -37,6 +37,7 @@ from sqlalchemy.orm import Session
 from app.models.catalog import Category, Department, Location, Vendor
 from app.models.membership import Membership
 from app.models.workspace import Workspace, WorkspaceType
+from app.services import asset_photo
 
 
 @dataclass(frozen=True)
@@ -238,6 +239,14 @@ def validate_references(
                         "That user is not a member of this workspace",
                     )
                 )
+
+    for field in ("image_key", "location_image_key"):
+        key: str | None = getattr(data, field, None)
+        if key is not None and not asset_photo.owns(workspace_id, key):
+            # Only a key from POST /assets/photos/presign in this workspace.
+            # Anything else could point the asset at another workspace's file
+            # or at a receipt, and the photo URL would then serve it.
+            errors.append(FieldError(field, "Not a photo uploaded to this workspace"))
 
     if errors:
         raise AssetValidationError(errors)
