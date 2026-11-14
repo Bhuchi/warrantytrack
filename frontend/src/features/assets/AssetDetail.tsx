@@ -93,8 +93,14 @@ function statusClasses(status: WarrantyStatus) {
 }
 
 /** The file name at the end of an S3 key: "workspace/abc/receipt.pdf" → "receipt.pdf". */
+/**
+ * The name to show for an uploaded file. Storage adds a random ID in front
+ * ("5cfe754c-...-receipt.png") so two uploads with the same name don't clash;
+ * the person only needs to see "receipt.png".
+ */
 function fileName(s3Key: string): string {
-  return s3Key.split("/").pop() || s3Key;
+  const last = s3Key.split("/").pop() || s3Key;
+  return last.replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i, "") || last;
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -250,29 +256,29 @@ function DocumentRow({ document }: { document: Document }) {
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-surface px-[14px] py-[13px]">
+      {/* The whole card is one button, so it can be clicked anywhere. */}
+      <button
+        type="button"
+        onClick={openFile}
+        disabled={opening}
+        title="Open in a new tab"
+        className="flex w-full min-w-0 items-center gap-3 rounded-xl border border-border bg-surface px-[14px] py-[13px] text-left hover:border-brand disabled:opacity-50"
+      >
         <span className="flex size-[38px] shrink-0 items-center justify-center rounded-[9px] bg-brand-subtle">
           <Image src="/icons/asset-document.svg" alt="" width={18} height={18} />
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-semibold tracking-[-0.26px] text-foreground">
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-[13px] font-semibold tracking-[-0.26px] text-foreground">
             {name}
-          </p>
-          <p className="text-[11px] text-muted-light">
-            {DOCUMENT_KINDS[document.kind]} · stored in S3
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={openFile}
-          disabled={opening}
-          aria-label={`Open ${name}`}
-          title="Open or download"
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg hover:bg-brand-subtle disabled:opacity-50"
-        >
+          </span>
+          <span className="text-[11px] text-muted-light">
+            {opening ? "Opening…" : `${DOCUMENT_KINDS[document.kind]} · stored in S3`}
+          </span>
+        </span>
+        <span className="flex size-9 shrink-0 items-center justify-center">
           <Image src="/icons/asset-download.svg" alt="" width={17} height={17} />
-        </button>
-      </div>
+        </span>
+      </button>
       {error && (
         <p role="alert" className="text-[12px] text-danger">
           {error}
