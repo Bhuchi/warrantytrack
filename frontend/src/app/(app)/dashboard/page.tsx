@@ -42,6 +42,7 @@ export default async function DashboardPage() {
       {/* Mobile only: desktop shows the workspace in the sidebar. M04 3382:169. */}
       <Link
         href="/workspace"
+        prefetch={false}
         className="flex items-center gap-2.5 rounded-[10px] border border-border bg-surface px-3 py-2.5 md:hidden"
       >
         <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand text-[10px] font-bold text-brand-foreground">
@@ -63,6 +64,7 @@ export default async function DashboardPage() {
       {/* Mobile only: desktop has Add Asset in the top bar. M04 3460:178. */}
       <Link
         href="/assets/new"
+        prefetch={false}
         className="flex h-[54px] items-center justify-center gap-2 rounded-lg bg-brand text-[14px] font-bold tracking-[-0.28px] text-brand-foreground md:hidden"
       >
         <AddAssetIcon className="size-[17px]" />

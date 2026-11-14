@@ -43,6 +43,7 @@ export default function AppBar({
       <div className="flex items-center gap-2.5">
         <Link
           href="/notifications"
+          prefetch={false}
           aria-label={
             unreadCount > 0
               ? `Notifications, ${unreadCount} unread`

@@ -63,11 +63,12 @@ ${EXPIRY_LABEL}     1 Nov 2028
     Wait Until Location Contains    /dashboard    timeout=20s
 
 4. Open Add Asset
-    # Loaded directly rather than through the sidebar link: on AWS the load balancer
-    # sometimes answers the link's background page request (?_rsc=) with 503, and
-    # Next.js then reloads the whole page in the middle of the next step.
-    Go To    ${URL}/assets/new
+    # A marker in window survives a client-side route change, but not a full reload.
+    Execute Javascript    window.__clientNavigationMarker = true
+    Click Link    xpath://nav[@aria-label='Main menu']//a[normalize-space()='Add Asset']
     Wait Until Page Contains    Scan the receipt, or enter the details yourself.
+    ${marker}=    Execute Javascript    return window.__clientNavigationMarker === true
+    Should Be True    ${marker}    msg=Opening Add Asset caused a full page reload.
 
 5. Upload Receipt And Check The Extracted Details
     [Teardown]    Run Keyword If Test Failed    Log Upload Requests
