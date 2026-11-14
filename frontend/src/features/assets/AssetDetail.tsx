@@ -8,6 +8,7 @@ import type { WarrantyStatus } from "@/types";
 import type { AssetDetail as Asset } from "@/types/assets";
 
 import DeleteAssetButton from "./DeleteAssetButton";
+import { getDocumentDownloadUrl } from "./documentDownload";
 import { getAsset } from "./getAsset";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -222,21 +223,61 @@ function WarrantyCountdown({ warranty }: { warranty: Warranty }) {
 }
 
 function DocumentRow({ document }: { document: Document }) {
+  const [opening, setOpening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const name = fileName(document.s3_key);
+
+  async function openFile() {
+    // Open the tab now, while the click still counts as the user's own action.
+    // Browsers block a tab opened later, after waiting for the API.
+    const tab = window.open("", "_blank");
+    if (!tab) {
+      setError("Your browser blocked the new tab. Allow pop-ups for this site and try again.");
+      return;
+    }
+    tab.opener = null; // The receipt's tab can't reach back into this page.
+    setOpening(true);
+    setError(null);
+    try {
+      tab.location.href = await getDocumentDownloadUrl(document.id);
+    } catch (problem) {
+      tab.close();
+      setError(problem instanceof Error ? problem.message : "Couldn't open the file.");
+    } finally {
+      setOpening(false);
+    }
+  }
+
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-surface px-[14px] py-[13px]">
-      <span className="flex size-[38px] shrink-0 items-center justify-center rounded-[9px] bg-brand-subtle">
-        <Image src="/icons/asset-document.svg" alt="" width={18} height={18} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-semibold tracking-[-0.26px] text-foreground">
-          {fileName(document.s3_key)}
-        </p>
-        <p className="text-[11px] text-muted-light">
-          {DOCUMENT_KINDS[document.kind]} · stored in S3
-        </p>
+    <div className="flex flex-col gap-1.5">
+      <div className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-surface px-[14px] py-[13px]">
+        <span className="flex size-[38px] shrink-0 items-center justify-center rounded-[9px] bg-brand-subtle">
+          <Image src="/icons/asset-document.svg" alt="" width={18} height={18} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-semibold tracking-[-0.26px] text-foreground">
+            {name}
+          </p>
+          <p className="text-[11px] text-muted-light">
+            {DOCUMENT_KINDS[document.kind]} · stored in S3
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={openFile}
+          disabled={opening}
+          aria-label={`Open ${name}`}
+          title="Open or download"
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg hover:bg-brand-subtle disabled:opacity-50"
+        >
+          <Image src="/icons/asset-download.svg" alt="" width={17} height={17} />
+        </button>
       </div>
-      {/* TODO: make this a download link once the API hands out presigned GET URLs. */}
-      <Image src="/icons/asset-download.svg" alt="" width={17} height={17} />
+      {error && (
+        <p role="alert" className="text-[12px] text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
