@@ -10,6 +10,7 @@ import type { WorkspaceMember } from "@/types";
  *   cancelInvite(id, email)      → DELETE /workspaces/{id}/invites?email=
  *   removeMember(id, userId)     → DELETE /workspaces/{id}/members/{userId}
  *   leaveOrganization(id)        → POST   /workspaces/{id}/leave
+ *   deleteOrganization(id)       → DELETE /workspaces/{id}
  *
  * The local UI demo uses a mock when Cognito is not configured. Signed-in
  * sessions call the backend so team membership survives a page reload.
@@ -168,6 +169,22 @@ export async function leaveOrganization(workspaceId: string): Promise<void> {
     return;
   }
   await leaveInApi(workspaceId);
+}
+
+/** The owner deletes the organization and everything in it. Cannot be undone. */
+export async function deleteOrganization(workspaceId: string): Promise<void> {
+  if (USE_MOCK) {
+    await delay(600);
+    return;
+  }
+  try {
+    await api.delete(`/workspaces/${encodeURIComponent(workspaceId)}`);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 403) {
+      throw new Error("Only the owner can delete the organization.");
+    }
+    throw new Error("Couldn't delete the organization. Check your connection and try again.");
+  }
 }
 
 /** Everyone in the organization, active members first, then pending invites. */

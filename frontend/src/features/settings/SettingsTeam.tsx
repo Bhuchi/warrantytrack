@@ -14,6 +14,7 @@ import {
   getMembers,
   inviteMember,
   isValidEmail,
+  deleteOrganization,
   leaveOrganization,
   removeMember,
   type InviteRole,
@@ -49,7 +50,8 @@ function Note({ children }: { children: ReactNode }) {
 type PendingAction =
   | { kind: "cancel"; member: WorkspaceMember }
   | { kind: "remove"; member: WorkspaceMember }
-  | { kind: "leave" };
+  | { kind: "leave" }
+  | { kind: "delete" };
 
 function nameOf(member: WorkspaceMember): string {
   return member.display_name ?? member.email;
@@ -110,6 +112,12 @@ export default function SettingsTeam({
   const canManage = isOrganization && canManageAssets(role);
   // The owner can't leave: an organization must always keep its owner.
   const canLeave = isOrganization && (role === "admin" || role === "employee");
+  // Only the owner can delete the organization. A personal workspace has no
+  // delete: it belongs to the account and goes when the account is deleted.
+  const canDelete = isOrganization && role === "owner";
+  // Deleting asks you to type the organization's name, so it can't be a misclick.
+  const [typedName, setTypedName] = useState("");
+  const nameMatches = typedName.trim() === organizationName.trim();
 
   // Your own email, so your row never offers "Remove" (use Leave instead).
   const [myEmail, setMyEmail] = useState<string | null>(null);
@@ -175,6 +183,7 @@ export default function SettingsTeam({
     if (working) return; // Don't hide the dialog halfway through a request.
     setPending(null);
     setActionError(null);
+    setTypedName("");
   }
 
   /** Runs whatever the open dialog is about, then updates the screen. */
@@ -188,6 +197,13 @@ export default function SettingsTeam({
         await leaveOrganization(workspaceId);
         rememberWorkspace("personal"); // This organization is no longer yours to open.
         showToast({ tone: "success", title: `You left ${organizationName}` });
+        router.push("/workspace");
+        return;
+      }
+      if (pending.kind === "delete") {
+        await deleteOrganization(workspaceId);
+        rememberWorkspace("personal"); // The organization no longer exists.
+        showToast({ tone: "success", title: `${organizationName} was deleted` });
         router.push("/workspace");
         return;
       }
@@ -233,12 +249,19 @@ export default function SettingsTeam({
             confirm: "Remove",
             dismiss: "Cancel",
           }
-        : {
-            title: `Leave ${organizationName}?`,
-            text: `You lose access to its assets straight away. An owner or admin can invite you again.`,
-            confirm: "Leave",
-            dismiss: "Cancel",
-          };
+        : pending?.kind === "delete"
+          ? {
+              title: `Delete ${organizationName}?`,
+              text: `This deletes the organization for everyone: all of its assets, warranties, receipts, members and invites. It can't be undone. Your Personal workspace is not affected.`,
+              confirm: "Delete organization",
+              dismiss: "Cancel",
+            }
+          : {
+              title: `Leave ${organizationName}?`,
+              text: `You lose access to its assets straight away. An owner or admin can invite you again.`,
+              confirm: "Leave",
+              dismiss: "Cancel",
+            };
 
   const leaveCard = canLeave ? (
     <Card title={`Leave ${organizationName}`}>
@@ -249,6 +272,19 @@ export default function SettingsTeam({
         className="flex h-[48px] w-full items-center justify-center rounded-[10px] border border-danger bg-surface text-[15px] font-bold text-danger md:w-fit md:px-6"
       >
         Leave organization
+      </button>
+    </Card>
+  ) : null;
+
+  const deleteCard = canDelete ? (
+    <Card title={`Delete ${organizationName}`}>
+      <Note>Deletes this organization and everything in it for every member. This can&apos;t be undone.</Note>
+      <button
+        type="button"
+        onClick={() => setPending({ kind: "delete" })}
+        className="flex h-[48px] w-full items-center justify-center rounded-[10px] border border-danger bg-surface text-[15px] font-bold text-danger md:w-fit md:px-6"
+      >
+        Delete organization
       </button>
     </Card>
   ) : null;
@@ -354,6 +390,7 @@ export default function SettingsTeam({
         <SettingsTabs active="team" />
         {body}
         {leaveCard}
+        {deleteCard}
       </main>
 
       <Modal
@@ -365,13 +402,30 @@ export default function SettingsTeam({
             <Button variant="secondary" onClick={closeDialog} disabled={working}>
               {dialog.dismiss}
             </Button>
-            <Button variant="danger" onClick={confirmAction} disabled={working}>
+            <Button
+              variant="danger"
+              onClick={confirmAction}
+              disabled={working || (pending?.kind === "delete" && !nameMatches)}
+            >
               {working ? "Working…" : dialog.confirm}
             </Button>
           </>
         }
       >
         <p>{dialog.text}</p>
+        {pending?.kind === "delete" && (
+          <div className="mt-4">
+            <TextField
+              id="confirm-organization-name"
+              label={`Type ${organizationName} to confirm`}
+              iconSrc="/icons/lock.svg"
+              value={typedName}
+              onChange={(event) => setTypedName(event.target.value)}
+              autoComplete="off"
+              disabled={working}
+            />
+          </div>
+        )}
         {actionError && (
           <p role="alert" className="mt-3 rounded-[10px] bg-red-50 px-4 py-3 text-[13px] text-red-700">
             {actionError}

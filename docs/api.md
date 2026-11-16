@@ -91,6 +91,8 @@ person may not have an account yet. They must accept before becoming a member.
 | `DELETE` | `/workspaces/{id}/invites?email=` | Cancel a pending invite; owner/admin only; 204 |
 | `DELETE` | `/workspaces/{id}/members/{user_id}` | Remove a member; owner/admin only; 204 |
 | `POST` | `/workspaces/{id}/leave` | The caller leaves; admin/employee only; 204 |
+| `DELETE` | `/workspaces/{id}` | Delete the organization and everything in it; owner only; 204 |
+| `DELETE` | `/me` | Delete the caller's data so the email can sign up again; 204 |
 
 `POST /workspaces` accepts `{ "name": "Acme Co", "type": "organization" }`
 and returns 201 with the new workspace's `id`, `name`, `type`, `created_at`,
@@ -133,6 +135,17 @@ header. No membership there is 404; deleting an organization is out of scope.
 - **Leave**: the owner can't leave (409); a personal workspace is 422. Use
   `POST .../leave`, not `DELETE .../members/me`, so it can't clash with
   `DELETE .../members/{user_id}`.
+- **Delete organization**: owner only (an admin or employee is 403); a
+  personal workspace is 422, because it belongs to the account. Every table
+  that points at a workspace is `ON DELETE CASCADE`, so its assets, warranties,
+  documents, catalog, members, invites and notifications go with it. Receipt
+  files in S3 stay, as they do when one asset is deleted.
+- **Delete account** (`DELETE /me`): refused with 409 while the caller owns an
+  organization (the detail names them). Otherwise deletes the caller's personal
+  workspace, invites they sent or that wait for their email, and the user row;
+  assets elsewhere that were assigned to or created by them become null. The
+  frontend then deletes the Cognito account with Cognito `DeleteUser` and the
+  user's own access token, so the backend needs no extra IAM permission.
 - Removing or leaving sets `assigned_to_user_id` back to null on that person's
   assets **in this workspace**, so no asset points at someone who can no longer
   see it.
