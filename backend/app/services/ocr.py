@@ -63,6 +63,14 @@ class NotAReceipt(OcrError):
         )
 
 
+class InvalidImage(OcrError):
+    """The upload was not a supported, readable image."""
+
+
+class BedrockUnavailable(OcrError):
+    """Bedrock is not configured or could not complete the request."""
+
+
 # Textract's own field names. ITEM/PRICE/PRODUCT_CODE appear per line item,
 # the rest in the document summary.
 _VENDOR = "VENDOR_NAME"
@@ -429,7 +437,7 @@ def _prepare_image(data: bytes) -> bytes:
     try:
         image = ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
     except UnidentifiedImageError as exc:
-        raise OcrError("This file is not an image the OCR can read.") from exc
+        raise InvalidImage("This file is not an image the OCR can read.") from exc
     longest = max(image.size)
     if longest > _MAX_IMAGE_SIDE:
         scale = _MAX_IMAGE_SIDE / longest
@@ -496,6 +504,53 @@ def _bedrock_extract(s3_key: str, filename: str | None, content_type: str | None
         raise OcrError(f"Bedrock could not read this file ({code or type(exc).__name__}).") from exc
 
     return parse_model_json(_json_from_reply("".join(b.get("text", "") for b in blocks)))
+
+
+_SERIAL_SCAN_PROMPT = """You read product serial-number labels from photos.
+
+Return ONLY one JSON object with exactly this shape:
+{"serial_number": string | null}
+
+Read the value explicitly labeled S/N, SN, Serial, Serial Number, or a clear
+Thai equivalent such as หมายเลขเครื่อง. Preserve letters, digits, and meaningful
+hyphens exactly as printed. Do not return the model number, part number (P/N),
+SKU, IMEI, MAC address, barcode value, or regulatory ID. If the label is blurry,
+ambiguous, or has no clearly identified serial number, return null. Never guess."""
+
+
+def extract_serial_number(image_bytes: bytes) -> str | None:
+    """Read an explicitly labeled serial number from a device-label photo."""
+    if not settings.bedrock_model_id:
+        raise BedrockUnavailable("Serial scanning is not configured right now.")
+
+    image = _prepare_image(image_bytes)
+    try:
+        response = _bedrock().converse(
+            modelId=settings.bedrock_model_id,
+            system=[{"text": _SERIAL_SCAN_PROMPT}],
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"image": {"format": "jpeg", "source": {"bytes": image}}},
+                    {"text": "Read the serial number from this product label."},
+                ],
+            }],
+            inferenceConfig={"maxTokens": 256},
+        )
+        blocks = response["output"]["message"]["content"]
+    except (BotoCoreError, ClientError, KeyError) as exc:  # pragma: no cover - needs AWS
+        logger.warning("Bedrock serial scan failed: %s: %s", type(exc).__name__, exc)
+        code = exc.response.get("Error", {}).get("Code") if isinstance(exc, ClientError) else None
+        raise BedrockUnavailable(
+            f"Serial scanning is unavailable right now ({code or type(exc).__name__})."
+        ) from exc
+
+    result = _json_from_reply("".join(block.get("text", "") for block in blocks))
+    value = result.get("serial_number")
+    if not isinstance(value, str):
+        return None
+    serial = re.sub(r"\s+", " ", value).strip()
+    return serial if 0 < len(serial) <= 120 else None
 
 
 def _fake_extraction(filename: str | None) -> dict[str, Any]:
