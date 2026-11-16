@@ -124,7 +124,7 @@ async def scan_serial_number(
     if serial is None:
         return SerialScanResponse(
             serial=None,
-            error="No clearly labeled serial number found. Try a closer photo or enter it manually.",
+            error="No clear serial number found. Try a closer photo of the label or enter it manually.",
         )
     return SerialScanResponse(serial=serial)
 

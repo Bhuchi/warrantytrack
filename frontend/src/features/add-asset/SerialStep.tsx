@@ -12,7 +12,7 @@ import { scanSerial } from "./scanSerial";
 type SerialMethod = "scan" | "type";
 
 const SERIAL_METHODS: readonly MethodOption<SerialMethod>[] = [
-  { id: "scan", label: "Scan", desktopLabel: "Scan serial", description: "Point your camera at the sticker on the device.", Icon: CameraIcon },
+  { id: "scan", label: "Scan", desktopLabel: "Scan serial", description: "Frame the whole sticker, including text below any barcode.", Icon: CameraIcon },
   { id: "type", label: "Type", desktopLabel: "Type it", description: "Enter the serial number yourself.", Icon: PencilIcon },
 ];
 
@@ -119,7 +119,7 @@ export default function SerialStep({ draft, onChange, ocrSerial, onBack, onCance
         )}
 
         <p className="text-[12px] tracking-[-0.24px] text-muted">
-          Usually on a sticker on the back or bottom of the device. Needed when you make a warranty claim.
+          Usually on a sticker on the back or bottom of the device. Frame the label and any printed digits below a barcode.
         </p>
       </Card>
 

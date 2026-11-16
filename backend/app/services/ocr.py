@@ -511,15 +511,24 @@ _SERIAL_SCAN_PROMPT = """You read product serial-number labels from photos.
 Return ONLY one JSON object with exactly this shape:
 {"serial_number": string | null}
 
-Read the value explicitly labeled S/N, SN, Serial, Serial Number, or a clear
-Thai equivalent such as หมายเลขเครื่อง. Preserve letters, digits, and meaningful
-hyphens exactly as printed. Do not return the model number, part number (P/N),
-SKU, IMEI, MAC address, barcode value, or regulatory ID. If the label is blurry,
-ambiguous, or has no clearly identified serial number, return null. Never guess."""
+Inspect the whole product label. Prefer a value explicitly labeled S/N, SN,
+Serial, Serial Number, or a clear Thai equivalent such as หมายเลขเครื่อง. Some
+labels omit that heading: when there is no explicit label, you may return the
+single clear, human-readable alphanumeric identifier printed directly below or
+beside a barcode if it appears to be the device serial. Preserve letters,
+digits, leading zeroes, and meaningful hyphens exactly as printed. Do not read
+the barcode bars themselves as text.
+
+Never return a model number, part number (P/N), SKU, IMEI, MAC address, asset
+tag, regulatory ID, or ordinary retail UPC/EAN/GTIN. In particular, an
+unlabeled numeric-only value of 8, 12, 13, or 14 digits is usually a retail
+barcode, so return null for it unless it is explicitly labeled as the serial.
+If several identifiers are present and you cannot distinguish the serial, or
+the relevant text is blurry, return null. Never guess."""
 
 
 def extract_serial_number(image_bytes: bytes) -> str | None:
-    """Read an explicitly labeled serial number from a device-label photo."""
+    """Read a clearly identifiable serial number from a device-label photo."""
     if not settings.bedrock_model_id:
         raise BedrockUnavailable("Serial scanning is not configured right now.")
 
