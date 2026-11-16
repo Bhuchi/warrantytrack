@@ -511,15 +511,32 @@ _SERIAL_SCAN_PROMPT = """You read product serial-number labels from photos.
 Return ONLY one JSON object with exactly this shape:
 {"serial_number": string | null}
 
-Read the value explicitly labeled S/N, SN, Serial, Serial Number, or a clear
-Thai equivalent such as หมายเลขเครื่อง. Preserve letters, digits, and meaningful
-hyphens exactly as printed. Do not return the model number, part number (P/N),
-SKU, IMEI, MAC address, barcode value, or regulatory ID. If the label is blurry,
-ambiguous, or has no clearly identified serial number, return null. Never guess."""
+Inspect the entire product label. First read a value explicitly labeled S/N,
+SN, Serial, Serial Number, Service Tag, PPID, or a clear Thai equivalent such
+as หมายเลขเครื่อง. Some labels omit a heading and print the identifier directly
+under or beside its barcode; in that case, read the full human-readable code if
+it is clearly the product or component serial.
+
+Dell PPIDs are valid serial identifiers for components and commonly use the
+format XX-XXXXXX-XXXXX-XXX-XXXX, including prefixes CN-, KR-, MX-, or PH-.
+When one is present, return the entire code with every letter, digit, and
+hyphen, including the leading zero after the prefix. Do not shorten it to one
+segment. If a separate Dell Service Tag is clearly labeled for the whole
+laptop, prefer that tag for the laptop asset; otherwise return the visible
+PPID when it is the identifier shown on the scanned label.
+
+For other brands, accept a single clear identifier printed on the product
+label even when it has no S/N heading; serials may be letters and digits or
+digits alone. Do not return a model number, part number (P/N), SKU, IMEI, MAC
+address, asset tag, regulatory ID, or an ordinary retail UPC/EAN/GTIN. Treat
+unlabeled numeric-only codes of exactly 8, 12, 13, or 14 digits as retail
+barcodes unless explicitly labeled as a serial. Barcode bars alone are not
+readable text. If several identifiers are present and the serial cannot be
+distinguished, or the relevant text is blurry, return null. Never guess."""
 
 
 def extract_serial_number(image_bytes: bytes) -> str | None:
-    """Read an explicitly labeled serial number from a device-label photo."""
+    """Read a labeled or clearly identifiable serial from a device-label photo."""
     if not settings.bedrock_model_id:
         raise BedrockUnavailable("Serial scanning is not configured right now.")
 
