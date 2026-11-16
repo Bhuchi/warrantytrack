@@ -11,6 +11,7 @@ import {
   getNotificationSettings,
   saveNotificationSettings,
 } from "./notificationSettings";
+import DeleteAccountCard from "./DeleteAccountCard";
 import SettingsTabs from "./SettingsTabs";
 
 interface ToggleProps {
@@ -273,6 +274,7 @@ export default function SettingsNotifications() {
             </div>
           </SettingCard>
         </div>
+        <DeleteAccountCard />
       </main>
     </div>
   );

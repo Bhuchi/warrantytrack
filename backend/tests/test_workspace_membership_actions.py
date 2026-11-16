@@ -173,3 +173,91 @@ def test_a_non_member_gets_404_everywhere(api: TestClient, db: Session, other_wo
 
 def test_signed_out_is_401(client: TestClient, workspace: Workspace):
     assert client.post(f"/workspaces/{workspace.id}/leave").status_code == 401
+
+
+# --- delete an organization ------------------------------------------------------
+
+
+def workspace_exists(db: Session, workspace_id: uuid.UUID) -> bool:
+    db.expire_all()  # The route deleted rows in SQL; forget what the session cached.
+    return db.get(Workspace, workspace_id) is not None
+
+
+def test_the_owner_deletes_the_organization_and_everything_in_it(
+    api: TestClient, db: Session, workspace: Workspace
+):
+    employee = make_member(db, workspace, MembershipRole.employee)
+    asset = assigned_asset(db, workspace, employee)
+    db.add(WorkspaceInvite(workspace_id=workspace.id, email="new@acme.com",
+                           role=MembershipRole.employee, invited_by=employee.id))
+    db.flush()
+    asset_id = asset.id
+
+    assert api.delete(f"/workspaces/{workspace.id}").status_code == 204
+
+    assert not workspace_exists(db, workspace.id)
+    assert db.get(Asset, asset_id) is None
+    assert membership_of(db, workspace, employee) is None
+    assert db.scalar(select(WorkspaceInvite).where(WorkspaceInvite.workspace_id == workspace.id)) is None
+    # The people themselves are untouched; they just lose this organization.
+    assert db.get(User, employee.id) is not None
+
+
+@pytest.mark.parametrize("role", [MembershipRole.admin, MembershipRole.employee])
+def test_only_the_owner_deletes_the_organization(
+    api: TestClient, db: Session, workspace: Workspace, role: MembershipRole
+):
+    act_as(make_member(db, workspace, role))
+    assert api.delete(f"/workspaces/{workspace.id}").status_code == 403
+    assert workspace_exists(db, workspace.id)
+
+
+def test_nobody_deletes_a_personal_workspace(api: TestClient, db: Session, personal_workspace: Workspace, user: User):
+    db.add(Membership(user_id=user.id, workspace_id=personal_workspace.id, role=MembershipRole.owner))
+    db.flush()
+    assert api.delete(f"/workspaces/{personal_workspace.id}").status_code == 422
+    assert workspace_exists(db, personal_workspace.id)
+
+
+def test_deleting_someone_elses_organization_is_404(api: TestClient, db: Session, other_workspace: Workspace):
+    assert api.delete(f"/workspaces/{other_workspace.id}").status_code == 404
+    assert workspace_exists(db, other_workspace.id)
+
+
+# --- delete your account ---------------------------------------------------------
+
+
+def test_an_owner_must_delete_their_organizations_first(api: TestClient, db: Session, user: User):
+    response = api.delete("/me")
+
+    assert response.status_code == 409
+    assert "Test Workspace" in response.json()["detail"]
+    db.expire_all()
+    assert db.get(User, user.id) is not None
+
+
+def test_deleting_your_account_removes_your_data_and_frees_the_email(
+    api: TestClient, db: Session, workspace: Workspace, personal_workspace: Workspace
+):
+    person = make_member(db, workspace, MembershipRole.admin)
+    db.add(Membership(user_id=person.id, workspace_id=personal_workspace.id, role=MembershipRole.owner))
+    private = assigned_asset(db, personal_workspace, person)
+    shared = assigned_asset(db, workspace, person)
+    # An invite they sent, and one waiting for their email elsewhere.
+    db.add(WorkspaceInvite(workspace_id=workspace.id, email="friend@acme.com",
+                           role=MembershipRole.employee, invited_by=person.id))
+    db.flush()
+    private_id, shared_id, email = private.id, shared.id, person.email
+    act_as(person)
+
+    assert api.delete("/me").status_code == 204
+
+    assert db.get(User, person.id) is None
+    assert not workspace_exists(db, personal_workspace.id)
+    assert db.get(Asset, private_id) is None
+    # The organization keeps its asset; it is just no longer assigned to anyone.
+    assert workspace_exists(db, workspace.id)
+    assert db.get(Asset, shared_id).assigned_to_user_id is None
+    assert db.scalar(select(WorkspaceInvite).where(WorkspaceInvite.invited_by == person.id)) is None
+    # The same email can sign up again: nothing still holds it.
+    assert db.scalar(select(User).where(User.email == email)) is None
