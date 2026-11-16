@@ -10,6 +10,8 @@ import Field, { inputClasses } from "./Field";
 interface BoxPhotoStepProps {
   draft: AssetDraft;
   onChange: (changes: Partial<AssetDraft>) => void;
+  assetNumber: number;
+  assetCount: number;
   /** True while the asset is being saved: buttons are disabled. */
   saving: boolean;
   onBack: () => void;
@@ -24,7 +26,7 @@ interface BoxPhotoStepProps {
  * the asset. Mobile 3569:568, desktop 3571:331. No Cancel here: Skip already
  * finishes the flow, and Back leads to Cancel on the earlier steps.
  */
-export default function BoxPhotoStep({ draft, onChange, saving, onBack, onSave, onSkip }: BoxPhotoStepProps) {
+export default function BoxPhotoStep({ draft, onChange, assetNumber, assetCount, saving, onBack, onSave, onSkip }: BoxPhotoStepProps) {
   const photo = draft.location_photo;
 
   // A temporary address for the picked photo so it can be shown before upload.
@@ -115,12 +117,12 @@ export default function BoxPhotoStep({ draft, onChange, saving, onBack, onSave, 
         <div className="flex flex-col-reverse gap-3 md:flex-row">
           <div className="md:w-44">
             <Button variant="secondary" disabled={saving} onClick={onSkip}>
-              Skip for now
+              {assetNumber < assetCount ? "Skip this asset" : "Skip and save"}
             </Button>
           </div>
           <div className="md:w-60">
             <Button disabled={saving} onClick={onSave}>
-              {saving ? "Saving…" : "Save asset"}
+              {saving ? "Saving…" : assetNumber < assetCount ? "Continue" : assetCount > 1 ? "Save assets" : "Save asset"}
             </Button>
           </div>
         </div>
