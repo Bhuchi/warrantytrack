@@ -8,17 +8,18 @@ import Modal from "@/components/Modal";
 import { CameraIcon, PencilIcon, UploadIcon } from "@/components/NavIcons";
 import { useToast } from "@/components/ToastProvider";
 import { PhotoUploadError } from "@/features/assets/assetPhoto";
+import { ApiError } from "@/lib/api";
 import type { OcrDocument } from "@/types/documents";
 
 import BoxPhotoStep from "./BoxPhotoStep";
-import { type AssetDraft, EMPTY_DRAFT, draftFromScan } from "./draft";
+import { additionalDraftFrom, type AssetDraft, draftFromScan, EMPTY_DRAFT } from "./draft";
 import MethodCards, { type MethodOption } from "./MethodCards";
 import ReceiptReview from "./ReceiptReview";
 import ReceiptUpload, { type UploadStatus } from "./ReceiptUpload";
 import { NOT_A_RECEIPT_FILE_MESSAGE, isReceiptFile } from "./receiptFile";
 import SerialStep from "./SerialStep";
 import StepProgress from "./StepProgress";
-import { saveAsset } from "./saveAsset";
+import { saveAssets } from "./saveAsset";
 import { queueSavedToast } from "./savedToast";
 import { scanReceipt } from "./scanReceipt";
 
@@ -38,14 +39,19 @@ const RECEIPT_METHODS: readonly MethodOption<ReceiptMethod>[] = [
   { id: "manual", label: "Manual", desktopLabel: "Manual Entry", description: "Type the asset details yourself", Icon: PencilIcon },
 ];
 
-/**
- * Add Asset, the 3-step flow: receipt (required), serial number (required),
- * box photo (optional). Figma mobile 3569:187, desktop 3570:18.
- *
- * Runs in the browser ("use client") because it reacts to taps and typing.
- * The wizard owns all the answers (`draft`); each step reads it and reports
- * changes back. Nothing is saved until the last step.
- */
+function confirmError(error: unknown): { index: number; message: string } | null {
+  if (!(error instanceof ApiError) || error.status !== 422 || typeof error.body !== "object" || error.body === null) {
+    return null;
+  }
+  const detail = (error.body as { detail?: unknown }).detail;
+  if (!Array.isArray(detail) || detail.length === 0) return null;
+  const first = detail[0] as { loc?: unknown; msg?: unknown };
+  if (!Array.isArray(first.loc) || typeof first.msg !== "string") return null;
+  const index = first.loc[2];
+  return typeof index === "number" ? { index, message: first.msg } : null;
+}
+
+/** Add Asset: review every receipt line item, then complete per-asset details before one save. */
 export default function AddAssetWizard() {
   const router = useRouter();
   const showToast = useToast();
@@ -54,13 +60,25 @@ export default function AddAssetWizard() {
   const [phase, setPhase] = useState<ReceiptPhase>("choose");
   const [file, setFile] = useState<File | null>(null);
   const [scan, setScan] = useState<OcrDocument | null>(null);
-  const [draft, setDraft] = useState<AssetDraft>(EMPTY_DRAFT);
+  const [drafts, setDrafts] = useState<AssetDraft[]>([EMPTY_DRAFT]);
+  /** Original OCR line-item index for each draft; null means added by the user. */
+  const [ocrLineItemIndexes, setOcrLineItemIndexes] = useState<Array<number | null>>([null]);
+  const [activeAssetIndex, setActiveAssetIndex] = useState(0);
+  const [saveError, setSaveError] = useState<{ index: number; message: string } | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  /** Change some fields of the draft and keep the rest. */
-  function updateDraft(changes: Partial<AssetDraft>) {
-    setDraft((current) => ({ ...current, ...changes }));
+  function updateDraft(index: number, changes: Partial<AssetDraft>) {
+    setSaveError(null);
+    setDrafts((current) => current.map((draft, draftIndex) =>
+      draftIndex === index ? { ...draft, ...changes } : draft,
+    ));
+  }
+
+  function resetDrafts(nextDrafts: AssetDraft[], nextOcrIndexes: Array<number | null>) {
+    setDrafts(nextDrafts);
+    setOcrLineItemIndexes(nextOcrIndexes);
+    setActiveAssetIndex(0);
   }
 
   /** Picking another method starts the receipt over. */
@@ -69,47 +87,99 @@ export default function AddAssetWizard() {
     setPhase("choose");
     setFile(null);
     setScan(null);
-    setDraft(EMPTY_DRAFT);
+    resetDrafts([EMPTY_DRAFT], [null]);
   }
 
-  /** The last step: save, then show a toast on the Dashboard (Figma N02 3488:171). */
-  async function save(final: AssetDraft) {
+  function addAsset() {
+    const source = drafts[drafts.length - 1] ?? EMPTY_DRAFT;
+    setDrafts((current) => [...current, additionalDraftFrom(source)]);
+    setOcrLineItemIndexes((current) => [...current, null]);
+    setSaveError(null);
+  }
+
+  function removeAsset(index: number) {
+    setDrafts((current) => current.filter((_, draftIndex) => draftIndex !== index));
+    setOcrLineItemIndexes((current) => current.filter((_, draftIndex) => draftIndex !== index));
+    setSaveError(null);
+  }
+
+  /** Save all receipt assets through the document confirm endpoint in one request. */
+  async function saveAll(finalDrafts: AssetDraft[] = drafts) {
     setSaving(true);
     try {
-      await saveAsset(final);
-      queueSavedToast(final.name);
-      showToast({ tone: "success", title: "Asset saved successfully", message: `${final.name} was added.` });
+      const created = await saveAssets(finalDrafts);
+      const names = finalDrafts.map((draft) => draft.name.trim()).filter(Boolean);
+      const title = created.ids.length === 1 ? "Asset saved successfully" : "Assets saved successfully";
+      const message = created.ids.length === 1
+        ? `${names[0] ?? "The asset"} was added.`
+        : `${created.ids.length} assets were added.`;
+      queueSavedToast(title, message);
+      showToast({ tone: "success", title, message });
       router.push("/dashboard");
     } catch (error) {
-      // Stay on the page so nothing typed is lost. A failed photo upload says
-      // so, because "Skip for now" is then a way to save without it.
-      const message = error instanceof PhotoUploadError ? error.message : "Please try again.";
-      showToast({ tone: "error", title: "Could not save the asset", message });
+      if (error instanceof PhotoUploadError) {
+        showToast({ tone: "error", title: "Could not save the assets", message: error.message });
+        setSaving(false);
+        return;
+      }
+      const issue = confirmError(error);
+      if (issue) {
+        setSaveError(issue);
+        setActiveAssetIndex(0);
+        setStep(1);
+        setPhase("review");
+        setSaving(false);
+        return;
+      }
+      showToast({ tone: "error", title: "Could not save the assets", message: "Please check the entries and try again." });
       setSaving(false);
     }
   }
 
-  /**
-   * Manual entry, chosen up front or offered after a failed scan. The draft is
-   * not cleared here: it is already empty, unless the user typed something,
-   * pressed Back and came in again, and then their typing is kept.
-   */
+  function confirmSerialStep() {
+    if (activeAssetIndex < drafts.length - 1) {
+      setActiveAssetIndex((current) => current + 1);
+      return;
+    }
+    setActiveAssetIndex(0);
+    setStep(3);
+  }
+
+  function backFromSerialStep() {
+    if (activeAssetIndex > 0) {
+      setActiveAssetIndex((current) => current - 1);
+      return;
+    }
+    setStep(1);
+  }
+
+  function finishBoxPhotoStep(clearCurrent = false) {
+    const nextDrafts = clearCurrent
+      ? drafts.map((draft, index) => index === activeAssetIndex
+        ? { ...draft, location: "", location_photo: null }
+        : draft)
+      : drafts;
+    if (clearCurrent) setDrafts(nextDrafts);
+
+    if (activeAssetIndex < drafts.length - 1) {
+      setActiveAssetIndex((current) => current + 1);
+      return;
+    }
+    void saveAll(nextDrafts);
+  }
+
+  /** Manual entry, chosen up front or offered after a failed scan. */
   function enterManually() {
+    resetDrafts([EMPTY_DRAFT], [null]);
     setPhase("review");
   }
 
-  /** Back from the review form to where the user came from. The draft is kept. */
-  function backFromReview() {
-    if (scan?.status === "extracted") setPhase("scanned");
-    else if (scan) setPhase("failed");
-    else setPhase("choose");
-  }
-
-  /** Runs when a file is picked or dropped: show "Reading…", wait for OCR, then show the result. */
+  /** Read the receipt and create one draft for each detected line item. */
   async function handleFile(picked: File) {
     setFile(picked);
-    // A new file starts over, so nothing from an earlier file is left in the form.
-    setDraft(EMPTY_DRAFT);
+    // Starting another upload discards any earlier OCR drafts.
+    setScan(null);
+    resetDrafts([EMPTY_DRAFT], [null]);
 
     if (!isReceiptFile(picked)) {
       setScan({ id: "", status: "failed", extracted: null, error: NOT_A_RECEIPT_FILE_MESSAGE });
@@ -128,7 +198,9 @@ export default function AddAssetWizard() {
     setScan(result);
 
     if (result.status === "extracted") {
-      setDraft(draftFromScan(result));
+      const itemCount = Math.max(1, result.extracted?.line_items.length ?? 0);
+      const indexes = Array.from({ length: itemCount }, (_, index) => index < (result.extracted?.line_items.length ?? 0) ? index : null);
+      resetDrafts(Array.from({ length: itemCount }, (_, index) => draftFromScan(result, index)), indexes);
       setPhase("scanned");
     } else {
       // OCR failed: offer manual entry automatically (Figma 3569:274).
@@ -139,6 +211,7 @@ export default function AddAssetWizard() {
 
   const uploadStatus: UploadStatus =
     phase === "scanning" ? "scanning" : phase === "scanned" ? "done" : phase === "failed" ? "failed" : "idle";
+  const activeDraft = drafts[activeAssetIndex] ?? drafts[0] ?? EMPTY_DRAFT;
 
   return (
     <div className="flex flex-col gap-3 md:gap-4">
@@ -153,35 +226,62 @@ export default function AddAssetWizard() {
 
       <StepProgress step={step} />
 
+      {step > 1 && drafts.length > 1 && (
+        <p className="text-center text-[13px] font-semibold text-muted" aria-live="polite">
+          Asset {activeAssetIndex + 1} of {drafts.length}
+        </p>
+      )}
+
       {step === 2 && (
         <SerialStep
-          draft={draft}
-          onChange={updateDraft}
-          ocrSerial={scan?.extracted?.line_items[0]?.serial_number ?? null}
-          onBack={() => setStep(1)}
+          key={activeAssetIndex}
+          draft={activeDraft}
+          onChange={(changes) => updateDraft(activeAssetIndex, changes)}
+          ocrSerial={ocrLineItemIndexes[activeAssetIndex] === null
+            ? null
+            : scan?.extracted?.line_items[ocrLineItemIndexes[activeAssetIndex] ?? 0]?.serial_number ?? null}
+          onBack={backFromSerialStep}
           onCancel={() => setDiscardOpen(true)}
-          onConfirm={() => setStep(3)}
+          onConfirm={confirmSerialStep}
         />
       )}
 
       {step === 3 && (
         <BoxPhotoStep
-          draft={draft}
-          onChange={updateDraft}
+          key={activeAssetIndex}
+          draft={activeDraft}
+          onChange={(changes) => updateDraft(activeAssetIndex, changes)}
+          assetNumber={activeAssetIndex + 1}
+          assetCount={drafts.length}
           saving={saving}
-          onBack={() => setStep(2)}
-          onSave={() => save(draft)}
-          onSkip={() => save({ ...draft, location: "", location_photo: null })}
+          onBack={() => {
+            if (activeAssetIndex > 0) setActiveAssetIndex((current) => current - 1);
+            else {
+              setActiveAssetIndex(drafts.length - 1);
+              setStep(2);
+            }
+          }}
+          onSave={() => finishBoxPhotoStep()}
+          onSkip={() => finishBoxPhotoStep(true)}
         />
       )}
 
       {step === 1 && phase === "review" && (
         <ReceiptReview
-          draft={draft}
+          drafts={drafts}
+          ocrLineItemIndexes={ocrLineItemIndexes}
           onChange={updateDraft}
           scan={scan}
-          onBack={backFromReview}
-          onConfirm={() => setStep(2)}
+          error={saveError}
+          canAddAsset={scan?.status === "extracted"}
+          onAddAsset={addAsset}
+          onRemoveAsset={removeAsset}
+          onBack={() => {
+            if (scan?.status === "extracted") setPhase("scanned");
+            else if (scan) setPhase("failed");
+            else setPhase("choose");
+          }}
+          onConfirm={() => { setActiveAssetIndex(0); setStep(2); }}
           onCancel={() => setDiscardOpen(true)}
         />
       )}
@@ -190,7 +290,6 @@ export default function AddAssetWizard() {
         <>
           <MethodCards options={RECEIPT_METHODS} value={method} onSelect={chooseMethod} />
 
-          {/* Shown for Upload and Photo, and kept on screen after a failure so the red card explains why. */}
           {(method !== "manual" || phase === "failed") && (
             <ReceiptUpload
               method={method === "photo" ? "photo" : "upload"}
@@ -214,12 +313,10 @@ export default function AddAssetWizard() {
       <Modal
         open={discardOpen}
         onClose={() => setDiscardOpen(false)}
-        title="Discard this asset?"
+        title="Discard these assets?"
         actions={
           <>
-            <Button variant="secondary" onClick={() => setDiscardOpen(false)}>
-              Keep editing
-            </Button>
+            <Button variant="secondary" onClick={() => setDiscardOpen(false)}>Keep editing</Button>
             <Button onClick={() => router.push("/dashboard")}>Discard</Button>
           </>
         }

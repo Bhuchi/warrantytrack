@@ -53,12 +53,12 @@ export const EMPTY_DRAFT: AssetDraft = {
 };
 
 /**
- * A draft pre-filled from what OCR read. Uses the first line item only:
- * receipts listing several assets are a later improvement.
+ * A draft pre-filled from one line item on the receipt. Receipt-level values
+ * (vendor, date, invoice number) are shared by every item.
  */
-export function draftFromScan(scan: OcrDocument): AssetDraft {
+export function draftFromScan(scan: OcrDocument, itemIndex = 0): AssetDraft {
   const receipt = scan.extracted;
-  const item = receipt?.line_items[0];
+  const item = receipt?.line_items[itemIndex];
 
   return {
     ...EMPTY_DRAFT,
@@ -68,7 +68,9 @@ export function draftFromScan(scan: OcrDocument): AssetDraft {
     category_name: item?.category ?? "",
     vendor_name: receipt?.vendor_name ?? "",
     purchase_date: receipt?.purchase_date ?? "",
-    price: item?.price ?? receipt?.total_amount ?? "",
+    // Do not repeat a receipt total across several assets when OCR missed
+    // their individual prices; leave those values for the user to review.
+    price: item?.price ?? ((receipt?.line_items.length ?? 0) <= 1 ? receipt?.total_amount ?? "" : ""),
     currency: receipt?.currency ?? EMPTY_DRAFT.currency,
     // Receipts rarely name the warranty provider, so start from the vendor
     // (Bhuchi's suggestion on issue #34). Same for the start date: the
@@ -78,6 +80,21 @@ export function draftFromScan(scan: OcrDocument): AssetDraft {
     serial_number: item?.serial_number ?? "",
     // The warranty length printed on the receipt, if OCR found one.
     warranty_duration_months: item?.warranty_months ? String(item.warranty_months) : "",
+  };
+}
+
+/** Start another asset from the same receipt, keeping only receipt-level values. */
+export function additionalDraftFrom(source: AssetDraft): AssetDraft {
+  return {
+    ...source,
+    name: "",
+    price: "",
+    category_name: "",
+    condition: "",
+    warranty_duration_months: "",
+    serial_number: "",
+    location: "",
+    location_photo: null,
   };
 }
 

@@ -7,8 +7,8 @@
 export type DocumentStatus = "pending" | "processing" | "extracted" | "confirmed" | "failed";
 
 /**
- * One item read from the receipt. A receipt can list several; the Add Asset
- * flow uses the first for now (multi-item invoices are a later improvement).
+ * One item read from a receipt or invoice. A single document can produce
+ * several asset drafts in the Add Asset flow.
  */
 export interface ExtractedLineItem {
   name: string;
