@@ -1,6 +1,6 @@
-import { wait } from "./scanReceipt";
+import { ApiError, api } from "@/lib/api";
 
-/** What reading a serial-number sticker gives back. Frontend-only for now: see below. */
+/** What reading a serial-number sticker gives back. */
 export interface SerialScan {
   /** The serial that was read, or null when nothing could be read. */
   serial: string | null;
@@ -9,21 +9,32 @@ export interface SerialScan {
 }
 
 /**
- * Reads the serial number from a photo of the sticker on the device.
- *
- * Mock for now: waits 1.5 seconds, then returns the Figma serial. A photo whose
- * name contains "fail" comes back with no serial, so that case can be tested.
- *
- * TODO: docs/api.md has no endpoint for this yet (it only reads serials off the
- * receipt). Asked Bhuchi to add one; Textract can read a sticker photo the same
- * way as a receipt. Swap this body for the real call when it exists.
+ * Reads the serial number from a photo of the sticker through the authenticated
+ * backend, which sends the image to Bedrock. The photo is not stored.
  */
 export async function scanSerial(photo: File): Promise<SerialScan> {
-  await wait(1500);
-
-  if (photo.name.toLowerCase().includes("fail")) {
-    return { serial: null, error: "We couldn't find a serial number in this photo." };
+  try {
+    return await api.post<SerialScan>("/assets/scan-serial", photo, {
+      headers: { "Content-Type": photo.type || "image/jpeg" },
+    });
+  } catch (error) {
+    if (error instanceof ApiError) {
+      if (error.status === 413) {
+        return { serial: null, error: "Photo must be 10 MB or smaller." };
+      }
+      if (error.status === 415 || error.status === 422) {
+        return { serial: null, error: error.message };
+      }
+      if (error.status === 503) {
+        return {
+          serial: null,
+          error: "Serial scanning is unavailable right now. Please enter it manually.",
+        };
+      }
+    }
+    return {
+      serial: null,
+      error: "We couldn't scan this photo. Please try again or enter the serial manually.",
+    };
   }
-
-  return { serial: "C02X1234ABC", error: null };
 }

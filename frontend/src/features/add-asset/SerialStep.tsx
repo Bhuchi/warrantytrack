@@ -76,7 +76,7 @@ export default function SerialStep({ draft, onChange, ocrSerial, onBack, onCance
       <input
         ref={photoInput}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp"
         capture="environment"
         className="sr-only"
         aria-label="Photo of the serial number sticker"
