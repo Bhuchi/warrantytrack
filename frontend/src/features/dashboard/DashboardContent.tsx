@@ -24,9 +24,9 @@ export default function DashboardContent() {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    const name = takeSavedToast();
-    if (name !== null) {
-      showToast({ tone: "success", title: "Asset saved successfully", message: `${name} was added.` });
+    const saved = takeSavedToast();
+    if (saved !== null) {
+      showToast({ tone: "success", ...saved });
     }
   }, [showToast]);
 
