@@ -47,8 +47,12 @@ const FRIENDLY_MESSAGES: Record<string, string> = {
   LimitExceededException: "Too many attempts. Wait a minute and try again.",
 };
 
-/** Sends one action to Cognito and returns its JSON reply, or throws CognitoError. */
-async function callCognito<T>(action: string, body: object): Promise<T> {
+/**
+ * Sends one action to Cognito and returns its JSON reply, or throws CognitoError.
+ * Most actions need our ClientId; DeleteUser is identified by its access token
+ * alone, so it passes `withClientId: false`.
+ */
+async function callCognito<T>(action: string, body: object, withClientId = true): Promise<T> {
   if (!COGNITO_CLIENT_ID) {
     throw new CognitoError(
       "NotConfigured",
@@ -64,7 +68,7 @@ async function callCognito<T>(action: string, body: object): Promise<T> {
         "Content-Type": "application/x-amz-json-1.1",
         "X-Amz-Target": `AWSCognitoIdentityProviderService.${action}`,
       },
-      body: JSON.stringify({ ClientId: COGNITO_CLIENT_ID, ...body }),
+      body: JSON.stringify(withClientId ? { ClientId: COGNITO_CLIENT_ID, ...body } : body),
     });
   } catch {
     throw new CognitoError("NetworkError", "Can't reach the sign-in service. Check your connection.");
@@ -81,8 +85,27 @@ async function callCognito<T>(action: string, body: object): Promise<T> {
 
 /** The part of InitiateAuth's reply we use. */
 interface InitiateAuthReply {
-  AuthenticationResult?: { IdToken: string; RefreshToken?: string; ExpiresIn: number };
+  AuthenticationResult?: { IdToken: string; AccessToken?: string; RefreshToken?: string; ExpiresIn: number };
   ChallengeName?: string;
+}
+
+/**
+ * Checks the password once more and returns a Cognito *access* token.
+ * Only deleting the account uses it: everything else runs on the ID token.
+ */
+export async function confirmPassword(email: string, password: string): Promise<string> {
+  const reply = await callCognito<InitiateAuthReply>("InitiateAuth", {
+    AuthFlow: "USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: email, PASSWORD: password },
+  });
+  const accessToken = reply.AuthenticationResult?.AccessToken;
+  if (!accessToken) throw new CognitoError("UnknownError", "Something went wrong. Please try again.");
+  return accessToken;
+}
+
+/** Deletes the signed-in person's Cognito account. Cannot be undone. */
+export async function deleteCognitoUser(accessToken: string): Promise<void> {
+  await callCognito("DeleteUser", { AccessToken: accessToken }, false);
 }
 
 /** Signs in with email and password. */

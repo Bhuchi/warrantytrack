@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -280,4 +280,70 @@ def leave_workspace(
         raise HTTPException(status_code=409, detail="The owner can't leave the organization.")
     _unassign(db, workspace_id, user_id)
     db.delete(membership)
+    db.commit()
+
+
+@router.delete("/workspaces/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_organization(
+    workspace_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """The owner deletes an organization and everything in it. Cannot be undone.
+
+    Every table that points at a workspace is ON DELETE CASCADE, so removing
+    this one row also removes its members, invites, assets, warranties,
+    documents, catalog and notifications. Receipt files in S3 stay, as they do
+    when a single asset is deleted.
+    """
+    membership = _caller_in(db, workspace_id, user_id)
+    if membership.role is not MembershipRole.owner:
+        raise HTTPException(status_code=403, detail="Only the owner can delete the organization.")
+    workspace = db.get(Workspace, workspace_id)
+    if workspace.type is WorkspaceType.personal:
+        raise HTTPException(status_code=422, detail="You can't delete your personal workspace.")
+    db.delete(workspace)
+    db.commit()
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(
+    user_id: uuid.UUID = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Delete the caller's data so the same email can sign up again later.
+
+    The frontend deletes the Cognito account itself afterwards (Cognito
+    DeleteUser with the user's own access token), so no IAM change is needed.
+
+    Refused while the caller owns an organization: deleting the account must
+    never take other people's assets with it. They delete the organization first.
+    """
+    owned = db.scalars(
+        select(Workspace).join(Membership).where(
+            Membership.user_id == user_id,
+            Membership.role == MembershipRole.owner,
+            Workspace.type == WorkspaceType.organization,
+        )
+    ).all()
+    if owned:
+        names = ", ".join(sorted(workspace.name for workspace in owned))
+        raise HTTPException(status_code=409, detail=f"Delete these organizations first: {names}")
+
+    user = db.get(User, user_id)
+    # Your personal workspace and everything in it (assets, receipts, notifications).
+    db.execute(delete(Workspace).where(
+        Workspace.type == WorkspaceType.personal,
+        Workspace.id.in_(select(Membership.workspace_id).where(Membership.user_id == user_id)),
+    ))
+    # Invites you sent: invited_by has no ON DELETE rule, so they would block
+    # deleting the user. Invites waiting for your email go too.
+    db.execute(delete(WorkspaceInvite).where(
+        (WorkspaceInvite.invited_by == user_id) | (WorkspaceInvite.email == func.lower(user.email))
+    ))
+    # The rest follows the schema: memberships, notifications and notification
+    # settings are ON DELETE CASCADE; assets assigned to or created by you in
+    # other organizations, and documents you uploaded, are SET NULL.
+    # One SQL DELETE, so Postgres does all of that instead of the ORM.
+    db.execute(delete(User).where(User.id == user_id))
     db.commit()
