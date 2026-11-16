@@ -190,7 +190,8 @@ inline:
 
 > **Built:** the full CRUD set — `GET /assets`, `GET /assets/{id}`,
 > `POST /assets`, `PATCH /assets/{id}`, `DELETE /assets/{id}` — plus
-> `POST /assets/{id}/assign` and `POST /assets/import` (CSV and .xlsx).
+> `POST /assets/{id}/assign`, `POST /assets/import` (CSV and .xlsx), and
+> `POST /assets/scan-serial` for Bedrock serial-label scanning.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -202,6 +203,15 @@ inline:
 | `POST` | `/assets/{id}/assign` | Assign / unassign to an employee (admin only) |
 | `POST` | `/assets/import` | Bulk CSV/Excel import |
 | `POST` | `/assets/photos/presign` | Upload URL + key for a box / storage photo |
+| `POST` | `/assets/scan-serial` | Read an explicitly labeled device serial from a photo with Bedrock |
+
+`POST /assets/scan-serial` requires an authenticated workspace member. Send the
+raw photo bytes with `Content-Type: image/jpeg`, `image/png`, or `image/webp`;
+the maximum size is 10 MB. The backend resizes the photo and sends it directly
+to Bedrock for this request. It does not save the photo. The response is
+`{"serial":"...","error":null}` when a serial is read, or has `serial: null`
+and an `error` message when no clearly labeled serial is found. The user can
+then enter it manually.
 
 ```jsonc
 // GET /assets  → paginated (lightweight rows for the list screen D05)

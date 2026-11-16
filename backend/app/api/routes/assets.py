@@ -46,9 +46,10 @@ from app.schemas.asset_import import (
     ImportMode,
     ImportValidateResponse,
 )
+from app.schemas.serial_scan import SerialScanResponse
 from app.services import asset as asset_service
 from app.services import asset_import
-from app.services import asset_photo, storage
+from app.services import asset_photo, ocr, storage
 from app.services import asset_validation
 from app.services.asset import DuplicateSerialNumber, UnknownDocument
 from app.services.asset_validation import AssetValidationError
@@ -58,6 +59,74 @@ from app.services.warranty import WarrantyStatus
 # No prefix here — main.py mounts this router at "/assets", so the collection
 # root is "".
 router = APIRouter(tags=["assets"])
+
+_MAX_SERIAL_SCAN_BYTES = 10 * 1024 * 1024
+_SERIAL_SCAN_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+@router.post("/scan-serial", response_model=SerialScanResponse)
+async def scan_serial_number(
+    request: Request,
+    _membership: Membership = Depends(get_current_membership),
+) -> SerialScanResponse:
+    """POST /assets/scan-serial — read a device's serial label with Bedrock.
+
+    The photo is sent as the raw request body to avoid a multipart dependency.
+    It is used for this request only and is not stored. Auth and workspace
+    membership are required because each inference call can incur AWS cost.
+    """
+    content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if content_type not in _SERIAL_SCAN_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=http_status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Use a JPEG, PNG, or WebP photo of the serial label.",
+        )
+
+    content_length = request.headers.get("content-length")
+    if content_length and content_length.isdigit() and int(content_length) > _MAX_SERIAL_SCAN_BYTES:
+        raise HTTPException(
+            status_code=http_status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Photo must be 10 MB or smaller.",
+        )
+
+    photo = bytearray()
+    async for chunk in request.stream():
+        photo.extend(chunk)
+        if len(photo) > _MAX_SERIAL_SCAN_BYTES:
+            raise HTTPException(
+                status_code=http_status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Photo must be 10 MB or smaller.",
+            )
+    if not photo:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Choose a photo of the serial label.",
+        )
+
+    try:
+        serial = await run_in_threadpool(ocr.extract_serial_number, bytes(photo))
+    except ocr.InvalidImage as error:
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="We could not read that image. Try a clear JPEG, PNG, or WebP photo.",
+        ) from error
+    except ocr.BedrockUnavailable as error:
+        raise HTTPException(
+            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+    except ocr.OcrError as error:
+        raise HTTPException(
+            status_code=http_status.HTTP_502_BAD_GATEWAY,
+            detail="Bedrock could not read the serial label. Please enter it manually.",
+        ) from error
+
+    if serial is None:
+        return SerialScanResponse(
+            serial=None,
+            error="No clearly labeled serial number found. Try a closer photo or enter it manually.",
+        )
+    return SerialScanResponse(serial=serial)
 
 
 @router.get("", response_model=AssetList)
