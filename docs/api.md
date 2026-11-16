@@ -203,15 +203,17 @@ inline:
 | `POST` | `/assets/{id}/assign` | Assign / unassign to an employee (admin only) |
 | `POST` | `/assets/import` | Bulk CSV/Excel import |
 | `POST` | `/assets/photos/presign` | Upload URL + key for a box / storage photo |
-| `POST` | `/assets/scan-serial` | Read an explicitly labeled device serial from a photo with Bedrock |
+| `POST` | `/assets/scan-serial` | Read a device serial or clearly identified barcode label code with Bedrock |
 
 `POST /assets/scan-serial` requires an authenticated workspace member. Send the
 raw photo bytes with `Content-Type: image/jpeg`, `image/png`, or `image/webp`;
 the maximum size is 10 MB. The backend resizes the photo and sends it directly
-to Bedrock for this request. It does not save the photo. The response is
-`{"serial":"...","error":null}` when a serial is read, or has `serial: null`
-and an `error` message when no clearly labeled serial is found. The user can
-then enter it manually.
+to Bedrock for this request. It does not save the photo. It supports labeled
+serials and clear human-readable codes printed by barcodes, including Dell
+PPID codes such as `CN-XXXXXX-XXXXX-XXX-XXXX`; it does not decode barcode bars
+by themselves. The response is `{"serial":"...","error":null}` when a serial
+is read, or has `serial: null` and an `error` message when it cannot identify
+one. The user can then enter it manually.
 
 ```jsonc
 // GET /assets  → paginated (lightweight rows for the list screen D05)
