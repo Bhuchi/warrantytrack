@@ -4,6 +4,25 @@ Cloud-based warranty management for individuals and organizations. Register
 products/assets, upload receipts (read by Claude Haiku 5.5 on Amazon Bedrock), track
 warranty status, and get expiration notifications.
 
+**What it does**
+
+- **Add assets three ways:** by hand, in bulk from a CSV/Excel file, or by
+  uploading a receipt or invoice (PDF, JPG or PNG). Bedrock reads the vendor,
+  date, invoice number and each line item with its serial number and warranty
+  length. A file that is not an invoice or receipt is refused with a message.
+- **Fills in a missing warranty length** by looking the product up on the web
+  (optional, off by default; see [Local and AWS backends](#local-and-aws-backends)).
+- **Tracks warranty status** (active, expiring soon, expired) and shows it on
+  the dashboard and in the asset list.
+- **Reminds you before a warranty ends:** a daily scan creates in-app
+  notifications and sends emails through Amazon SES. Each person picks their
+  channels and how many days ahead to be reminded.
+- **Works for a team:** organizations with owner, admin and employee roles,
+  invites, assigning assets to people, removing members, leaving or deleting an
+  organization.
+- **Keeps the paperwork:** the receipt and a photo of the box are stored in a
+  private S3 bucket and opened through short-lived links.
+
 **Course:** DES424 Cloud-based Application Development · Semester 1, 2026 · Group 5
 
 ---
@@ -25,13 +44,16 @@ Then find your slice in the [team table](#team-who-owns-what) and start on your 
 |---|---|
 | Frontend | Next.js (React) + TypeScript + Tailwind |
 | Backend | FastAPI (Python) |
-| Database | PostgreSQL + SQLAlchemy + Alembic |
+| Database | PostgreSQL (Amazon RDS on AWS) + SQLAlchemy + Alembic |
 | Auth | Amazon Cognito |
 | Storage / OCR | Amazon S3 + Amazon Bedrock (Claude Haiku 5.5) |
+| Warranty lookup (optional) | Tavily web search, read by Bedrock |
 | Notifications | Amazon SES |
+| Scheduled scan | Amazon EventBridge Scheduler starting an ECS task |
 | Hosting | Amazon ECS Fargate + ALB |
+| Infrastructure as code | Terraform (`infra/aws`) |
 | Containers | Docker |
-| CI | GitHub Actions |
+| CI/CD | GitHub Actions (checks every PR, deploys `main` to AWS) |
 
 ## Repository Structure
 
@@ -42,8 +64,11 @@ what lives there and how to work in it.
 warrantytrack/
 ├── frontend/     → Next.js web app (UI). See frontend/README.md
 ├── backend/      → FastAPI API + business logic. See backend/README.md
-├── infra/        → Docker, AWS deployment configs. See infra/README.md
+├── infra/        → Dockerfiles and the Terraform for AWS. See infra/README.md
+│                   and infra/aws/DEPLOYMENT.md (the deployment runbook)
 ├── docs/         → Architecture, ERD, API contract. See docs/README.md
+├── tests/        → Robot (browser) and Postman (API) tests. See tests/robot/README.md
+│                   and tests/postman/README.md
 ├── scripts/      → Helper scripts for local dev. See scripts/README.md
 └── .github/      → CI workflows + PR/issue templates
 ```
@@ -89,20 +114,78 @@ docker compose down       # stop
 docker compose down -v    # stop and wipe the database
 ```
 
-### Adding AWS credentials later
+### Local and AWS backends
 
-Only needed once we have an AWS account, for S3/Bedrock/Cognito/SES work:
+Locally, everything that costs money or needs an account is replaced by a
+stand-in, so the whole flow works with no AWS account and no spend:
+
+| Setting | Local default | On AWS | What the local one does |
+|---|---|---|---|
+| `STORAGE_BACKEND` | `local` | `s3` | Keeps uploads on the API container's disk |
+| `OCR_BACKEND` | `fake` | `bedrock` | Returns canned receipt fields |
+| `EMAIL_BACKEND` | `log` | `ses` | Writes the email to the log instead of sending it |
+| `AUTH_BACKEND` | `dev` (set by `docker-compose.yml`) | `cognito` | Treats every request as one seeded dev user |
+| `WARRANTY_SEARCH_PROVIDER` | `none` | `tavily` (optional) | No web lookup of a missing warranty length |
+
+The app **refuses to start in production** on a development backend, so a
+misconfigured deploy fails loudly instead of quietly using fake data. All
+settings are described in [backend/.env.example](backend/.env.example).
+
+### Trying the real AWS services locally
+
+Only needed if you want to run real Bedrock, S3, Cognito or SES from your
+machine; the deployed app already uses them. You need AWS credentials for that.
 
 ```bash
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
 ```
 
-Compose picks these up automatically if present. **Never commit them.**
+Compose picks these up automatically if present. **Never commit them**, and
+never paste a key into a chat, a PR or an issue; the `.env` files are
+git-ignored for that reason. The optional web lookup also needs a Tavily key
+(`TAVILY_API_KEY`) and Bedrock, and costs one search per item.
 
 ### Running a service without Docker
 
 See [frontend/README.md](frontend/README.md) and [backend/README.md](backend/README.md).
+
+---
+
+## Deployment (AWS)
+
+The app runs on **Amazon ECS Fargate** behind an Application Load Balancer in
+`ap-southeast-1`, with RDS PostgreSQL, a private S3 bucket, Cognito and SES.
+
+**Merging `dev` into `main` deploys to production automatically.** On every
+push to `main`, the `Deploy to AWS after CI` job in
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) waits for the checks to
+pass, then:
+
+1. builds the API and web images and pushes them to ECR, tagged with the commit;
+2. runs the database migrations as a one-off ECS task;
+3. updates the ECS service to the new images.
+
+Pull requests and pushes to `dev` only run the checks; they never deploy. So
+open the "Dev to main" PR only when the team agrees `dev` is ready, and expect
+the deploy to start the moment it is merged.
+
+**Daily warranty scan.** An EventBridge Scheduler rule starts a one-off ECS
+task every day at 08:00 Bangkok time (the default in
+[`infra/aws/scheduler.tf`](infra/aws/scheduler.tf)) that runs
+`python -m scripts.scan_warranties`. It creates the notifications and sends the
+emails. It is a separate task, not a thread in the API, so it does not run
+twice when the API has more than one task. You can run it locally with
+`docker compose exec backend python -m scripts.scan_warranties`.
+
+**Infrastructure** is Terraform in [`infra/aws/`](infra/aws/). The first-time
+setup, redeploying, reading logs and troubleshooting are in
+[infra/aws/DEPLOYMENT.md](infra/aws/DEPLOYMENT.md). The Terraform state is not
+shared yet: it lives on the machine of whoever ran `terraform apply`, so
+infrastructure changes have to go through that person.
+
+**Testing the deployed app:** `./scripts/run-aws-tests.sh` runs the Robot and
+Postman suites against it (see [scripts/README.md](scripts/README.md)).
 
 ---
 
@@ -145,7 +228,8 @@ All work goes through `dev` before it reaches `main`. See
 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the full workflow. Short version:
 
 1. **Never commit directly to `dev` or `main`.** `main` only receives merges
-   from `dev`, when the team agrees `dev` is ready.
+   from `dev`, when the team agrees `dev` is ready. A merge into `main`
+   [deploys to AWS](#deployment-aws).
 2. Branch off `dev` for every piece of work:
    - `feat/<short-name>` — new feature (e.g. `feat/asset-list-page`)
    - `fix/<short-name>` — bug fix
@@ -187,6 +271,7 @@ Every PR runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
 |---|---|
 | Frontend | `npm run lint`, `npm run typecheck`, `npm run build` |
 | Backend | `alembic upgrade head`, `alembic check`, `pytest` |
+| Deploy to AWS | Only on a push to `main`, and only after the two jobs above pass: build, migrate, update ECS |
 
 `alembic check` fails if someone changed a model without writing a migration.
 If it goes red, run `alembic revision --autogenerate -m "..."` and commit the
